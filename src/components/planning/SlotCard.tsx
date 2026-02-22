@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus, AlertCircle, CheckCircle2, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { SlotWithProposals } from '@/types/database'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -88,8 +88,26 @@ export function SlotCard({ slot, currentName: _currentName, onClick }: SlotCardP
           {lockedProposal.note && (
             <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{lockedProposal.note}</p>
           )}
-          <div className="flex items-center gap-1 mt-1.5">
+          <div className="flex items-center justify-between gap-2 mt-1.5">
             <ProposerAvatar name={lockedProposal.proposer_name} size="xs" showName />
+            {lockedProposal.booking_status === 'booked' && (
+              <span className="flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 shrink-0">
+                <CheckCircle2 className="w-3 h-3" />
+                {lockedProposal.exact_time ?? 'Confirmed'}
+              </span>
+            )}
+            {lockedProposal.booking_status === 'needs_booking' && (
+              <span className="flex items-center gap-0.5 text-[10px] font-medium text-amber-600 shrink-0">
+                <AlertCircle className="w-3 h-3" />
+                Book
+              </span>
+            )}
+            {!lockedProposal.booking_status && lockedProposal.exact_time && (
+              <span className="flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
+                <Clock className="w-3 h-3" />
+                {lockedProposal.exact_time}
+              </span>
+            )}
           </div>
         </div>
       )}

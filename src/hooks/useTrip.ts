@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
-import { trackTripVisit } from '@/lib/visitedTrips'
 
 export function useTrip(slug: string | undefined) {
   const [trip, setTrip] = useState<Trip | null>(null)
@@ -31,7 +30,6 @@ export function useTrip(slug: string | undefined) {
         const tripDoc = tripSnap.docs[0]
         const tripData = { id: tripDoc.id, ...tripDoc.data() } as Trip
         setTrip(tripData)
-        trackTripVisit(tripData)
 
         // Mutable maps shared by all snapshot callbacks in this effect invocation
         const liveSlots = new Map<string, Slot>()

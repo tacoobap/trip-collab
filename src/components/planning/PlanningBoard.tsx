@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react'
-import type { DayWithSlots, SlotWithProposals } from '@/types/database'
+import type { Trip, DayWithSlots, SlotWithProposals } from '@/types/database'
 import { DayColumn } from './DayColumn'
 import { ProposalDrawer } from './ProposalDrawer'
 import { AddDayDialog } from './AddDayDialog'
-import { Plus, CalendarDays } from 'lucide-react'
+import { TripSetupPanel } from './TripSetupPanel'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface PlanningBoardProps {
-  tripId: string
+  trip: Trip
   days: DayWithSlots[]
   currentName: string
 }
 
-export function PlanningBoard({ tripId, days, currentName }: PlanningBoardProps) {
+export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
   const [activeSlot, setActiveSlot] = useState<SlotWithProposals | null>(null)
   const [activeDayLabel, setActiveDayLabel] = useState('')
   const [addDayOpen, setAddDayOpen] = useState(false)
@@ -35,29 +36,7 @@ export function PlanningBoard({ tripId, days, currentName }: PlanningBoardProps)
   }
 
   if (days.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-muted mb-4">
-          <CalendarDays className="w-7 h-7 text-muted-foreground" />
-        </div>
-        <h2 className="text-lg font-serif font-semibold text-foreground mb-2">
-          No days set up yet
-        </h2>
-        <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-          Add your first day to start building the trip structure.
-        </p>
-        <Button onClick={() => setAddDayOpen(true)}>
-          <Plus className="w-4 h-4 mr-1.5" />
-          Add first day
-        </Button>
-        <AddDayDialog
-          open={addDayOpen}
-          onOpenChange={setAddDayOpen}
-          tripId={tripId}
-          nextDayNumber={1}
-        />
-      </div>
-    )
+    return <TripSetupPanel trip={trip} />
   }
 
   return (
@@ -68,6 +47,7 @@ export function PlanningBoard({ tripId, days, currentName }: PlanningBoardProps)
             <DayColumn
               key={day.id}
               day={day}
+              tripId={trip.id}
               currentName={currentName}
               onSlotClick={handleSlotClick}
             />
@@ -98,8 +78,8 @@ export function PlanningBoard({ tripId, days, currentName }: PlanningBoardProps)
       <AddDayDialog
         open={addDayOpen}
         onOpenChange={setAddDayOpen}
-        tripId={tripId}
-        nextDayNumber={days.length + 1}
+        trip={trip}
+        existingDays={days}
       />
     </>
   )

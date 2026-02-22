@@ -1,4 +1,4 @@
-import { MapPin, Calendar, Sparkles, ChevronDown } from 'lucide-react'
+import { MapPin, Calendar, Sparkles, ChevronDown, NotebookPen, BedDouble } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import type { Trip } from '@/types/database'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
@@ -9,6 +9,10 @@ interface PageHeaderProps {
   travelers?: string[]
   currentName?: string | null
   onChangeName?: () => void
+  noteCount?: number
+  onOpenNotes?: () => void
+  stayCount?: number
+  onOpenStays?: () => void
 }
 
 export function PageHeader({
@@ -16,6 +20,10 @@ export function PageHeader({
   travelers = [],
   currentName,
   onChangeName,
+  noteCount = 0,
+  onOpenNotes,
+  stayCount = 0,
+  onOpenStays,
 }: PageHeaderProps) {
   const location = useLocation()
   const isItinerary = location.pathname.endsWith('/itinerary')
@@ -103,7 +111,7 @@ export function PageHeader({
       </div>
 
       {/* Tab row */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 pb-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center pb-0">
         <Link
           to={`/trip/${trip.slug}`}
           className={cn(
@@ -126,6 +134,39 @@ export function PageHeader({
         >
           Itinerary
         </Link>
+
+        {(onOpenStays || onOpenNotes) && (
+          <div className="ml-auto flex items-center">
+            {onOpenStays && (
+              <button
+                onClick={onOpenStays}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent transition-colors"
+              >
+                <BedDouble className="w-3.5 h-3.5" />
+                <span>Stays</span>
+                {stayCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+                    {stayCount}
+                  </span>
+                )}
+              </button>
+            )}
+            {onOpenNotes && (
+              <button
+                onClick={onOpenNotes}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent transition-colors"
+              >
+                <NotebookPen className="w-3.5 h-3.5" />
+                <span>Notes</span>
+                {noteCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+                    {noteCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )

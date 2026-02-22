@@ -1,15 +1,24 @@
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
+import { TripNotesDrawer } from '@/components/planning/TripNotesDrawer'
+import { StaysDrawer } from '@/components/stays/StaysDrawer'
 import { NamePrompt } from './NamePrompt'
 import { useProposerName } from '@/hooks/useProposerName'
 import { useTrip } from '@/hooks/useTrip'
+import { useTripNotes } from '@/hooks/useTripNotes'
+import { useStays } from '@/hooks/useStays'
 import { Loader2 } from 'lucide-react'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
   const { name, setName, clearName } = useProposerName()
   const { trip, days, travelers, loading, error } = useTrip(slug)
+  const { notes, addNote, deleteNote } = useTripNotes(trip?.id)
+  const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [staysOpen, setStaysOpen] = useState(false)
 
   if (loading) {
     return (
@@ -34,7 +43,6 @@ export function TripPage() {
     )
   }
 
-  // Show name prompt after trip loads so we can pass existing travelers
   if (!name) {
     return <NamePrompt onSetName={setName} travelers={travelers} />
   }
@@ -46,14 +54,34 @@ export function TripPage() {
         travelers={travelers}
         currentName={name}
         onChangeName={clearName}
+        stayCount={stays.length}
+        onOpenStays={() => setStaysOpen(true)}
+        noteCount={notes.length}
+        onOpenNotes={() => setNotesOpen(true)}
       />
       <main className="pt-6">
-        <PlanningBoard
-          tripId={trip.id}
-          days={days}
-          currentName={name}
-        />
+        <PlanningBoard trip={trip} days={days} currentName={name} />
       </main>
+
+      <StaysDrawer
+        open={staysOpen}
+        onClose={() => setStaysOpen(false)}
+        trip={trip}
+        stays={stays}
+        currentName={name}
+        onAdd={addStay}
+        onUpdate={updateStay}
+        onDelete={deleteStay}
+      />
+
+      <TripNotesDrawer
+        open={notesOpen}
+        onClose={() => setNotesOpen(false)}
+        notes={notes}
+        currentName={name}
+        onAdd={(text) => addNote(text, name)}
+        onDelete={deleteNote}
+      />
     </div>
   )
 }

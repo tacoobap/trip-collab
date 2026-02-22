@@ -33,6 +33,7 @@ export type Trip = {
   start_date: string | null
   end_date: string | null
   created_at: string
+  image_url: string | null
 }
 
 export type Day = {
@@ -42,6 +43,7 @@ export type Day = {
   label: string
   city: string
   day_number: number
+  image_url: string | null
 }
 
 export type Slot = {
@@ -54,6 +56,8 @@ export type Slot = {
   sort_order: number
 }
 
+export type BookingStatus = 'needs_booking' | 'booked'
+
 export type Proposal = {
   id: string
   slot_id: string
@@ -62,6 +66,34 @@ export type Proposal = {
   note: string | null
   url: string | null
   votes: string[]
+  created_at: string
+  // Booking / execution layer — only relevant on locked proposals
+  booking_status: BookingStatus | null
+  exact_time: string | null          // e.g. "7:30 PM" — used for itinerary ordering
+  confirmation_number: string | null
+  confirmation_url: string | null    // booking ref link (different from the venue url)
+  assigned_to: string | null         // who is responsible for making the reservation
+}
+
+export type Stay = {
+  id: string
+  trip_id: string
+  name: string
+  city: string
+  check_in: string
+  check_out: string
+  url: string | null
+  notes: string | null
+  status: 'considering' | 'booked'
+  proposed_by: string
+  created_at: string
+}
+
+export type TripNote = {
+  id: string
+  trip_id: string
+  text: string
+  author_name: string
   created_at: string
 }
 

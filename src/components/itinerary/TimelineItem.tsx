@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, AlertCircle, CheckCircle2, Hash } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { SlotWithProposals } from '@/types/database'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
@@ -41,6 +41,9 @@ export function TimelineItem({ slot, index }: TimelineItemProps) {
     )
   }
 
+  const { booking_status, exact_time, confirmation_number, confirmation_url } = lockedProposal
+  const displayTime = exact_time ?? slot.time_label
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -16 }}
@@ -56,13 +59,32 @@ export function TimelineItem({ slot, index }: TimelineItemProps) {
       </div>
 
       <div className="pb-6 min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground font-medium">{slot.time_label}</p>
+        {/* Time row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`text-xs font-semibold ${exact_time ? 'text-foreground' : 'text-muted-foreground'}`}>
+            {displayTime}
+          </p>
+          {booking_status === 'booked' && (
+            <span className="flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+              <CheckCircle2 className="w-2.5 h-2.5" />
+              Confirmed
+            </span>
+          )}
+          {booking_status === 'needs_booking' && (
+            <span className="flex items-center gap-0.5 text-[10px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+              <AlertCircle className="w-2.5 h-2.5" />
+              Needs booking
+            </span>
+          )}
+        </div>
+
         <h4 className="font-serif font-semibold text-foreground mt-0.5 text-lg leading-tight">
           {lockedProposal.title}
         </h4>
         {lockedProposal.note && (
           <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{lockedProposal.note}</p>
         )}
+
         <div className="flex items-center gap-3 mt-2 flex-wrap">
           <ProposerAvatar
             name={lockedProposal.proposer_name}
@@ -80,6 +102,23 @@ export function TimelineItem({ slot, index }: TimelineItemProps) {
               <ExternalLink className="w-3 h-3" />
               Details
             </a>
+          )}
+          {confirmation_url && (
+            <a
+              href={confirmation_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-emerald-600 hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Booking
+            </a>
+          )}
+          {confirmation_number && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+              <Hash className="w-3 h-3" />
+              {confirmation_number}
+            </span>
           )}
         </div>
       </div>

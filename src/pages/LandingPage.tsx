@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle } from 'lucide-react'
-import { firebaseReady } from '@/lib/firebase'
-import { getVisitedTrips, relativeTime, type TripRecord } from '@/lib/visitedTrips'
+import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react'
+import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { db, firebaseReady } from '@/lib/firebase'
 import { NewTripDialog } from '@/components/trips/NewTripDialog'
 import { Button } from '@/components/ui/button'
+import type { Trip } from '@/types/database'
 
-function TripCard({ trip }: { trip: TripRecord }) {
+function TripCard({ trip }: { trip: Trip }) {
   const formatDate = (d: string | null) =>
     d
       ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -22,7 +23,7 @@ function TripCard({ trip }: { trip: TripRecord }) {
       <motion.div
         whileHover={{ y: -2 }}
         transition={{ duration: 0.15 }}
-        className="group bg-card border border-border rounded-2xl p-5 cursor-pointer hover:border-primary/30 hover:shadow-md transition-all"
+        className="group bg-card border border-border rounded-2xl p-5 cursor-pointer hover:border-primary/30 hover:shadow-md transition-all h-full"
       >
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-serif font-semibold text-foreground text-base leading-snug group-hover:text-primary transition-colors">
@@ -45,10 +46,6 @@ function TripCard({ trip }: { trip: TripRecord }) {
             </div>
           )}
         </div>
-
-        <p className="text-xs text-muted-foreground/60 mt-4">
-          {relativeTime(trip.lastVisited)}
-        </p>
       </motion.div>
     </Link>
   )
@@ -56,7 +53,17 @@ function TripCard({ trip }: { trip: TripRecord }) {
 
 export function LandingPage() {
   const [newTripOpen, setNewTripOpen] = useState(false)
-  const trips = getVisitedTrips()
+  const [trips, setTrips] = useState<Trip[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getDocs(query(collection(db, 'trips'), orderBy('created_at', 'desc')))
+      .then((snap) => {
+        setTrips(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip)))
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -84,7 +91,11 @@ export function LandingPage() {
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10">
-        {trips.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : trips.length === 0 ? (
           /* ── Empty state ── */
           <motion.div
             initial={{ opacity: 0, y: 24 }}
@@ -99,23 +110,18 @@ export function LandingPage() {
             </h1>
             <p className="text-muted-foreground leading-relaxed max-w-sm mb-8">
               Propose ideas, vote on favorites, lock in the plan —
-              no spreadsheets, no accounts required.
+              no spreadsheets required.
             </p>
             <Button size="lg" onClick={() => setNewTripOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Plan your first trip
             </Button>
-            <p className="text-xs text-muted-foreground mt-5">
-              Already have a trip link? Open it to see it here.
-            </p>
           </motion.div>
         ) : (
-          /* ── Trip dashboard ── */
+          /* ── Trip grid ── */
           <>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-serif font-semibold text-foreground">
-                Your trips
-              </h2>
+              <h2 className="text-xl font-serif font-semibold text-foreground">Trips</h2>
             </div>
 
             <motion.div
@@ -142,7 +148,7 @@ export function LandingPage() {
               >
                 <button
                   onClick={() => setNewTripOpen(true)}
-                  className="w-full h-full min-h-[120px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer"
+                  className="w-full h-full min-h-[110px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer"
                 >
                   <Plus className="w-5 h-5" />
                   <span className="text-sm font-medium">Plan a new trip</span>
