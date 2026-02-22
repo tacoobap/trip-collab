@@ -237,7 +237,7 @@ export function ItineraryPage() {
         <div className="absolute inset-0 flex items-center justify-center px-6 sm:px-12">
           <div className="text-center max-w-2xl">
             <motion.h1
-              className="font-serif text-4xl sm:text-5xl md:text-6xl font-medium text-white leading-tight tracking-tight mb-4"
+              className="font-serif text-4xl sm:text-5xl md:text-6xl font-normal text-white leading-tight tracking-tight mb-4"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
@@ -251,7 +251,7 @@ export function ItineraryPage() {
                 : withoutTripName
               return (
                 <motion.p
-                  className="font-serif text-sm sm:text-base md:text-lg text-white/80 italic font-normal tracking-wide mb-3"
+                  className="font-serif text-xs sm:text-sm md:text-base text-white/65 italic font-normal tracking-wide mb-3"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35, duration: 0.45 }}
@@ -260,6 +260,14 @@ export function ItineraryPage() {
                 </motion.p>
               )
             })()}
+            {(trip.destinations.length > 0 || dateRange) && (
+              <motion.div
+                className="w-12 h-px bg-primary/80 mx-auto my-3"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.4 }}
+              />
+            )}
             {trip.destinations.length > 0 && (
               <motion.p
                 className="text-white/80 text-base sm:text-lg font-sans font-light tracking-wide mb-1"
@@ -281,48 +289,6 @@ export function ItineraryPage() {
               </motion.p>
             )}
           </div>
-        </div>
-
-        {/* Actions — top right, below header (visible but subtle) */}
-        <div className="absolute top-14 right-4 z-10 flex flex-col items-end gap-1.5">
-          <div className="flex gap-2">
-            <input
-              ref={heroInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleHeroUpload}
-            />
-            <button
-              onClick={() => heroInputRef.current?.click()}
-              disabled={heroUploading}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-black/25 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 text-xs font-medium border border-white/15 transition-all"
-              title={currentHero ? 'Change cover photo' : 'Add cover photo'}
-            >
-              {heroUploading ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
-              ) : (
-                <><Camera className="w-3.5 h-3.5" /> {currentHero ? 'Photo' : 'Add photo'}</>
-              )}
-            </button>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-black/25 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 text-xs font-medium border border-white/15 transition-all disabled:opacity-50"
-              title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
-            >
-              {generating ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generateStatus || '…'}</>
-              ) : (
-                <><Sparkles className="w-3.5 h-3.5" /> {trip.tagline ? 'Update text' : 'Generate text'}</>
-              )}
-            </button>
-          </div>
-          {generateError && (
-            <p className="text-[10px] text-red-200/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded max-w-[200px] text-right">
-              {generateError}
-            </p>
-          )}
         </div>
       </div>
 
@@ -351,6 +317,46 @@ export function ItineraryPage() {
             tags={trip.vibe_tags}
             heading={trip.vibe_heading}
           />
+        )}
+
+        {/* Photo + Update text — below the fold */}
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 flex justify-end gap-2">
+          <input
+            ref={heroInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleHeroUpload}
+          />
+          <button
+            onClick={() => heroInputRef.current?.click()}
+            disabled={heroUploading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all"
+            title={currentHero ? 'Change cover photo' : 'Add cover photo'}
+          >
+            {heroUploading ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
+            ) : (
+              <><Camera className="w-3.5 h-3.5" /> {currentHero ? 'Photo' : 'Add photo'}</>
+            )}
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50"
+            title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
+          >
+            {generating ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generateStatus || '…'}</>
+            ) : (
+              <><Sparkles className="w-3.5 h-3.5" /> {trip.tagline ? 'Update text' : 'Generate text'}</>
+            )}
+          </button>
+        </div>
+        {generateError && (
+          <p className="max-w-3xl mx-auto px-4 sm:px-6 text-[10px] text-destructive/90 text-right -mt-2 pb-2">
+            {generateError}
+          </p>
         )}
 
         {/* ── Content ── */}

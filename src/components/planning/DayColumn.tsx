@@ -5,6 +5,7 @@ import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
+import { CityTag } from '@/components/shared/CityTag'
 import { Camera, Loader2, Plus, Check, X, Upload, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseTimeToMinutes } from '@/lib/timeUtils'
@@ -159,7 +160,9 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
             Day {day.day_number}
           </h3>
           <div className="flex items-center gap-1.5">
-
+            {day.city && (
+              <CityTag city={day.city} className="bg-muted/80 text-muted-foreground border-border" />
+            )}
             {/* Camera button + popover menu */}
             <div className="relative">
               <button
