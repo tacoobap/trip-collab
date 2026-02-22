@@ -5,15 +5,14 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { getProposerColor } from '@/lib/proposerColors'
 
-const SUGGESTED_NAMES = ['Rad', 'Tyler']
-
 interface NamePromptProps {
   onSetName: (name: string) => void
+  travelers?: string[]
 }
 
-export function NamePrompt({ onSetName }: NamePromptProps) {
+export function NamePrompt({ onSetName, travelers = [] }: NamePromptProps) {
   const [customName, setCustomName] = useState('')
-  const [showCustom, setShowCustom] = useState(false)
+  const [showCustom, setShowCustom] = useState(travelers.length === 0)
 
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,7 +35,7 @@ export function NamePrompt({ onSetName }: NamePromptProps) {
         </p>
 
         <div className="flex flex-col gap-3">
-          {SUGGESTED_NAMES.map((name) => {
+          {travelers.map((name) => {
             const color = getProposerColor(name)
             return (
               <button
@@ -55,14 +54,16 @@ export function NamePrompt({ onSetName }: NamePromptProps) {
             )
           })}
 
-          {!showCustom ? (
+          {travelers.length > 0 && !showCustom && (
             <button
               onClick={() => setShowCustom(true)}
               className="rounded-xl border border-dashed border-border bg-card hover:border-primary/40 transition-all p-4 text-sm text-muted-foreground hover:text-foreground"
             >
               + Someone else
             </button>
-          ) : (
+          )}
+
+          {showCustom && (
             <motion.form
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
