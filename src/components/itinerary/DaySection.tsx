@@ -89,7 +89,7 @@ export function DaySection({ day, flip = false }: DaySectionProps) {
 
           <div className="space-y-4 font-sans text-muted-foreground leading-relaxed">
             {sortedSlots.map((slot, i) => (
-              <TimelineItem key={slot.id} slot={slot} index={i} isLast={i === sortedSlots.length - 1} />
+              <TimelineItem key={slot.id} slot={slot} isLast={i === sortedSlots.length - 1} />
             ))}
           </div>
         </div>

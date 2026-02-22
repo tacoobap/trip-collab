@@ -3,11 +3,10 @@ import type { SlotWithProposals } from '@/types/database'
 
 interface TimelineItemProps {
   slot: SlotWithProposals
-  index: number
   isLast?: boolean
 }
 
-export function TimelineItem({ slot, index, isLast = false }: TimelineItemProps) {
+export function TimelineItem({ slot, isLast = false }: TimelineItemProps) {
   const lockedProposal = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
 
   if (slot.status !== 'locked' || !lockedProposal) {
