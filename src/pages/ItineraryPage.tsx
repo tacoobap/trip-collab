@@ -21,8 +21,8 @@ import { formatTripDate } from '@/lib/utils'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { trip, days, travelers, loading, error } = useTrip(slug)
-  const { name, setName, clearName } = useProposerName()
+  const { trip, days, loading, error } = useTrip(slug)
+  const { name, setName, clearName, namesUsed } = useProposerName()
   const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
@@ -177,7 +177,7 @@ export function ItineraryPage() {
   }
 
   if (!name) {
-    return <NamePrompt onSetName={setName} travelers={travelers} />
+    return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
   }
 
   const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric' })
@@ -201,7 +201,6 @@ export function ItineraryPage() {
       {!scrolledPastHero && (
         <PageHeader
           trip={trip}
-          travelers={travelers}
           currentName={name}
           onChangeName={clearName}
           overHero
@@ -249,22 +248,16 @@ export function ItineraryPage() {
             >
               {trip.name}
             </motion.h1>
-            {trip.tagline && (() => {
-              const withoutTripName = trip.tagline.replace(new RegExp(` · ${trip.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '').trim()
-              const displayLine = trip.start_date
-                ? `${withoutTripName} · ${new Date(trip.start_date).getFullYear()}`
-                : withoutTripName
-              return (
-                <motion.p
-                  className="font-serif text-xs sm:text-sm md:text-base text-white/65 italic font-normal tracking-wide mb-3"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35, duration: 0.45 }}
-                >
-                  {displayLine}
-                </motion.p>
-              )
-            })()}
+            {trip.tagline && (
+              <motion.p
+                className="font-serif text-xs sm:text-sm md:text-base text-white/65 italic font-normal tracking-wide mb-3"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, duration: 0.45 }}
+              >
+                {trip.tagline}
+              </motion.p>
+            )}
             {(trip.destinations.length > 0 || dateRange) && (
               <motion.div
                 className="w-12 h-px bg-primary/80 mx-auto my-3"
@@ -301,7 +294,6 @@ export function ItineraryPage() {
       {scrolledPastHero && (
         <PageHeader
           trip={trip}
-          travelers={travelers}
           currentName={name}
           onChangeName={clearName}
         />
@@ -324,45 +316,52 @@ export function ItineraryPage() {
           />
         )}
 
-        {/* Photo + Update text — below the fold */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 flex justify-center gap-2">
-          <input
-            ref={heroInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleHeroUpload}
-          />
-          <button
-            onClick={() => heroInputRef.current?.click()}
-            disabled={heroUploading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all"
-            title={currentHero ? 'Change cover photo' : 'Add cover photo'}
-          >
-            {heroUploading ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
-            ) : (
-              <><Camera className="w-3.5 h-3.5" /> Hero Photo</>
+        {/* Photo + Update text — in their own section */}
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4">
+          <div className="rounded-xl border border-border bg-card/50 px-4 py-3 flex flex-col items-center gap-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Customize
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <input
+                ref={heroInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleHeroUpload}
+              />
+              <button
+                onClick={() => heroInputRef.current?.click()}
+                disabled={heroUploading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all"
+                title={currentHero ? 'Change cover photo' : 'Add cover photo'}
+              >
+                {heroUploading ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
+                ) : (
+                  <><Camera className="w-3.5 h-3.5" /> Hero Photo</>
+                )}
+              </button>
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50"
+                title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
+              >
+                {generating ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generateStatus || '…'}</>
+                ) : (
+                  <><Sparkles className="w-3.5 h-3.5" /> {trip.tagline ? 'Update text' : 'Generate text'}</>
+                )}
+              </button>
+            </div>
+            {generateError && (
+              <p className="text-[10px] text-destructive/90 text-center">
+                {generateError}
+              </p>
             )}
-          </button>
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50"
-            title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
-          >
-            {generating ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generateStatus || '…'}</>
-            ) : (
-              <><Sparkles className="w-3.5 h-3.5" /> {trip.tagline ? 'Update text' : 'Generate text'}</>
-            )}
-          </button>
+          </div>
         </div>
-        {generateError && (
-          <p className="max-w-3xl mx-auto px-4 sm:px-6 text-[10px] text-destructive/90 text-center -mt-2 pb-2">
-            {generateError}
-          </p>
-        )}
 
         {/* ── Content ── */}
         {days.length === 0 ? (

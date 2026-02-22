@@ -12,8 +12,8 @@ import { Loader2, BedDouble } from 'lucide-react'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { name, setName, clearName } = useProposerName()
-  const { trip, days, travelers, loading, error } = useTrip(slug)
+  const { name, setName, clearName, namesUsed } = useProposerName()
+  const { trip, days, loading, error } = useTrip(slug)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
 
@@ -41,7 +41,7 @@ export function TripPage() {
   }
 
   if (!name) {
-    return <NamePrompt onSetName={setName} travelers={travelers} />
+    return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
   }
 
   const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric', year: 'numeric' })
@@ -52,7 +52,6 @@ export function TripPage() {
     <div className="min-h-screen bg-background">
       <PageHeader
         trip={trip}
-        travelers={travelers}
         currentName={name}
         onChangeName={clearName}
       />

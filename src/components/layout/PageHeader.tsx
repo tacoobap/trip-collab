@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 
 interface PageHeaderProps {
   trip: Trip
-  travelers?: string[]
   currentName?: string | null
   onChangeName?: () => void
   /** When true (e.g. itinerary over full-screen hero), use dark transparent overlay; otherwise light bar */
@@ -15,7 +14,6 @@ interface PageHeaderProps {
 
 export function PageHeader({
   trip,
-  travelers = [],
   currentName,
   onChangeName,
   overHero = false,
@@ -27,7 +25,6 @@ export function PageHeader({
   const linkActive = isDark ? 'text-white bg-white/15' : 'border-primary text-foreground'
   const linkInactive = isDark ? 'text-white/70 hover:text-white' : 'border-transparent text-muted-foreground hover:text-foreground'
   const nameBtn = isDark ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
-  const nameText = isDark ? 'text-white' : 'text-foreground'
 
   return (
     <header
@@ -76,32 +73,21 @@ export function PageHeader({
           </Link>
         </nav>
 
-        {/* Right: avatars + current user */}
-        <div className="flex items-center gap-2 shrink-0">
-          {travelers.length > 0 && (
-            <div className="flex items-center -space-x-1">
-              {travelers.slice(0, 5).map((t) => (
-                <ProposerAvatar key={t} name={t} size="sm" />
-              ))}
-            </div>
-          )}
-          {currentName && onChangeName && (
-            <button
-              onClick={onChangeName}
-              className={cn(
-                'flex items-center gap-1 text-xs transition-colors group',
-                nameBtn
+        {/* Right: single avatar (you); chevron goes to "Who are you?" page */}
+        <div className="flex items-center shrink-0">
+          {currentName && (
+            <div className="flex items-center gap-1.5">
+              <ProposerAvatar name={currentName} size="sm" />
+              {onChangeName && (
+                <button
+                  onClick={onChangeName}
+                  className={cn('flex items-center transition-colors group', nameBtn)}
+                  title="Change person"
+                >
+                  <ChevronDown className={cn('w-3 h-3 opacity-50 group-hover:opacity-100', isDark ? 'text-white' : '')} />
+                </button>
               )}
-              title="Change name"
-            >
-              <span className={cn('hidden sm:block font-semibold', nameText)}>{currentName}</span>
-              <ChevronDown className={cn('w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity', isDark ? 'text-white' : '')} />
-            </button>
-          )}
-          {currentName && !onChangeName && (
-            <span className={cn('text-xs hidden sm:block font-semibold', nameText)}>
-              {currentName}
-            </span>
+            </div>
           )}
         </div>
       </div>
