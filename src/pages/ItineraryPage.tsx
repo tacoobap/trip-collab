@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { NamePrompt } from '@/pages/NamePrompt'
 import { useProposerName } from '@/hooks/useProposerName'
 import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
@@ -21,7 +22,7 @@ import { formatTripDate } from '@/lib/utils'
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
   const { trip, days, travelers, loading, error } = useTrip(slug)
-  const { name, clearName } = useProposerName()
+  const { name, setName, clearName } = useProposerName()
   const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
@@ -175,6 +176,10 @@ export function ItineraryPage() {
     )
   }
 
+  if (!name) {
+    return <NamePrompt onSetName={setName} travelers={travelers} />
+  }
+
   const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric' })
   const endFmt = formatTripDate(trip.end_date, { month: 'long', day: 'numeric' })
   const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
@@ -320,7 +325,7 @@ export function ItineraryPage() {
         )}
 
         {/* Photo + Update text — below the fold */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 flex justify-end gap-2">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 flex justify-center gap-2">
           <input
             ref={heroInputRef}
             type="file"
@@ -337,7 +342,7 @@ export function ItineraryPage() {
             {heroUploading ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
             ) : (
-              <><Camera className="w-3.5 h-3.5" /> {currentHero ? 'Photo' : 'Add photo'}</>
+              <><Camera className="w-3.5 h-3.5" /> Hero Photo</>
             )}
           </button>
           <button
@@ -354,7 +359,7 @@ export function ItineraryPage() {
           </button>
         </div>
         {generateError && (
-          <p className="max-w-3xl mx-auto px-4 sm:px-6 text-[10px] text-destructive/90 text-right -mt-2 pb-2">
+          <p className="max-w-3xl mx-auto px-4 sm:px-6 text-[10px] text-destructive/90 text-center -mt-2 pb-2">
             {generateError}
           </p>
         )}
