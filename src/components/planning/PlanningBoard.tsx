@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Trip, DayWithSlots, SlotWithProposals } from '@/types/database'
 import { DayColumn } from './DayColumn'
 import { ProposalDrawer } from './ProposalDrawer'
-import { AddDayDialog } from './AddDayDialog'
 import { TripSetupPanel } from './TripSetupPanel'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 interface PlanningBoardProps {
   trip: Trip
@@ -16,7 +13,6 @@ interface PlanningBoardProps {
 export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
   const [activeSlot, setActiveSlot] = useState<SlotWithProposals | null>(null)
   const [activeDayLabel, setActiveDayLabel] = useState('')
-  const [addDayOpen, setAddDayOpen] = useState(false)
 
   // Keep the open drawer in sync when real-time updates arrive
   useEffect(() => {
@@ -52,18 +48,6 @@ export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
               onSlotClick={handleSlotClick}
             />
           ))}
-
-          {/* Add day button at the end of the board */}
-          <div className="flex flex-col min-w-[160px] pt-1">
-            <Button
-              variant="outline"
-              className="h-full min-h-[80px] border-dashed text-muted-foreground hover:text-foreground flex flex-col gap-1.5"
-              onClick={() => setAddDayOpen(true)}
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-xs">Add day</span>
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -73,13 +57,6 @@ export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
         currentName={currentName}
         onClose={() => setActiveSlot(null)}
         onUpdate={() => {}}
-      />
-
-      <AddDayDialog
-        open={addDayOpen}
-        onOpenChange={setAddDayOpen}
-        trip={trip}
-        existingDays={days}
       />
     </>
   )

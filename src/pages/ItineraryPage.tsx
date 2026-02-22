@@ -4,7 +4,7 @@ import { DaySection } from '@/components/itinerary/DaySection'
 import { CityDivider } from '@/components/layout/CityDivider'
 import { VibeTagsSection } from '@/components/itinerary/VibeTagsSection'
 import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
-import { Loader2, Share2, Camera, Sparkles, BedDouble, ExternalLink } from 'lucide-react'
+import { Loader2, Camera, Sparkles, BedDouble } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTrip } from '@/hooks/useTrip'
 import { useTripNotes } from '@/hooks/useTripNotes'
@@ -28,7 +28,6 @@ export function ItineraryPage() {
   const { notes, addNote, deleteNote } = useTripNotes(trip?.id)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
 
-  const [copied, setCopied] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [staysOpen, setStaysOpen] = useState(false)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
@@ -40,13 +39,6 @@ export function ItineraryPage() {
   const [generateStatus, setGenerateStatus] = useState('')
   const [generateError, setGenerateError] = useState('')
 
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch { /* fallback */ }
-  }
 
   const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -88,16 +80,29 @@ export function ItineraryPage() {
         vibe_tags: result.vibe_tags ?? null,
       })
 
-      // Step 3: write day narrative titles
+      // Step 3: write day narrative titles — only for days that don't have one yet
+      const daysNeedingTitle = result.days.filter((d) => {
+        const fullDay = days.find((day) => day.id === d.day_id)
+        return !fullDay?.narrative_title
+      })
       await Promise.all(
-        result.days.map((d) =>
+        daysNeedingTitle.map((d) =>
           updateDoc(doc(db, 'days', d.day_id), { narrative_title: d.narrative_title })
         )
       )
 
-      // Step 4: write proposal editorial captions + suggested times
+      // Step 4: write proposal editorial captions + suggested times — only for proposals that don't have one yet
+      const proposalsNeedingCaption = result.proposals.filter((p) => {
+        for (const day of days) {
+          for (const slot of day.slots) {
+            const existing = slot.proposals.find((pr) => pr.id === p.proposal_id)
+            if (existing) return !existing.editorial_caption
+          }
+        }
+        return true
+      })
       await Promise.all(
-        result.proposals.map((p) =>
+        proposalsNeedingCaption.map((p) =>
           updateDoc(doc(db, 'proposals', p.proposal_id), {
             editorial_caption: p.editorial_caption,
             narrative_time: p.suggested_time ?? null,
@@ -105,11 +110,15 @@ export function ItineraryPage() {
         )
       )
 
-      // Step 5: fetch and store a hero image for each day that has an image_query
-      const daysWithQuery = result.days.filter((d) => d.image_query)
-      for (let i = 0; i < daysWithQuery.length; i++) {
-        const d = daysWithQuery[i]
-        setGenerateStatus(`Finding photos… (${i + 1}/${daysWithQuery.length})`)
+      // Step 5: fetch images only for days that don't already have one
+      const daysNeedingImages = result.days.filter((d) => {
+        const fullDay = days.find((day) => day.id === d.day_id)
+        return !fullDay?.image_url
+      })
+      for (let i = 0; i < daysNeedingImages.length; i++) {
+        const d = daysNeedingImages[i]
+        setGenerateStatus(`Finding photos… (${i + 1}/${daysNeedingImages.length})`)
+        const fullDay = days.find((day) => day.id === d.day_id)
         try {
           const img = await searchImage(d.image_query)
           await updateDoc(doc(db, 'days', d.day_id), {
@@ -117,7 +126,17 @@ export function ItineraryPage() {
             image_attribution: img.attribution,
           })
         } catch {
-          // Non-fatal — skip missing images silently
+          if (fullDay?.city) {
+            try {
+              const img = await searchImage(fullDay.city)
+              await updateDoc(doc(db, 'days', d.day_id), {
+                image_url: img.url,
+                image_attribution: img.attribution,
+              })
+            } catch {
+              // Non-fatal
+            }
+          }
         }
       }
 
@@ -155,11 +174,9 @@ export function ItineraryPage() {
   // heroPreview = local blob URL shown instantly on file select (bypasses CDN cache)
   // heroUrl    = confirmed remote URL after upload completes
   const currentHero = heroPreview ?? heroUrl ?? trip.image_url
-  const bookedStays = stays.filter((s) => s.status === 'booked')
-
   function stayForDay(date: string | null): Stay | undefined {
     if (!date) return undefined
-    return bookedStays.find((s) => s.check_in <= date && date < s.check_out)
+    return stays.find((s) => s.check_in <= date && date < s.check_out)
   }
 
   let lastCity = ''
@@ -178,63 +195,73 @@ export function ItineraryPage() {
         onOpenNotes={() => setNotesOpen(true)}
       />
 
-      {/* ── Hero ── */}
-      <div className="relative h-[62vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40">
+      {/* ── Hero: full-bleed feel with soft fade into page (reference design) ── */}
+      <div className="relative min-h-[calc(100vh-8rem)] max-h-[85vh] overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40">
         {currentHero && (
           <motion.img
             src={currentHero}
             alt={trip.name}
             className="absolute inset-0 w-full h-full object-cover"
-            initial={{ scale: 1 }}
-            animate={{ scale: 1.08 }}
-            transition={{
-              duration: 20,
-              ease: 'linear',
-              repeat: Infinity,
-              repeatType: 'reverse',
-            }}
+            initial={{ opacity: 0.92 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8 }}
           />
         )}
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/10" />
+        {/* Soft fade to page background (no dark overlay — image blends into content) */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"
+          aria-hidden
+        />
+        {/* Very subtle top vignette so centered text stays readable */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-transparent h-1/2" />
 
-        {/* Trip info — bottom left */}
-        <div className="absolute bottom-0 left-0 right-0 px-6 sm:px-12 pb-10">
-          <motion.p
-            className="text-white/50 text-[10px] uppercase tracking-[0.3em] mb-3"
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}
-          >
-            Final Itinerary
-          </motion.p>
+        {/* Trip info — centered, reference hierarchy */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 sm:px-12 text-center">
+          {travelers.length > 0 && (
+            <motion.p
+              className="text-[10px] sm:text-xs font-sans font-medium uppercase tracking-[0.25em] text-white/90 mb-2"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.5 }}
+            >
+              {travelers.slice(0, 4).join(' & ')}
+            </motion.p>
+          )}
           <motion.h1
-            className="text-4xl sm:text-6xl font-serif font-bold text-white leading-tight mb-2"
+            className="text-4xl sm:text-6xl md:text-7xl font-serif font-bold text-white leading-tight mb-2 drop-shadow-sm"
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, duration: 0.6 }}
           >
             {trip.name}
           </motion.h1>
-          {trip.tagline && (
+          {(trip.tagline || dateRange) && (
             <motion.p
-              className="text-white/70 text-base sm:text-lg italic mb-1"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42, duration: 0.5 }}
+              className="text-white/90 text-base sm:text-lg font-sans mb-1"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, duration: 0.5 }}
             >
-              {trip.tagline}
+              {[trip.tagline, dateRange].filter(Boolean).join(' • ')}
             </motion.p>
           )}
-          {trip.destinations.length > 0 && (
+          {trip.vibe_tags && trip.vibe_tags.length > 0 && (
             <motion.p
-              className="text-white/80 text-lg sm:text-xl"
+              className="text-white/80 text-sm sm:text-base font-sans"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.5 }}
+            >
+              {trip.vibe_tags.map((t) => t.label).join(' • ')}
+            </motion.p>
+          )}
+          {trip.destinations.length > 0 && !(trip.vibe_tags && trip.vibe_tags.length > 0) && (
+            <motion.p
+              className="text-white/70 text-sm sm:text-base font-sans mt-0.5"
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
             >
               {trip.destinations.join(' · ')}
             </motion.p>
           )}
-          {dateRange && (
+          {trip.destinations.length > 0 && (trip.vibe_tags?.length ?? 0) > 0 && (
             <motion.p
-              className="text-white/50 text-sm mt-1"
+              className="text-white/60 text-xs sm:text-sm font-sans mt-1"
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56, duration: 0.5 }}
             >
-              {dateRange}
+              {trip.destinations.join(' · ')}
             </motion.p>
           )}
         </div>
@@ -268,15 +295,8 @@ export function ItineraryPage() {
               {generating ? (
                 <><Loader2 className="w-3 h-3 animate-spin" /> {generateStatus || 'Generating…'}</>
               ) : (
-                <><Sparkles className="w-3 h-3" /> {trip.tagline ? 'Regenerate' : 'Generate narrative'}</>
+                <><Sparkles className="w-3 h-3" /> {trip.tagline ? 'Update text' : 'Generate narrative'}</>
               )}
-            </button>
-            <button
-              onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
-            >
-              <Share2 className="w-3 h-3" />
-              {copied ? 'Copied!' : 'Share'}
             </button>
           </div>
           {generateError && (
@@ -293,53 +313,47 @@ export function ItineraryPage() {
       )}
 
       {/* ── Content ── */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-14 pb-0">
-        {days.length === 0 ? (
-          <div className="text-center py-16 px-4">
-            <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
-            <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
-              ← Head back to planning
-            </Link>
-          </div>
-        ) : (
-          days.map((day) => {
-            const showDivider = day.city !== lastCity
-            lastCity = day.city
-            const dayStay = stayForDay(day.date)
-            const showStay = !!dayStay && dayStay.id !== lastStayId
-            if (dayStay) lastStayId = dayStay.id
+      {days.length === 0 ? (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-14 pb-16 text-center">
+          <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
+          <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
+            ← Head back to planning
+          </Link>
+        </div>
+      ) : (
+        days.map((day, dayIndex) => {
+          const showDivider = day.city !== lastCity
+          lastCity = day.city
+          const dayStay = stayForDay(day.date)
+          const showStay = !!dayStay && dayStay.id !== lastStayId
+          if (dayStay) lastStayId = dayStay.id
 
-            return (
-              <div key={day.id}>
+          return (
+            <div
+              key={day.id}
+              className={dayIndex % 2 === 0 ? 'bg-background' : 'bg-sand/40'}
+            >
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-16 pb-20">
                 {showDivider && <CityDivider city={day.city} />}
 
                 {showStay && dayStay && (
-                  <div className="mt-4 flex items-start gap-3 px-4 py-3 border border-border rounded-xl bg-muted/30 mb-2">
-                    <BedDouble className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
+                  <div className="mt-4 flex items-center gap-3 px-4 py-3 border border-border rounded-xl bg-muted/30 mb-2">
+                    <BedDouble className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
                       <p className="text-xs text-muted-foreground">Staying at</p>
                       <p className="text-sm font-semibold text-foreground">{dayStay.name}</p>
-                      {dayStay.notes && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{dayStay.notes}</p>
-                      )}
                     </div>
-                    {dayStay.url && (
-                      <a href={dayStay.url} target="_blank" rel="noopener noreferrer"
-                        className="shrink-0 text-muted-foreground hover:text-primary transition-colors mt-0.5">
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    )}
                   </div>
                 )}
 
                 <div className="mt-6">
-                  <DaySection day={day} />
+                  <DaySection day={day} flip={dayIndex % 2 === 1} />
                 </div>
               </div>
-            )
-          })
-        )}
-      </div>
+            </div>
+          )
+        })
+      )}
 
       {/* ── At a Glance ── */}
       {days.length > 0 && <AtAGlanceSection days={days} />}

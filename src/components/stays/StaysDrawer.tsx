@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, BedDouble, ExternalLink, Plus, Trash2, CheckCircle2, Clock, Loader2 } from 'lucide-react'
+import { X, BedDouble, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import type { Stay, Trip } from '@/types/database'
 import type { StayInput } from '@/hooks/useStays'
-import { cn, sanitizeUrl } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 function formatDateRange(checkIn: string, checkOut: string) {
   const fmt = (d: string) =>
@@ -29,84 +28,39 @@ function nightCount(checkIn: string, checkOut: string) {
 interface StayCardProps {
   stay: Stay
   currentName: string | null
-  onToggleStatus: () => void
   onDelete: () => void
 }
 
-function StayCard({ stay, currentName, onToggleStatus, onDelete }: StayCardProps) {
-  const isBooked = stay.status === 'booked'
-
+function StayCard({ stay, currentName, onDelete }: StayCardProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+    <div className="bg-card border border-border rounded-xl p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
-                isBooked
-                  ? 'bg-sage/15 text-sage'
-                  : 'bg-amber-100 text-amber-700'
-              )}
-            >
-              {isBooked ? (
-                <CheckCircle2 className="w-3 h-3" />
-              ) : (
-                <Clock className="w-3 h-3" />
-              )}
-              {isBooked ? 'Booked' : 'Considering'}
-            </span>
-            <span className="text-xs text-muted-foreground">{stay.city}</span>
-          </div>
-          <h3 className="font-serif font-semibold text-foreground mt-1 leading-snug">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">{stay.city}</p>
+          <h3 className="font-serif font-semibold text-foreground mt-0.5 leading-snug">
             {stay.name}
           </h3>
         </div>
-
-        {stay.url && (
-          <a
-            href={stay.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-primary transition-colors shrink-0 mt-0.5"
-            title="View booking"
+        {stay.proposed_by === currentName && (
+          <button
+            onClick={onDelete}
+            className="text-muted-foreground hover:text-destructive transition-colors shrink-0 mt-0.5"
+            title="Delete stay"
           >
-            <ExternalLink className="w-4 h-4" />
-          </a>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         )}
       </div>
 
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-2">
         <BedDouble className="w-3.5 h-3.5 shrink-0" />
         <span>{formatDateRange(stay.check_in, stay.check_out)}</span>
         <span className="text-border">·</span>
         <span>{nightCount(stay.check_in, stay.check_out)}</span>
       </div>
 
-      {stay.notes && (
-        <p className="text-sm text-muted-foreground leading-relaxed">{stay.notes}</p>
-      )}
-
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
+      <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border">
         <ProposerAvatar name={stay.proposed_by} size="xs" showName />
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onToggleStatus}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-          >
-            {isBooked ? 'Mark considering' : 'Mark booked'}
-          </button>
-          {stay.proposed_by === currentName && (
-            <button
-              onClick={onDelete}
-              className="text-muted-foreground hover:text-destructive transition-colors"
-              title="Delete stay"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
       </div>
     </div>
   )
@@ -125,10 +79,6 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
   const [customCity, setCustomCity] = useState('')
   const [checkIn, setCheckIn] = useState(trip.start_date ?? '')
   const [checkOut, setCheckOut] = useState(trip.end_date ?? '')
-  const [url, setUrl] = useState('')
-  const [urlError, setUrlError] = useState('')
-  const [notes, setNotes] = useState('')
-  const [status, setStatus] = useState<'considering' | 'booked'>('considering')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -141,15 +91,6 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
     if (!checkIn || !checkOut) { setError('Check-in and check-out are required.'); return }
     if (checkOut <= checkIn) { setError('Check-out must be after check-in.'); return }
 
-    setUrlError('')
-    let safeUrl: string | null = null
-    try {
-      safeUrl = sanitizeUrl(url)
-    } catch (err) {
-      setUrlError(err instanceof Error ? err.message : 'Invalid URL')
-      return
-    }
-
     setLoading(true)
     setError('')
     try {
@@ -158,9 +99,6 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
         city: effectiveCity,
         check_in: checkIn,
         check_out: checkOut,
-        url: safeUrl,
-        notes: notes.trim() || null,
-        status,
         proposed_by: currentName,
       })
     } catch {
@@ -258,49 +196,6 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-foreground mb-1">
-          Booking link <span className="text-muted-foreground">(optional)</span>
-        </label>
-        <Input
-          placeholder="https://airbnb.com/rooms/…"
-          value={url}
-          onChange={(e) => { setUrl(e.target.value); setUrlError('') }}
-          className="text-sm"
-        />
-        {urlError && <p className="text-xs text-destructive mt-1">{urlError}</p>}
-      </div>
-
-      <div>
-        <label className="block text-xs font-medium text-foreground mb-1">
-          Notes <span className="text-muted-foreground">(optional)</span>
-        </label>
-        <Textarea
-          placeholder="3 bedrooms, great location, free cancellation until May 1…"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          className="text-sm resize-none"
-        />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-medium text-foreground">Status:</span>
-        {(['considering', 'booked'] as const).map((s) => (
-          <label key={s} className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="radio"
-              name="status"
-              value={s}
-              checked={status === s}
-              onChange={() => setStatus(s)}
-              className="accent-primary"
-            />
-            <span className="text-xs capitalize">{s}</span>
-          </label>
-        ))}
-      </div>
-
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex gap-2">
@@ -322,7 +217,7 @@ interface StaysDrawerProps {
   stays: Stay[]
   currentName: string | null
   onAdd: (data: StayInput) => Promise<void>
-  onUpdate: (stayId: string, data: Partial<StayInput>) => Promise<void>
+  onUpdate?: (stayId: string, data: Partial<StayInput>) => Promise<void>
   onDelete: (stayId: string) => Promise<void>
 }
 
@@ -333,7 +228,6 @@ export function StaysDrawer({
   stays,
   currentName,
   onAdd,
-  onUpdate,
   onDelete,
 }: StaysDrawerProps) {
   const [showForm, setShowForm] = useState(false)
@@ -376,7 +270,7 @@ export function StaysDrawer({
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {stays.length === 0
                     ? 'No stays added yet'
-                    : `${stays.filter((s) => s.status === 'booked').length} booked · ${stays.filter((s) => s.status === 'considering').length} considering`}
+                    : `${stays.length} stay${stays.length !== 1 ? 's' : ''}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -409,9 +303,7 @@ export function StaysDrawer({
               {stays.length === 0 && !showForm && (
                 <div className="text-center py-10">
                   <BedDouble className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    No stays added yet.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No stays added yet.</p>
                 </div>
               )}
 
@@ -420,11 +312,6 @@ export function StaysDrawer({
                   key={stay.id}
                   stay={stay}
                   currentName={currentName}
-                  onToggleStatus={() =>
-                    void onUpdate(stay.id, {
-                      status: stay.status === 'booked' ? 'considering' : 'booked',
-                    })
-                  }
                   onDelete={() => void onDelete(stay.id)}
                 />
               ))}

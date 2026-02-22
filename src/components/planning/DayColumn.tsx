@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react'
-import { updateDoc, doc } from 'firebase/firestore'
+import { updateDoc, doc, addDoc, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { uploadImage } from '@/lib/imageUpload'
+import { searchImage } from '@/lib/imageSearch'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
-import { CityTag } from '@/components/shared/CityTag'
-import { Camera, Loader2 } from 'lucide-react'
+import { Camera, Loader2, Plus, Check, X, Upload, Sparkles } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { parseTimeToMinutes } from '@/lib/timeUtils'
+
 
 interface DayColumnProps {
   day: DayWithSlots
@@ -15,14 +18,32 @@ interface DayColumnProps {
 }
 
 export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick }: DayColumnProps) {
-  const sortedSlots = [...day.slots].sort((a, b) => a.sort_order - b.sort_order)
+  const getDisplayTime = (slot: SlotWithProposals) => {
+    const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
+    return locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
+  }
+  const sortedSlots = [...day.slots].sort((a, b) => {
+    const ta = parseTimeToMinutes(getDisplayTime(a))
+    const tb = parseTimeToMinutes(getDisplayTime(b))
+    if (ta !== tb) return ta - tb
+    return a.sort_order - b.sort_order
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
+  const [autoLoading, setAutoLoading] = useState(false)
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+
+  const [addingSlot, setAddingSlot] = useState(false)
+  const [newLabel, setNewLabel] = useState('')
+  const [savingSlot, setSavingSlot] = useState(false)
+
+  const imageWorking = uploading || autoLoading
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setPhotoMenuOpen(false)
     setUploading(true)
     setUploadPct(0)
     try {
@@ -40,13 +61,73 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
     }
   }
 
+  const handleAutoImage = async () => {
+    setPhotoMenuOpen(false)
+    setAutoLoading(true)
+    try {
+      // Build a query from actual events: prefer locked titles, then all proposal titles
+      const eventTitles = day.slots.flatMap((s) => {
+        const locked = s.proposals.find((p) => p.id === s.locked_proposal_id)
+        if (locked) return [locked.title]
+        return s.proposals.map((p) => p.title)
+      })
+      const query = [
+        day.city,
+        ...eventTitles.slice(0, 4),
+      ].filter(Boolean).join(', ')
+
+      const img = await searchImage(query)
+      await updateDoc(doc(db, 'days', day.id), {
+        image_url: img.url,
+        image_attribution: img.attribution,
+      })
+    } catch {
+      try {
+        const img = await searchImage([day.city, day.label].filter(Boolean).join(' '))
+        await updateDoc(doc(db, 'days', day.id), {
+          image_url: img.url,
+          image_attribution: img.attribution,
+        })
+      } catch (err) {
+        console.error('Could not find image for day', err)
+      }
+    } finally {
+      setAutoLoading(false)
+    }
+  }
+
+  const handleAddSlot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newLabel.trim()) return
+    setSavingSlot(true)
+    try {
+      await addDoc(collection(db, 'slots'), {
+        day_id: day.id,
+        time_label: newLabel.trim(),
+        category: 'activity',
+        icon: null,
+        status: 'open',
+        locked_proposal_id: null,
+        sort_order: day.slots.length,
+      })
+      setNewLabel('')
+      setAddingSlot(false)
+    } finally {
+      setSavingSlot(false)
+    }
+  }
+
+  const cancelAddSlot = () => {
+    setAddingSlot(false)
+    setNewLabel('')
+  }
+
   return (
     <div className="flex flex-col min-w-[200px] sm:min-w-[220px]">
-      {/* Day image thumbnail / upload */}
+      {/* Day image thumbnail */}
       <div
-        className="relative mb-3 rounded-lg overflow-hidden cursor-pointer group"
+        className="relative mb-3 rounded-lg overflow-hidden"
         style={{ height: day.image_url ? 80 : 0 }}
-        onClick={() => fileInputRef.current?.click()}
       >
         {day.image_url && (
           <>
@@ -55,9 +136,11 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
               alt={day.label}
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-              <Camera className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+            {imageWorking && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -73,23 +156,55 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
       <div className="pb-3 mb-3 border-b border-border">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-serif font-semibold text-sm text-foreground leading-tight">
-            {day.label}
+            Day {day.day_number}
           </h3>
           <div className="flex items-center gap-1.5">
-            <CityTag city={day.city} />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-              title={day.image_url ? 'Change day photo' : 'Add day photo'}
-            >
-              {uploading ? (
-                <span className="text-[10px] font-medium">{uploadPct}%</span>
-              ) : (
-                <Camera className="w-3 h-3" />
+
+            {/* Camera button + popover menu */}
+            <div className="relative">
+              <button
+                onClick={() => setPhotoMenuOpen((v) => !v)}
+                disabled={imageWorking}
+                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40"
+                title={day.image_url ? 'Change day photo' : 'Add day photo'}
+              >
+                {uploading ? (
+                  <span className="text-[10px] font-medium">{uploadPct}%</span>
+                ) : autoLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Camera className="w-3 h-3" />
+                )}
+              </button>
+
+              {photoMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setPhotoMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[200px]">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      Upload from computer
+                    </button>
+                    <button
+                      onClick={handleAutoImage}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span>
+                        Let AI embarrass you
+                        <span className="block text-[11px] text-muted-foreground font-normal">finds a photo for this day</span>
+                      </span>
+                    </button>
+                  </div>
+                </>
               )}
-            </button>
-            {uploading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+            </div>
           </div>
         </div>
         {day.date && (
@@ -108,9 +223,52 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
           <SlotCard
             key={slot.id}
             slot={slot}
-            onClick={() => onSlotClick(slot, day.label)}
+            onClick={() => onSlotClick(slot, `Day ${day.day_number}`)}
           />
         ))}
+
+        {/* Add slot */}
+        {addingSlot ? (
+          <form
+            onSubmit={handleAddSlot}
+            className="flex items-center gap-1.5 border border-dashed border-primary/40 rounded-lg px-2.5 py-2 bg-primary/5"
+          >
+            <input
+              autoFocus
+              placeholder="e.g. 9:00 AM"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              className="flex-1 text-xs bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
+            />
+            <button
+              type="submit"
+              disabled={!newLabel.trim() || savingSlot}
+              className={cn(
+                'w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0',
+                newLabel.trim()
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground/30 cursor-not-allowed'
+              )}
+            >
+              {savingSlot ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+            </button>
+            <button
+              type="button"
+              onClick={cancelAddSlot}
+              className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </form>
+        ) : (
+          <button
+            onClick={() => setAddingSlot(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground border border-border/40 hover:border-border/70 rounded-lg py-2 transition-all"
+          >
+            <Plus className="w-3 h-3" />
+            Add slot
+          </button>
+        )}
       </div>
     </div>
   )

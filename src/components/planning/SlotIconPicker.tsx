@@ -156,20 +156,22 @@ export function SlotIconPicker({ open, current, onSelect, onClose }: SlotIconPic
           transition={{ duration: 0.15 }}
           className="absolute left-0 right-0 top-full mt-2 z-10 bg-background border border-border rounded-xl shadow-xl p-3"
         >
-          <div className="grid grid-cols-8 gap-0.5 max-h-52 overflow-y-auto">
-            {SLOT_EMOJIS.map(({ emoji, label }) => (
-              <button
-                key={emoji}
-                type="button"
-                title={label}
-                onClick={() => { onSelect(emoji); onClose() }}
-                className={`w-9 h-9 text-xl flex items-center justify-center rounded-lg transition-colors hover:bg-muted ${
-                  current === emoji ? 'bg-primary/10 ring-1 ring-primary/40' : ''
-                }`}
-              >
-                {emoji}
-              </button>
-            ))}
+          <div className="max-h-52 overflow-y-auto overflow-x-hidden overscroll-contain">
+            <div className="grid grid-cols-8 gap-0.5 pb-2">
+              {SLOT_EMOJIS.map(({ emoji, label }) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  title={label}
+                  onClick={() => { onSelect(emoji); onClose() }}
+                  className={`w-9 h-9 text-xl flex items-center justify-center rounded-lg transition-colors hover:bg-muted ${
+                    current === emoji ? 'bg-primary/10 ring-1 ring-primary/40' : ''
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
           </div>
         </motion.div>
       )}

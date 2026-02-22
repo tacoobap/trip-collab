@@ -17,7 +17,7 @@ export async function searchImage(query: string): Promise<ImageSearchResult> {
 
   const url = new URL('https://api.unsplash.com/search/photos')
   url.searchParams.set('query', query)
-  url.searchParams.set('per_page', '1')
+  url.searchParams.set('per_page', '20')
   url.searchParams.set('orientation', 'landscape')
   url.searchParams.set('content_filter', 'high')
 
@@ -28,8 +28,8 @@ export async function searchImage(query: string): Promise<ImageSearchResult> {
   if (!res.ok) throw new Error(`Unsplash API error: ${res.status}`)
 
   const data = await res.json() as { results: UnsplashPhoto[] }
-  const photo = data.results?.[0]
-  if (!photo) throw new Error(`No images found for query: "${query}"`)
+  if (!data.results?.length) throw new Error(`No images found for query: "${query}"`)
+  const photo = data.results[Math.floor(Math.random() * data.results.length)]
 
   // Required by Unsplash API guidelines: trigger download event when photo is used
   fetch(`${photo.links.download_location}?client_id=${accessKey}`).catch(() => { /* fire-and-forget */ })

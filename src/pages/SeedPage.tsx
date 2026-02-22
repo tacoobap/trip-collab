@@ -21,9 +21,9 @@ const SEED_DATA = {
       city: 'Paris',
       day_number: 1,
       slots: [
-        { time_label: 'Afternoon', category: 'accommodation', sort_order: 0 },
-        { time_label: 'Afternoon', category: 'activity', sort_order: 1 },
-        { time_label: 'Evening', category: 'food', sort_order: 2 },
+        { time_label: '1:00 PM', category: 'accommodation', sort_order: 0 },
+        { time_label: '3:00 PM', category: 'activity', sort_order: 1 },
+        { time_label: '7:00 PM', category: 'food', sort_order: 2 },
       ],
     },
     {
@@ -32,9 +32,9 @@ const SEED_DATA = {
       city: 'Paris',
       day_number: 2,
       slots: [
-        { time_label: 'Morning', category: 'activity', sort_order: 0 },
-        { time_label: 'Afternoon', category: 'activity', sort_order: 1 },
-        { time_label: 'Evening', category: 'food', sort_order: 2 },
+        { time_label: '9:00 AM', category: 'activity', sort_order: 0 },
+        { time_label: '1:00 PM', category: 'activity', sort_order: 1 },
+        { time_label: '7:00 PM', category: 'food', sort_order: 2 },
       ],
     },
     {
@@ -43,9 +43,9 @@ const SEED_DATA = {
       city: 'Paris',
       day_number: 3,
       slots: [
-        { time_label: 'Morning', category: 'activity', sort_order: 0 },
-        { time_label: 'Afternoon', category: 'travel', sort_order: 1 },
-        { time_label: 'Evening', category: 'food', sort_order: 2 },
+        { time_label: '9:00 AM', category: 'activity', sort_order: 0 },
+        { time_label: '1:00 PM', category: 'travel', sort_order: 1 },
+        { time_label: '7:00 PM', category: 'food', sort_order: 2 },
       ],
     },
     {
@@ -54,9 +54,9 @@ const SEED_DATA = {
       city: 'London',
       day_number: 4,
       slots: [
-        { time_label: 'Morning', category: 'activity', sort_order: 0 },
-        { time_label: 'Afternoon', category: 'activity', sort_order: 1 },
-        { time_label: 'Evening', category: 'food', sort_order: 2 },
+        { time_label: '9:00 AM', category: 'activity', sort_order: 0 },
+        { time_label: '1:00 PM', category: 'activity', sort_order: 1 },
+        { time_label: '7:00 PM', category: 'food', sort_order: 2 },
       ],
     },
     {
@@ -65,8 +65,8 @@ const SEED_DATA = {
       city: 'London',
       day_number: 5,
       slots: [
-        { time_label: 'Morning', category: 'activity', sort_order: 0 },
-        { time_label: 'Afternoon', category: 'food', sort_order: 1 },
+        { time_label: '9:00 AM', category: 'activity', sort_order: 0 },
+        { time_label: '1:00 PM', category: 'food', sort_order: 1 },
       ],
     },
   ],
@@ -186,6 +186,7 @@ export function SeedPage() {
             Something went wrong — check the console for details
           </div>
         )}
+
       </div>
     </div>
   )

@@ -1,217 +1,88 @@
-import { useState, useEffect } from 'react'
-import { X, Clock, LockOpen, CalendarCheck, AlertCircle, User, Hash, Link2, CheckCircle2, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { X, LockOpen, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   collection,
   addDoc,
   updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
+  where,
   doc,
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { SlotWithProposals, Proposal, BookingStatus } from '@/types/database'
+import type { SlotWithProposals, Proposal } from '@/types/database'
 import { SlotIconPicker, CATEGORY_ICONS } from './SlotIconPicker'
-import { sanitizeUrl } from '@/lib/utils'
 import { ProposalCard } from './ProposalCard'
 import { AddProposalForm } from './AddProposalForm'
-import { LockConfirm } from './LockConfirm'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-// ── Inline time input (per proposal, any status) ────────────────────────────
+const TIME_CHIPS = ['9:00 AM', '12:00 PM', '3:00 PM', '7:00 PM']
 
-function InlineTimeInput({ proposal }: { proposal: Proposal }) {
-  const [time, setTime] = useState(proposal.exact_time ?? '')
+// ── Inline slot label (editable time in drawer header) ──────────────────────
+
+function InlineSlotLabel({ slot }: { slot: SlotWithProposals }) {
+  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    setTime(proposal.exact_time ?? '')
-  }, [proposal.exact_time])
+  const lockedProposal = slot.status === 'locked'
+    ? slot.proposals.find((p) => p.id === slot.locked_proposal_id) ?? null
+    : null
 
-  const handleBlur = async () => {
-    const val = time.trim()
-    if (val === (proposal.exact_time ?? '')) return
+  // Mirror the same priority as SlotCard / TimelineItem
+  const displayTime = lockedProposal
+    ? (lockedProposal.exact_time ?? lockedProposal.narrative_time ?? slot.time_label)
+    : slot.time_label
+
+  const [draft, setDraft] = useState(displayTime)
+
+  const commit = async () => {
+    setEditing(false)
+    const val = draft.trim()
+    if (!val || val === displayTime) return
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'proposals', proposal.id), {
-        exact_time: val || null,
-      })
+      if (lockedProposal) {
+        await updateDoc(doc(db, 'proposals', lockedProposal.id), { exact_time: val })
+      } else {
+        await updateDoc(doc(db, 'slots', slot.id), { time_label: val })
+      }
     } finally {
       setSaving(false)
     }
   }
 
-  return (
-    <div className="flex items-center gap-2 mt-1.5 px-1">
-      <Clock className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+  if (editing) {
+    return (
       <input
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-        onBlur={handleBlur}
-        placeholder="Add time (e.g. 7:30 PM)"
-        className="flex-1 text-xs bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/35 focus:text-foreground transition-colors"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        placeholder="e.g. 9:00 AM"
+        className="text-sm font-semibold bg-transparent border-b border-primary outline-none text-foreground w-28 min-w-0"
       />
-      {saving && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50 shrink-0" />}
-    </div>
-  )
-}
-
-// ── Booking section ────────────────────────────────────────────────────────
-
-interface BookingSectionProps {
-  proposal: Proposal
-}
-
-function BookingSection({ proposal }: BookingSectionProps) {
-  const [status, setStatus] = useState<BookingStatus | null>(proposal.booking_status ?? null)
-  const [confirmNum, setConfirmNum] = useState(proposal.confirmation_number ?? '')
-  const [confirmUrl, setConfirmUrl] = useState(proposal.confirmation_url ?? '')
-  const [confirmUrlError, setConfirmUrlError] = useState('')
-  const [assignedTo, setAssignedTo] = useState(proposal.assigned_to ?? '')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  const updateStatus = async (next: BookingStatus | null) => {
-    setStatus(next)
-    await updateDoc(doc(db, 'proposals', proposal.id), { booking_status: next ?? null })
+    )
   }
-
-  const saveDetails = async () => {
-    setConfirmUrlError('')
-    let safeUrl: string | null = null
-    try {
-      safeUrl = sanitizeUrl(confirmUrl)
-    } catch (err) {
-      setConfirmUrlError(err instanceof Error ? err.message : 'Invalid URL')
-      return
-    }
-    setSaving(true)
-    try {
-      await updateDoc(doc(db, 'proposals', proposal.id), {
-        confirmation_number: confirmNum.trim() || null,
-        confirmation_url: safeUrl,
-        assigned_to: assignedTo.trim() || null,
-      })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const hasDetails = confirmNum || confirmUrl || assignedTo
-  const detailsDirty =
-    confirmNum !== (proposal.confirmation_number ?? '') ||
-    confirmUrl !== (proposal.confirmation_url ?? '') ||
-    assignedTo !== (proposal.assigned_to ?? '')
 
   return (
-    <div className="mt-3 rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          <CalendarCheck className="w-3.5 h-3.5" />
-          Booking
-        </div>
-        {status === 'booked' && (
-          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-            <CheckCircle2 className="w-3 h-3" />
-            Confirmed
-          </span>
-        )}
-        {status === 'needs_booking' && (
-          <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-            <AlertCircle className="w-3 h-3" />
-            Needs booking
-          </span>
-        )}
-      </div>
-
-      {/* Status toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => updateStatus(status === 'needs_booking' ? null : 'needs_booking')}
-          className={cn(
-            'flex-1 text-xs font-medium py-1.5 rounded-lg border transition-all',
-            status === 'needs_booking'
-              ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-700 dark:text-amber-400'
-              : 'bg-background border-border text-muted-foreground hover:border-amber-300 hover:text-amber-600'
-          )}
-        >
-          Needs booking
-        </button>
-        <button
-          onClick={() => updateStatus(status === 'booked' ? null : 'booked')}
-          className={cn(
-            'flex-1 text-xs font-medium py-1.5 rounded-lg border transition-all',
-            status === 'booked'
-              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-400'
-              : 'bg-background border-border text-muted-foreground hover:border-emerald-300 hover:text-emerald-600'
-          )}
-        >
-          Confirmed
-        </button>
-      </div>
-
-      {/* Detail fields — shown when status is set */}
-      {status && (
-        <div className="space-y-2 pt-1">
-          <div className="flex items-center gap-2">
-            <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <input
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-              placeholder="Who's booking this?"
-              className="flex-1 text-xs bg-background border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground/50"
-            />
-          </div>
-          {status === 'booked' && (
-            <>
-              <div className="flex items-center gap-2">
-                <Hash className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <input
-                  value={confirmNum}
-                  onChange={(e) => setConfirmNum(e.target.value)}
-                  placeholder="Confirmation number"
-                  className="flex-1 text-xs bg-background border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground/50"
-                />
-              </div>
-              <div className="flex items-start gap-2">
-                <Link2 className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-1.5" />
-                <div className="flex-1">
-                  <input
-                    value={confirmUrl}
-                    onChange={(e) => { setConfirmUrl(e.target.value); setConfirmUrlError('') }}
-                    placeholder="Booking link (OpenTable, etc.)"
-                    className="w-full text-xs bg-background border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground/50"
-                  />
-                  {confirmUrlError && (
-                    <p className="text-[10px] text-destructive mt-0.5">{confirmUrlError}</p>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-          {(detailsDirty || hasDetails) && (
-            <div className="flex justify-end pt-1">
-              <button
-                onClick={saveDetails}
-                disabled={saving || !detailsDirty}
-                className={cn(
-                  'text-xs font-medium px-3 py-1.5 rounded-lg transition-all',
-                  saved
-                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800'
-                    : detailsDirty
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'bg-muted text-muted-foreground cursor-default'
-                )}
-              >
-                {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save details'}
-              </button>
-            </div>
-          )}
-        </div>
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      title="Change time"
+      className="group flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+    >
+      <span>{displayTime}</span>
+      {saving ? (
+        <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />
+      ) : (
+        <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
       )}
-    </div>
+    </button>
   )
 }
 
@@ -223,14 +94,16 @@ interface ProposalDrawerProps {
   currentName: string
   onClose: () => void
   onUpdate: () => void
+  onSlotDeleted?: () => void
 }
 
-export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate }: ProposalDrawerProps) {
+export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted }: ProposalDrawerProps) {
   const [showAddForm, setShowAddForm] = useState(false)
-  const [lockTarget, setLockTarget] = useState<Proposal | null>(null)
   const [lockLoading, setLockLoading] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
+  const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false)
+  const [deletingSlot, setDeletingSlot] = useState(false)
 
   const currentIcon = slot?.icon ?? CATEGORY_ICONS[slot?.category ?? ''] ?? '📌'
 
@@ -239,22 +112,34 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate 
     await updateDoc(doc(db, 'slots', slot.id), { icon: emoji })
   }
 
+  const handleQuickLabel = async (label: string) => {
+    if (!slot) return
+    const lockedProposal = slot.status === 'locked'
+      ? slot.proposals.find((p) => p.id === slot.locked_proposal_id)
+      : null
+    if (lockedProposal) {
+      await updateDoc(doc(db, 'proposals', lockedProposal.id), { exact_time: label })
+    } else {
+      if (label === slot.time_label) return
+      await updateDoc(doc(db, 'slots', slot.id), { time_label: label })
+    }
+  }
+
   if (!slot) return null
 
   const isLocked = slot.status === 'locked'
 
-  const handleAddProposal = async (data: { title: string; note: string; url: string }) => {
+  const handleAddProposal = async (data: { title: string }) => {
     await addDoc(collection(db, 'proposals'), {
       slot_id: slot.id,
       proposer_name: currentName,
       title: data.title,
-      note: data.note || null,
-      url: data.url || null,
+      note: null,
+      url: null,
       votes: [],
       created_at: serverTimestamp(),
     })
 
-    // Update slot status to 'proposed' if it was open
     if (slot.status === 'open') {
       await updateDoc(doc(db, 'slots', slot.id), { status: 'proposed' })
     }
@@ -286,15 +171,51 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate 
     }
   }
 
-  const handleLockConfirm = async () => {
-    if (!lockTarget) return
+  const handleDeleteProposal = async (proposalId: string) => {
+    if (!slot) return
+    await deleteDoc(doc(db, 'proposals', proposalId))
+    const remaining = slot.proposals.filter((p) => p.id !== proposalId)
+    if (remaining.length === 0) {
+      await updateDoc(doc(db, 'slots', slot.id), { status: 'open', locked_proposal_id: null })
+    } else if (slot.locked_proposal_id === proposalId) {
+      await updateDoc(doc(db, 'slots', slot.id), { status: 'proposed', locked_proposal_id: null })
+    }
+    onUpdate()
+  }
+
+  const handleDeleteSlot = async () => {
+    if (!slot) return
+    setDeletingSlot(true)
+    try {
+      const proposalsSnap = await getDocs(query(collection(db, 'proposals'), where('slot_id', '==', slot.id)))
+      await Promise.all(proposalsSnap.docs.map((d) => deleteDoc(d.ref)))
+      await deleteDoc(doc(db, 'slots', slot.id))
+      onClose()
+      onSlotDeleted?.()
+    } finally {
+      setDeletingSlot(false)
+    }
+  }
+
+  const handleEditProposal = async (
+    proposalId: string,
+    data: { title: string; note: string | null; url: string | null }
+  ) => {
+    await updateDoc(doc(db, 'proposals', proposalId), {
+      title: data.title,
+      note: data.note,
+      url: data.url,
+    })
+    onUpdate()
+  }
+
+  const handleLock = async (proposalId: string) => {
     setLockLoading(true)
     try {
       await updateDoc(doc(db, 'slots', slot.id), {
         status: 'locked',
-        locked_proposal_id: lockTarget.id,
+        locked_proposal_id: proposalId,
       })
-      setLockTarget(null)
       onUpdate()
       onClose()
     } finally {
@@ -321,28 +242,22 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate 
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl max-h-[85vh] flex flex-col"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl h-[85vh] max-h-[85vh] flex flex-col min-h-0"
             >
+              {/* Header */}
               <div className="px-5 pt-4 pb-3 border-b border-border shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="relative">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                      {/* Tappable icon — opens the emoji picker */}
-                      <button
-                        type="button"
-                        onClick={() => setIconPickerOpen((v) => !v)}
-                        title="Change icon"
-                        className="text-base leading-none hover:scale-110 active:scale-95 transition-transform"
-                      >
-                        {currentIcon}
-                      </button>
-                      <Clock className="w-3 h-3" />
-                      <span>{slot.time_label}</span>
-                      <span className="text-border">·</span>
-                      <span className="capitalize">{slot.category}</span>
-                      <span className="text-border">·</span>
-                      <span>{dayLabel}</span>
-                    </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="relative flex items-center gap-2 min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setIconPickerOpen((v) => !v)}
+                      title="Change icon"
+                      className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0"
+                    >
+                      {currentIcon}
+                    </button>
+                    <InlineSlotLabel slot={slot} />
+                    <span className="text-xs text-muted-foreground/40 truncate">· {dayLabel}</span>
                     <SlotIconPicker
                       open={iconPickerOpen}
                       current={currentIcon}
@@ -350,65 +265,123 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate 
                       onClose={() => setIconPickerOpen(false)}
                     />
                   </div>
-                  <button
-                    onClick={onClose}
-                    className="rounded-full w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {confirmDeleteSlot ? (
+                      <>
+                        <button
+                          onClick={handleDeleteSlot}
+                          disabled={deletingSlot}
+                          className="text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
+                        >
+                          {deletingSlot ? 'Deleting…' : 'Delete slot'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteSlot(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteSlot(true)}
+                        className="rounded-full w-8 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-destructive/70 hover:bg-destructive/10 transition-colors"
+                        title="Delete this slot"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={onClose}
+                      className="rounded-full w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <h2 className="font-serif font-semibold text-foreground">
-                  {isLocked
-                    ? 'Locked in'
-                    : `${slot.proposals.length} idea${slot.proposals.length !== 1 ? 's' : ''} proposed`}
-                </h2>
+
+                {/* Time quick-picks */}
+                <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
+                  {TIME_CHIPS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => handleQuickLabel(t)}
+                      className={cn(
+                        'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
+                        slot.time_label === t
+                          ? 'border-primary/50 bg-primary/10 text-primary'
+                          : 'border-border/60 text-muted-foreground/60 hover:border-primary/30 hover:text-foreground'
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                  <span className="text-[11px] text-muted-foreground/30">or type above ↑</span>
+                </div>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-5 space-y-3">
+              {/* Ideas collection — flex-1 + min-h-0 so it gets bounded height and scrolls */}
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 flex flex-col">
+                <div className="pt-3 pb-2 shrink-0">
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
+                    {slot.proposals.length === 0
+                      ? 'Ideas'
+                      : `${slot.proposals.length} idea${slot.proposals.length === 1 ? '' : 's'}`}
+                  </h3>
+                </div>
+
                 {slot.proposals.length === 0 && !showAddForm && (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No ideas yet. Be the first to propose something!
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No ideas for this slot yet. Add the first one and others can like it or lock it in.
                   </p>
                 )}
 
-                {slot.proposals.map((proposal) => {
-                  const isThisLocked = slot.locked_proposal_id === proposal.id
-                  return (
-                    <div key={proposal.id}>
-                      <ProposalCard
-                        proposal={proposal}
-                        currentName={currentName}
-                        isLocked={isThisLocked}
-                        onVote={handleVote}
-                        onLock={
-                          !isLocked
-                            ? (id) =>
-                                setLockTarget(
-                                  slot.proposals.find((p) => p.id === id) ?? null
-                                )
-                            : undefined
-                        }
-                      />
-                      <InlineTimeInput proposal={proposal} />
-                      {isThisLocked && (
-                        <BookingSection
-                          key={`${proposal.id}-${proposal.booking_status}-${proposal.confirmation_number}`}
+                <div className="divide-y divide-border/50 rounded-xl border border-border/50 bg-muted/20 overflow-hidden px-3">
+                  {[...slot.proposals]
+                    .sort((a, b) => b.votes.length - a.votes.length)
+                    .map((proposal) => {
+                      const isThisLocked = slot.locked_proposal_id === proposal.id
+                      return (
+                        <ProposalCard
+                          key={proposal.id}
                           proposal={proposal}
+                          currentName={currentName}
+                          isLocked={isThisLocked}
+                          onVote={handleVote}
+                          onLock={!isLocked ? handleLock : undefined}
+                          onDelete={!isThisLocked ? handleDeleteProposal : undefined}
+                          onEdit={handleEditProposal}
                         />
-                      )}
-                    </div>
-                  )
-                })}
+                      )
+                    })}
+                </div>
 
                 {showAddForm && (
-                  <AddProposalForm
-                    currentName={currentName}
-                    onSubmit={handleAddProposal}
-                    onCancel={() => setShowAddForm(false)}
-                  />
+                  <div className={cn('mt-3 pb-3', 'rounded-xl border border-border/50 bg-muted/20 p-3')}>
+                    <AddProposalForm
+                      currentName={currentName}
+                      onSubmit={handleAddProposal}
+                      onCancel={() => setShowAddForm(false)}
+                    />
+                  </div>
+                )}
+
+                {!isLocked && !showAddForm && (
+                  <div className="pt-3 pb-4">
+                    <Button
+                      onClick={() => setShowAddForm(true)}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      + Add an idea to the collection
+                    </Button>
+                  </div>
                 )}
               </div>
 
+              {/* Footer — only when locked */}
               {isLocked && (
                 <div className="px-5 py-4 border-t border-border shrink-0">
                   <Button
@@ -422,31 +395,11 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate 
                   </Button>
                 </div>
               )}
-
-              {!isLocked && !showAddForm && (
-                <div className="px-5 py-4 border-t border-border shrink-0">
-                  <Button
-                    onClick={() => setShowAddForm(true)}
-                    className="w-full"
-                    variant="outline"
-                  >
-                    + Add your idea
-                  </Button>
-                </div>
-              )}
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      <LockConfirm
-        proposal={lockTarget}
-        slotLabel={`${slot.time_label} · ${dayLabel}`}
-        open={lockTarget !== null}
-        onOpenChange={(open) => { if (!open) setLockTarget(null) }}
-        onConfirm={handleLockConfirm}
-        loading={lockLoading}
-      />
     </>
   )
 }

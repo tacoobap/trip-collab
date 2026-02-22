@@ -66,8 +66,6 @@ export type Slot = {
   sort_order: number
 }
 
-export type BookingStatus = 'needs_booking' | 'booked'
-
 export type Proposal = {
   id: string
   slot_id: string
@@ -77,15 +75,15 @@ export type Proposal = {
   url: string | null
   votes: string[]
   created_at: string
-  // Booking / execution layer — only relevant on locked proposals
-  booking_status: BookingStatus | null
   exact_time: string | null          // e.g. "7:30 PM" — used for itinerary ordering
-  confirmation_number: string | null
-  confirmation_url: string | null    // booking ref link (different from the venue url)
-  assigned_to: string | null         // who is responsible for making the reservation
   // LLM-generated editorial copy
   editorial_caption: string | null   // e.g. "Spanish moss, oak canopies, morning light"
   narrative_time: string | null      // LLM-suggested clock time, e.g. "9:30 AM" — fallback when exact_time not manually set
+  // legacy booking fields — kept optional for existing documents
+  booking_status?: string | null
+  confirmation_number?: string | null
+  confirmation_url?: string | null
+  assigned_to?: string | null
 }
 
 export type Stay = {
@@ -95,11 +93,12 @@ export type Stay = {
   city: string
   check_in: string
   check_out: string
-  url: string | null
-  notes: string | null
-  status: 'considering' | 'booked'
   proposed_by: string
   created_at: string
+  // legacy fields — may exist on older documents
+  url?: string | null
+  notes?: string | null
+  status?: 'considering' | 'booked'
 }
 
 export type TripNote = {

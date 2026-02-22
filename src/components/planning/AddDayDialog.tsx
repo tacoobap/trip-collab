@@ -6,28 +6,18 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import type { Trip, Day } from '@/types/database'
-import { SlotIconPicker, CATEGORY_ICONS } from './SlotIconPicker'
-
+import { SlotIconPicker } from './SlotIconPicker'
 interface SlotPreset {
   time_label: string
-  category: 'food' | 'activity' | 'travel' | 'accommodation' | 'vibe'
   icon: string | null
   enabled: boolean
 }
 
 const DEFAULT_PRESETS: SlotPreset[] = [
-  { time_label: 'Morning', category: 'activity', icon: null, enabled: true },
-  { time_label: 'Afternoon', category: 'activity', icon: null, enabled: true },
-  { time_label: 'Evening', category: 'food', icon: null, enabled: true },
+  { time_label: '9:00 AM', icon: null, enabled: true },
+  { time_label: '1:00 PM', icon: null, enabled: true },
+  { time_label: '7:00 PM', icon: null, enabled: true },
 ]
-
-const CATEGORY_OPTIONS = [
-  { value: 'activity', label: '🎭 Activity' },
-  { value: 'food', label: '🍽 Food' },
-  { value: 'travel', label: '✈️ Travel' },
-  { value: 'accommodation', label: '🏨 Stay' },
-  { value: 'vibe', label: '✨ Vibe' },
-] as const
 
 type DateOption = {
   date: string
@@ -96,9 +86,6 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
   const togglePreset = (index: number) =>
     setPresets((prev) => prev.map((p, i) => (i === index ? { ...p, enabled: !p.enabled } : p)))
 
-  const updatePresetCategory = (index: number, category: SlotPreset['category']) =>
-    setPresets((prev) => prev.map((p, i) => (i === index ? { ...p, category } : p)))
-
   const updatePresetIcon = (index: number, icon: string) =>
     setPresets((prev) => prev.map((p, i) => (i === index ? { ...p, icon } : p)))
 
@@ -139,7 +126,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
         batch.set(slotRef, {
           day_id: dayRef.id,
           time_label: preset.time_label,
-          category: preset.category,
+          category: 'activity',
           icon: preset.icon ?? null,
           status: 'open',
           locked_proposal_id: null,
@@ -306,29 +293,15 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
                         className="text-lg leading-none w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-40"
                         title="Choose icon"
                       >
-                        {preset.icon ?? CATEGORY_ICONS[preset.category] ?? '📌'}
+                        {preset.icon ?? '📌'}
                       </button>
                       <SlotIconPicker
                         open={openPickerIndex === i}
-                        current={preset.icon ?? CATEGORY_ICONS[preset.category] ?? '📌'}
+                        current={preset.icon ?? '📌'}
                         onSelect={(emoji) => updatePresetIcon(i, emoji)}
                         onClose={() => setOpenPickerIndex(null)}
                       />
                     </div>
-                    <select
-                      disabled={!preset.enabled}
-                      value={preset.category}
-                      onChange={(e) =>
-                        updatePresetCategory(i, e.target.value as SlotPreset['category'])
-                      }
-                      className="flex-1 text-xs border border-border rounded-md px-2 py-1 bg-background text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {CATEGORY_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 ))}
               </div>

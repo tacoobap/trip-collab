@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { TimelineItem } from './TimelineItem'
 import { CityTag } from '@/components/shared/CityTag'
+import { parseTimeToMinutes } from '@/lib/timeUtils'
 
 const ORDINALS = [
   'One','Two','Three','Four','Five','Six','Seven',
@@ -13,34 +14,17 @@ function dayOrdinal(n: number): string {
 
 interface DaySectionProps {
   day: DayWithSlots
-}
-
-/**
- * Converts a user-entered time string into minutes from midnight for sorting.
- * Handles formats like "7:30 PM", "19:30", "7pm", "9:00 AM".
- * Returns Infinity for unparseable values so they sort to the end.
- */
-function parseTimeToMinutes(time: string | null | undefined): number {
-  if (!time) return Infinity
-  const clean = time.trim().toLowerCase()
-  const match = clean.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/)
-  if (!match) return Infinity
-  let h = parseInt(match[1])
-  const m = parseInt(match[2] ?? '0')
-  const period = match[3]
-  if (period === 'pm' && h !== 12) h += 12
-  if (period === 'am' && h === 12) h = 0
-  return h * 60 + m
+  flip?: boolean
 }
 
 function slotSortKey(slot: SlotWithProposals): number {
   const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
-  const parsed = parseTimeToMinutes(locked?.exact_time)
-  // If we got a real time, use it. Otherwise fall back to sort_order (scaled up so times always beat it).
+  const timeStr = locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
+  const parsed = parseTimeToMinutes(timeStr)
   return parsed < Infinity ? parsed : 10000 + slot.sort_order
 }
 
-export function DaySection({ day }: DaySectionProps) {
+export function DaySection({ day, flip = false }: DaySectionProps) {
   const sortedSlots = [...day.slots].sort((a, b) => slotSortKey(a) - slotSortKey(b))
 
   const dateStr = day.date
@@ -51,74 +35,64 @@ export function DaySection({ day }: DaySectionProps) {
       })
     : null
 
+  const dayTitle = day.narrative_title ?? day.label
+  const titleWithDate = dateStr ? `${dateStr.split(',')[0]} — ${dayTitle}` : dayTitle
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 32 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="mb-16"
+      className=""
     >
-      {/* Day image with Ken Burns */}
-      {day.image_url && (
-        <div className="relative h-56 sm:h-80 rounded-2xl overflow-hidden mb-8">
-          <motion.img
-            src={day.image_url}
-            alt={day.label}
-            className="absolute inset-0 w-full h-full object-cover"
-            initial={{ scale: 1 }}
-            animate={{ scale: 1.07 }}
-            transition={{ duration: 16, ease: 'linear', repeat: Infinity, repeatType: 'reverse' }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-6">
-            <p className="text-white/50 text-[10px] uppercase tracking-[0.25em] mb-1.5">
+      <div className={`flex flex-col md:items-start md:gap-12 ${flip ? 'md:flex-row-reverse' : 'md:flex-row'}`}>
+        {/* Image column: full-bleed photo only, no overlay text */}
+        {day.image_url && (
+          <div className="md:sticky md:top-24 w-full md:w-[42%] lg:w-[380px] shrink-0 mb-8 md:mb-0 order-first md:order-none">
+            <div className="relative h-64 md:h-[320px] lg:aspect-[3/4] lg:h-auto lg:min-h-[380px] rounded-xl overflow-hidden bg-muted">
+              <motion.img
+                src={day.image_url}
+                alt={day.label}
+                className="absolute inset-0 w-full h-full object-cover"
+                initial={{ scale: 1 }}
+                animate={{ scale: 1.05 }}
+                transition={{ duration: 18, ease: 'linear', repeat: Infinity, repeatType: 'reverse' }}
+              />
+              {day.image_attribution && (
+                <a
+                  href="#"
+                  className="absolute bottom-2 right-3 text-[10px] text-white/40 hover:text-white/70 transition-colors drop-shadow-sm"
+                >
+                  {day.image_attribution}
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Schedule column: day label + title + timeline (always present) */}
+        <div className="flex-1 min-w-0">
+          <header className="mb-10">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-medium mb-2">
               Day {dayOrdinal(day.day_number)}
             </p>
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-white leading-tight">
-              {day.narrative_title ?? day.label}
+            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+              {titleWithDate}
             </h2>
-            {day.narrative_title && (
-              <p className="text-white/60 text-xs mt-1">{dateStr ?? day.label}</p>
+            {day.city && (
+              <div className="mt-2 flex items-center gap-2">
+                <CityTag city={day.city} />
+              </div>
             )}
-            {!day.narrative_title && dateStr && (
-              <p className="text-white/60 text-xs mt-1">{dateStr}</p>
-            )}
-          </div>
-          {day.image_attribution && (
-            <a
-              href="#"
-              className="absolute bottom-2 right-3 text-[10px] text-white/25 hover:text-white/50 transition-colors"
-            >
-              {day.image_attribution}
-            </a>
-          )}
-        </div>
-      )}
+          </header>
 
-      {/* Day header (shown when no image) */}
-      {!day.image_url && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground/60">
-              Day {dayOrdinal(day.day_number)}
-            </p>
-            <span className="text-border text-xs">·</span>
-            <CityTag city={day.city} />
-            {dateStr && (
-              <span className="text-xs text-muted-foreground">{dateStr}</span>
-            )}
+          <div>
+            {sortedSlots.map((slot, i) => (
+              <TimelineItem key={slot.id} slot={slot} index={i} isLast={i === sortedSlots.length - 1} />
+            ))}
           </div>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-            {day.narrative_title ?? day.label}
-          </h2>
         </div>
-      )}
-
-      <div>
-        {sortedSlots.map((slot, i) => (
-          <TimelineItem key={slot.id} slot={slot} index={i} />
-        ))}
       </div>
     </motion.section>
   )
