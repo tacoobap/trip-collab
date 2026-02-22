@@ -6,17 +6,19 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import type { Trip, Day } from '@/types/database'
+import { SlotIconPicker, CATEGORY_ICONS } from './SlotIconPicker'
 
 interface SlotPreset {
   time_label: string
   category: 'food' | 'activity' | 'travel' | 'accommodation' | 'vibe'
+  icon: string | null
   enabled: boolean
 }
 
 const DEFAULT_PRESETS: SlotPreset[] = [
-  { time_label: 'Morning', category: 'activity', enabled: true },
-  { time_label: 'Afternoon', category: 'activity', enabled: true },
-  { time_label: 'Evening', category: 'food', enabled: true },
+  { time_label: 'Morning', category: 'activity', icon: null, enabled: true },
+  { time_label: 'Afternoon', category: 'activity', icon: null, enabled: true },
+  { time_label: 'Evening', category: 'food', icon: null, enabled: true },
 ]
 
 const CATEGORY_OPTIONS = [
@@ -45,6 +47,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
   const [city, setCity] = useState(trip.destinations[0] ?? '')
   const [customCity, setCustomCity] = useState('')
   const [presets, setPresets] = useState<SlotPreset[]>(DEFAULT_PRESETS)
+  const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -96,11 +99,18 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
   const updatePresetCategory = (index: number, category: SlotPreset['category']) =>
     setPresets((prev) => prev.map((p, i) => (i === index ? { ...p, category } : p)))
 
+  const updatePresetIcon = (index: number, icon: string) =>
+    setPresets((prev) => prev.map((p, i) => (i === index ? { ...p, icon } : p)))
+
+  const updatePresetLabel = (index: number, time_label: string) =>
+    setPresets((prev) => prev.map((p, i) => (i === index ? { ...p, time_label } : p)))
+
   const handleClose = () => {
     setSelectedDate('')
     setCity(trip.destinations[0] ?? '')
     setCustomCity('')
     setPresets(DEFAULT_PRESETS)
+    setOpenPickerIndex(null)
     setError('')
     onOpenChange(false)
   }
@@ -130,6 +140,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
           day_id: dayRef.id,
           time_label: preset.time_label,
           category: preset.category,
+          icon: preset.icon ?? null,
           status: 'open',
           locked_proposal_id: null,
           sort_order: i,
@@ -278,9 +289,32 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
                         </svg>
                       )}
                     </button>
-                    <span className="text-sm text-foreground w-24 shrink-0">
-                      {preset.time_label}
-                    </span>
+                    <input
+                      type="text"
+                      value={preset.time_label}
+                      onChange={(e) => updatePresetLabel(i, e.target.value)}
+                      disabled={!preset.enabled}
+                      placeholder="e.g. 9:00 AM"
+                      className="text-sm text-foreground w-24 shrink-0 bg-transparent border-b border-border focus:border-primary outline-none placeholder:text-muted-foreground/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                    />
+                    {/* Emoji picker trigger */}
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        disabled={!preset.enabled}
+                        onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
+                        className="text-lg leading-none w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-40"
+                        title="Choose icon"
+                      >
+                        {preset.icon ?? CATEGORY_ICONS[preset.category] ?? '📌'}
+                      </button>
+                      <SlotIconPicker
+                        open={openPickerIndex === i}
+                        current={preset.icon ?? CATEGORY_ICONS[preset.category] ?? '📌'}
+                        onSelect={(emoji) => updatePresetIcon(i, emoji)}
+                        onClose={() => setOpenPickerIndex(null)}
+                      />
+                    </div>
                     <select
                       disabled={!preset.enabled}
                       value={preset.category}

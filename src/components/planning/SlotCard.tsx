@@ -3,23 +3,15 @@ import { motion } from 'framer-motion'
 import type { SlotWithProposals } from '@/types/database'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
+import { CATEGORY_ICONS } from './SlotIconPicker'
 import { cn } from '@/lib/utils'
 
 interface SlotCardProps {
   slot: SlotWithProposals
-  currentName: string
   onClick: () => void
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  food: '🍽',
-  activity: '🎭',
-  travel: '✈️',
-  accommodation: '🏨',
-  vibe: '✨',
-}
-
-export function SlotCard({ slot, currentName: _currentName, onClick }: SlotCardProps) {
+export function SlotCard({ slot, onClick }: SlotCardProps) {
   const isOpen = slot.status === 'open'
   const isProposed = slot.status === 'proposed'
   const isLocked = slot.status === 'locked'
@@ -45,7 +37,7 @@ export function SlotCard({ slot, currentName: _currentName, onClick }: SlotCardP
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-sm">{CATEGORY_ICONS[slot.category] ?? '📌'}</span>
+          <span className="text-sm">{slot.icon ?? CATEGORY_ICONS[slot.category] ?? '📌'}</span>
           <span className="text-xs font-medium text-muted-foreground truncate">
             {slot.time_label}
           </span>

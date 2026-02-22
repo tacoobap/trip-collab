@@ -2,7 +2,7 @@ import { MapPin, Calendar, Sparkles, ChevronDown, NotebookPen, BedDouble } from 
 import { Link, useLocation } from 'react-router-dom'
 import type { Trip } from '@/types/database'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
-import { cn } from '@/lib/utils'
+import { cn, formatTripDate } from '@/lib/utils'
 
 interface PageHeaderProps {
   trip: Trip
@@ -28,16 +28,8 @@ export function PageHeader({
   const location = useLocation()
   const isItinerary = location.pathname.endsWith('/itinerary')
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return null
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
-  const startFmt = formatDate(trip.start_date)
-  const endFmt = formatDate(trip.end_date)
+  const startFmt = formatTripDate(trip.start_date)
+  const endFmt = formatTripDate(trip.end_date)
   const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : null
 
   return (

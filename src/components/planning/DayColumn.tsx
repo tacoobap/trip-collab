@@ -108,7 +108,6 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
           <SlotCard
             key={slot.id}
             slot={slot}
-            currentName={_currentName}
             onClick={() => onSlotClick(slot, day.label)}
           />
         ))}

@@ -1,0 +1,97 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tripboard · Firestore Security Rules
+//
+// Current posture: COLLABORATIVE / FRIENDS-ONLY
+//   - Anyone with the link can read and write trip data.
+//   - There is no user authentication in the app.
+//   - Rules focus on preventing accidental data destruction and basic abuse.
+//
+// To harden later:
+//   - Add Firebase Authentication and scope writes to request.auth != null
+//   - Restrict trips to members listed in trips/{id}.member_emails
+//   - Add per-field validation (string lengths, enum values, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Trips ─────────────────────────────────────────────────────────────────
+    match /trips/{tripId} {
+      allow read: if true;
+
+      // Anyone can create a trip; updates must keep required fields intact
+      allow create: if request.resource.data.keys().hasAll(['name', 'slug', 'destinations'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 200
+                    && request.resource.data.slug is string;
+
+      allow update: if request.resource.data.keys().hasAll(['name', 'slug', 'destinations'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 200;
+
+      // Prevent accidental deletion from the client
+      allow delete: if false;
+    }
+
+    // ── Days ──────────────────────────────────────────────────────────────────
+    match /days/{dayId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.trip_id is string
+                            && request.resource.data.label is string
+                            && request.resource.data.label.size() <= 200;
+      allow delete: if false;
+    }
+
+    // ── Slots ─────────────────────────────────────────────────────────────────
+    match /slots/{slotId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.day_id is string
+                            && request.resource.data.status in ['open', 'proposed', 'locked'];
+      allow delete: if false;
+    }
+
+    // ── Proposals ─────────────────────────────────────────────────────────────
+    match /proposals/{proposalId} {
+      allow read: if true;
+      allow create: if request.resource.data.slot_id is string
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() >= 1
+                    && request.resource.data.title.size() <= 300
+                    && request.resource.data.proposer_name is string
+                    && request.resource.data.proposer_name.size() >= 1
+                    && request.resource.data.proposer_name.size() <= 100;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // ── Trip Notes ────────────────────────────────────────────────────────────
+    match /trip_notes/{noteId} {
+      allow read: if true;
+      allow create: if request.resource.data.trip_id is string
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() >= 1
+                    && request.resource.data.text.size() <= 5000;
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    // ── Stays ─────────────────────────────────────────────────────────────────
+    match /stays/{stayId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.trip_id is string
+                            && request.resource.data.name is string
+                            && request.resource.data.name.size() >= 1
+                            && request.resource.data.name.size() <= 200
+                            && request.resource.data.status in ['considering', 'booked'];
+      allow delete: if true;
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+  }
+}

@@ -7,15 +7,11 @@ import { db, firebaseReady } from '@/lib/firebase'
 import { NewTripDialog } from '@/components/trips/NewTripDialog'
 import { Button } from '@/components/ui/button'
 import type { Trip } from '@/types/database'
+import { formatTripDate } from '@/lib/utils'
 
 function TripCard({ trip }: { trip: Trip }) {
-  const formatDate = (d: string | null) =>
-    d
-      ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      : null
-
-  const start = formatDate(trip.start_date)
-  const end = formatDate(trip.end_date)
+  const start = formatTripDate(trip.start_date)
+  const end = formatTripDate(trip.end_date)
   const dateRange = start && end ? `${start} – ${end}` : start ?? end ?? null
 
   return (

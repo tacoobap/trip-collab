@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import type { Stay, Trip } from '@/types/database'
 import type { StayInput } from '@/hooks/useStays'
-import { cn } from '@/lib/utils'
+import { cn, sanitizeUrl } from '@/lib/utils'
 
 function formatDateRange(checkIn: string, checkOut: string) {
   const fmt = (d: string) =>
@@ -126,6 +126,7 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
   const [checkIn, setCheckIn] = useState(trip.start_date ?? '')
   const [checkOut, setCheckOut] = useState(trip.end_date ?? '')
   const [url, setUrl] = useState('')
+  const [urlError, setUrlError] = useState('')
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState<'considering' | 'booked'>('considering')
   const [loading, setLoading] = useState(false)
@@ -140,6 +141,15 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
     if (!checkIn || !checkOut) { setError('Check-in and check-out are required.'); return }
     if (checkOut <= checkIn) { setError('Check-out must be after check-in.'); return }
 
+    setUrlError('')
+    let safeUrl: string | null = null
+    try {
+      safeUrl = sanitizeUrl(url)
+    } catch (err) {
+      setUrlError(err instanceof Error ? err.message : 'Invalid URL')
+      return
+    }
+
     setLoading(true)
     setError('')
     try {
@@ -148,7 +158,7 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
         city: effectiveCity,
         check_in: checkIn,
         check_out: checkOut,
-        url: url.trim() || null,
+        url: safeUrl,
         notes: notes.trim() || null,
         status,
         proposed_by: currentName,
@@ -254,11 +264,11 @@ function AddStayForm({ trip, currentName, onSubmit, onCancel }: AddStayFormProps
         </label>
         <Input
           placeholder="https://airbnb.com/rooms/…"
-          type="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => { setUrl(e.target.value); setUrlError('') }}
           className="text-sm"
         />
+        {urlError && <p className="text-xs text-destructive mt-1">{urlError}</p>}
       </div>
 
       <div>

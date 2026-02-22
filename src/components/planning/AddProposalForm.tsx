@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
+import { sanitizeUrl } from '@/lib/utils'
 
 interface AddProposalFormProps {
   currentName: string
@@ -16,14 +17,23 @@ export function AddProposalForm({ currentName, onSubmit, onCancel }: AddProposal
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
   const [url, setUrl] = useState('')
+  const [urlError, setUrlError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
+    setUrlError('')
+    let safeUrl = ''
+    try {
+      safeUrl = sanitizeUrl(url) ?? ''
+    } catch (err) {
+      setUrlError(err instanceof Error ? err.message : 'Invalid URL')
+      return
+    }
     setLoading(true)
     try {
-      await onSubmit({ title: title.trim(), note: note.trim(), url: url.trim() })
+      await onSubmit({ title: title.trim(), note: note.trim(), url: safeUrl })
     } finally {
       setLoading(false)
     }
@@ -58,13 +68,15 @@ export function AddProposalForm({ currentName, onSubmit, onCancel }: AddProposal
             className="text-sm resize-none"
           />
 
-          <Input
-            placeholder="Link (optional — Google Maps, website)"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            type="url"
-            className="text-sm"
-          />
+          <div>
+            <Input
+              placeholder="Link (optional — Google Maps, website)"
+              value={url}
+              onChange={(e) => { setUrl(e.target.value); setUrlError('') }}
+              className="text-sm"
+            />
+            {urlError && <p className="text-xs text-destructive mt-1">{urlError}</p>}
+          </div>
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button

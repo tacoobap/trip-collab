@@ -25,6 +25,11 @@ export type Database = {
   }
 }
 
+export type VibeTag = {
+  label: string
+  subtitle: string
+}
+
 export type Trip = {
   id: string
   name: string
@@ -34,6 +39,8 @@ export type Trip = {
   end_date: string | null
   created_at: string
   image_url: string | null
+  tagline: string | null
+  vibe_tags: VibeTag[] | null
 }
 
 export type Day = {
@@ -44,6 +51,8 @@ export type Day = {
   city: string
   day_number: number
   image_url: string | null
+  image_attribution: string | null  // "Photo by Name on Unsplash"
+  narrative_title: string | null    // LLM-generated, e.g. "Arrive & Settle In"
 }
 
 export type Slot = {
@@ -51,6 +60,7 @@ export type Slot = {
   day_id: string
   time_label: string
   category: 'food' | 'activity' | 'travel' | 'accommodation' | 'vibe'
+  icon: string | null   // custom emoji; falls back to category default when null
   status: 'open' | 'proposed' | 'locked'
   locked_proposal_id: string | null
   sort_order: number
@@ -73,6 +83,9 @@ export type Proposal = {
   confirmation_number: string | null
   confirmation_url: string | null    // booking ref link (different from the venue url)
   assigned_to: string | null         // who is responsible for making the reservation
+  // LLM-generated editorial copy
+  editorial_caption: string | null   // e.g. "Spanish moss, oak canopies, morning light"
+  narrative_time: string | null      // LLM-suggested clock time, e.g. "9:30 AM" — fallback when exact_time not manually set
 }
 
 export type Stay = {

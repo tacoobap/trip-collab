@@ -2,7 +2,9 @@ import { useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { DaySection } from '@/components/itinerary/DaySection'
 import { CityDivider } from '@/components/layout/CityDivider'
-import { Loader2, Share2, Camera } from 'lucide-react'
+import { VibeTagsSection } from '@/components/itinerary/VibeTagsSection'
+import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
+import { Loader2, Share2, Camera, Sparkles, BedDouble, ExternalLink } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTrip } from '@/hooks/useTrip'
 import { useTripNotes } from '@/hooks/useTripNotes'
@@ -14,8 +16,10 @@ import { useProposerName } from '@/hooks/useProposerName'
 import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { BedDouble, ExternalLink } from 'lucide-react'
 import type { Stay } from '@/types/database'
+import { generateNarrative } from '@/lib/generateNarrative'
+import { searchImage } from '@/lib/imageSearch'
+import { formatTripDate } from '@/lib/utils'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -28,9 +32,13 @@ export function ItineraryPage() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [staysOpen, setStaysOpen] = useState(false)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
+  const [heroPreview, setHeroPreview] = useState<string | null>(null)
   const [heroUploading, setHeroUploading] = useState(false)
   const [heroPct, setHeroPct] = useState(0)
   const heroInputRef = useRef<HTMLInputElement>(null)
+  const [generating, setGenerating] = useState(false)
+  const [generateStatus, setGenerateStatus] = useState('')
+  const [generateError, setGenerateError] = useState('')
 
   const handleShare = async () => {
     try {
@@ -43,6 +51,11 @@ export function ItineraryPage() {
   const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !trip) return
+
+    // Show the local file immediately — no CDN round-trip needed
+    const preview = URL.createObjectURL(file)
+    setHeroPreview(preview)
+
     setHeroUploading(true)
     setHeroPct(0)
     try {
@@ -51,9 +64,71 @@ export function ItineraryPage() {
       setHeroUrl(url)
     } catch (err) {
       console.error('Hero upload failed', err)
+      URL.revokeObjectURL(preview)
+      setHeroPreview(null)
     } finally {
       setHeroUploading(false)
       if (heroInputRef.current) heroInputRef.current.value = ''
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (!trip || generating) return
+    setGenerating(true)
+    setGenerateError('')
+    try {
+      // Step 1: generate narrative copy from the LLM
+      setGenerateStatus('Writing narrative…')
+      const result = await generateNarrative(trip, days)
+
+      // Step 2: write trip-level fields
+      setGenerateStatus('Saving narrative…')
+      await updateDoc(doc(db, 'trips', trip.id), {
+        tagline: result.tagline ?? null,
+        vibe_tags: result.vibe_tags ?? null,
+      })
+
+      // Step 3: write day narrative titles
+      await Promise.all(
+        result.days.map((d) =>
+          updateDoc(doc(db, 'days', d.day_id), { narrative_title: d.narrative_title })
+        )
+      )
+
+      // Step 4: write proposal editorial captions + suggested times
+      await Promise.all(
+        result.proposals.map((p) =>
+          updateDoc(doc(db, 'proposals', p.proposal_id), {
+            editorial_caption: p.editorial_caption,
+            narrative_time: p.suggested_time ?? null,
+          })
+        )
+      )
+
+      // Step 5: fetch and store a hero image for each day that has an image_query
+      const daysWithQuery = result.days.filter((d) => d.image_query)
+      for (let i = 0; i < daysWithQuery.length; i++) {
+        const d = daysWithQuery[i]
+        setGenerateStatus(`Finding photos… (${i + 1}/${daysWithQuery.length})`)
+        try {
+          const img = await searchImage(d.image_query)
+          await updateDoc(doc(db, 'days', d.day_id), {
+            image_url: img.url,
+            image_attribution: img.attribution,
+          })
+        } catch {
+          // Non-fatal — skip missing images silently
+        }
+      }
+
+      setGenerateStatus('Done!')
+      setTimeout(() => setGenerateStatus(''), 3000)
+    } catch (err) {
+      console.error('[handleGenerate]', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setGenerateError(msg)
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -73,13 +148,13 @@ export function ItineraryPage() {
     )
   }
 
-  const formatDate = (d: string | null) =>
-    d ? new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : null
-  const startFmt = formatDate(trip.start_date)
-  const endFmt = formatDate(trip.end_date)
+  const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric' })
+  const endFmt = formatTripDate(trip.end_date, { month: 'long', day: 'numeric' })
   const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
 
-  const currentHero = heroUrl ?? trip.image_url
+  // heroPreview = local blob URL shown instantly on file select (bypasses CDN cache)
+  // heroUrl    = confirmed remote URL after upload completes
+  const currentHero = heroPreview ?? heroUrl ?? trip.image_url
   const bookedStays = stays.filter((s) => s.status === 'booked')
 
   function stayForDay(date: string | null): Stay | undefined {
@@ -126,56 +201,99 @@ export function ItineraryPage() {
 
         {/* Trip info — bottom left */}
         <div className="absolute bottom-0 left-0 right-0 px-6 sm:px-12 pb-10">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <p className="text-white/60 text-xs uppercase tracking-[0.2em] mb-3">
-              Final Itinerary
-            </p>
-            <h1 className="text-4xl sm:text-6xl font-serif font-bold text-white leading-tight mb-2">
-              {trip.name}
-            </h1>
-            {trip.destinations.length > 0 && (
-              <p className="text-white/80 text-lg sm:text-xl">
-                {trip.destinations.join(' · ')}
-              </p>
-            )}
-            {dateRange && (
-              <p className="text-white/55 text-sm mt-1">{dateRange}</p>
-            )}
-          </motion.div>
+          <motion.p
+            className="text-white/50 text-[10px] uppercase tracking-[0.3em] mb-3"
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}
+          >
+            Final Itinerary
+          </motion.p>
+          <motion.h1
+            className="text-4xl sm:text-6xl font-serif font-bold text-white leading-tight mb-2"
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, duration: 0.6 }}
+          >
+            {trip.name}
+          </motion.h1>
+          {trip.tagline && (
+            <motion.p
+              className="text-white/70 text-base sm:text-lg italic mb-1"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42, duration: 0.5 }}
+            >
+              {trip.tagline}
+            </motion.p>
+          )}
+          {trip.destinations.length > 0 && (
+            <motion.p
+              className="text-white/80 text-lg sm:text-xl"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
+            >
+              {trip.destinations.join(' · ')}
+            </motion.p>
+          )}
+          {dateRange && (
+            <motion.p
+              className="text-white/50 text-sm mt-1"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56, duration: 0.5 }}
+            >
+              {dateRange}
+            </motion.p>
+          )}
         </div>
 
         {/* Actions — top right */}
-        <div className="absolute top-4 right-4 flex gap-2">
-          <input
-            ref={heroInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleHeroUpload}
-          />
-          <button
-            onClick={() => heroInputRef.current?.click()}
-            disabled={heroUploading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
-          >
-            {heroUploading ? (
-              <><Loader2 className="w-3 h-3 animate-spin" /> {heroPct}%</>
-            ) : (
-              <><Camera className="w-3 h-3" /> {currentHero ? 'Change photo' : 'Add cover photo'}</>
-            )}
-          </button>
-          <button
-            onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
-          >
-            <Share2 className="w-3 h-3" />
-            {copied ? 'Copied!' : 'Share'}
-          </button>
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+          <div className="flex gap-2">
+            <input
+              ref={heroInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleHeroUpload}
+            />
+            <button
+              onClick={() => heroInputRef.current?.click()}
+              disabled={heroUploading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
+            >
+              {heroUploading ? (
+                <><Loader2 className="w-3 h-3 animate-spin" /> {heroPct}%</>
+              ) : (
+                <><Camera className="w-3 h-3" /> {currentHero ? 'Change photo' : 'Add cover photo'}</>
+              )}
+            </button>
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all disabled:opacity-60"
+            >
+              {generating ? (
+                <><Loader2 className="w-3 h-3 animate-spin" /> {generateStatus || 'Generating…'}</>
+              ) : (
+                <><Sparkles className="w-3 h-3" /> {trip.tagline ? 'Regenerate' : 'Generate narrative'}</>
+              )}
+            </button>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
+            >
+              <Share2 className="w-3 h-3" />
+              {copied ? 'Copied!' : 'Share'}
+            </button>
+          </div>
+          {generateError && (
+            <p className="text-xs text-red-300 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg max-w-xs text-right">
+              {generateError}
+            </p>
+          )}
         </div>
       </div>
 
+      {/* ── Vibe tags ── */}
+      {trip.vibe_tags && trip.vibe_tags.length > 0 && (
+        <VibeTagsSection tags={trip.vibe_tags} />
+      )}
+
       {/* ── Content ── */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-14">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-14 pb-0">
         {days.length === 0 ? (
           <div className="text-center py-16 px-4">
             <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
@@ -184,7 +302,7 @@ export function ItineraryPage() {
             </Link>
           </div>
         ) : (
-          days.map((day, i) => {
+          days.map((day) => {
             const showDivider = day.city !== lastCity
             lastCity = day.city
             const dayStay = stayForDay(day.date)
@@ -215,13 +333,16 @@ export function ItineraryPage() {
                 )}
 
                 <div className="mt-6">
-                  <DaySection day={day} dayIndex={i} />
+                  <DaySection day={day} />
                 </div>
               </div>
             )
           })
         )}
       </div>
+
+      {/* ── At a Glance ── */}
+      {days.length > 0 && <AtAGlanceSection days={days} />}
 
       <StaysDrawer
         open={staysOpen}
