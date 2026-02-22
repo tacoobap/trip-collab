@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
 
@@ -13,6 +13,7 @@ export function useTrip(slug: string | undefined) {
     if (!slug) return
 
     let cancelled = false
+    let unsubTrip: (() => void) | null = null
     let unsubDays: (() => void) | null = null
     let unsubSlots: (() => void) | null = null
     let unsubProposals: (() => void) | null = null
@@ -30,6 +31,13 @@ export function useTrip(slug: string | undefined) {
         const tripDoc = tripSnap.docs[0]
         const tripData = { id: tripDoc.id, ...tripDoc.data() } as Trip
         setTrip(tripData)
+
+        // Subscribe to trip doc so updates (e.g. vibe_heading, vibe_tags) flow to UI
+        unsubTrip = onSnapshot(doc(db, 'trips', tripDoc.id), (snap) => {
+          if (cancelled) return
+          const next = { id: snap.id, ...snap.data() } as Trip
+          setTrip(next)
+        })
 
         // Mutable maps shared by all snapshot callbacks in this effect invocation
         const liveSlots = new Map<string, Slot>()
@@ -133,6 +141,7 @@ export function useTrip(slug: string | undefined) {
 
     return () => {
       cancelled = true
+      unsubTrip?.()
       unsubDays?.()
       unsubSlots?.()
       unsubProposals?.()

@@ -34,24 +34,24 @@ const CARD_BG = [
   'bg-[#B76E79]/8',
 ] as const
 
-// Map label keywords to Lucide icon (else fallback)
+// Map label + subtitle keywords to Lucide icon (icon per card, based on text)
 const ICON_MAP: Array<{ keys: string[]; Icon: LucideIcon }> = [
-  { keys: ['walkable', 'walk', 'foot'], Icon: Footprints },
-  { keys: ['coffee', 'morning'], Icon: Coffee },
-  { keys: ['golden', 'sunset', 'sun', 'rooftop'], Icon: Sun },
+  { keys: ['walkable', 'walk', 'foot', 'on foot'], Icon: Footprints },
+  { keys: ['coffee', 'morning', 'starts right'], Icon: Coffee },
+  { keys: ['golden', 'sunset', 'sun', 'rooftop', 'cocktails'], Icon: Sun },
   { keys: ['architecture', 'building', 'wander', 'museum'], Icon: Building2 },
-  { keys: ['dining', 'food', 'eat', 'curated', 'boutique'], Icon: UtensilsCrossed },
-  { keys: ['romantic', 'couple', 'two'], Icon: Heart },
+  { keys: ['dining', 'food', 'eat', 'curated', 'boutique', 'chain'], Icon: UtensilsCrossed },
+  { keys: ['romantic', 'couple', 'two', 'for two'], Icon: Heart },
   { keys: ['mountain', 'hike', 'nature'], Icon: Mountain },
   { keys: ['coastal', 'beach', 'water'], Icon: Waves },
   { keys: ['night', 'nightlife'], Icon: Moon },
   { keys: ['culture', 'art'], Icon: Palette },
 ]
 
-function vibeIcon(label: string): LucideIcon {
-  const lower = label.toLowerCase()
+function vibeIcon(label: string, subtitle?: string): LucideIcon {
+  const text = `${label} ${subtitle ?? ''}`.toLowerCase()
   for (const { keys, Icon } of ICON_MAP) {
-    if (keys.some((k) => lower.includes(k))) return Icon
+    if (keys.some((k) => text.includes(k))) return Icon
   }
   return Sun
 }
@@ -75,17 +75,17 @@ export function VibeTagsSection({ tags, heading }: VibeTagsSectionProps) {
         transition={{ duration: 0.5, ease: 'easeOut' }}
         className="text-center mb-6"
       >
-        <p className="text-[10px] uppercase tracking-[0.25em] text-primary/90 mb-2 font-sans">
+        <p className="text-[10px] uppercase tracking-[0.25em] text-[#b8860b]/90 mb-2 font-sans">
           The Vibe
         </p>
-        <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold text-foreground">
+        <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-normal text-foreground antialiased">
           {sectionTitle}
         </h2>
       </motion.header>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {tags.slice(0, 6).map((tag, i) => {
-          const Icon = vibeIcon(tag.label)
+          const Icon = vibeIcon(tag.label, tag.subtitle)
           const colorClass = CARD_COLORS[i % CARD_COLORS.length]
           const bgClass = CARD_BG[i % CARD_BG.length]
           return (
@@ -95,15 +95,18 @@ export function VibeTagsSection({ tags, heading }: VibeTagsSectionProps) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-20px' }}
               transition={{ duration: 0.4, delay: i * 0.06, ease: 'easeOut' }}
-              className="rounded-xl border border-border/60 bg-white shadow-sm px-5 py-5 flex flex-col"
+              className="rounded-xl border border-border/50 bg-[#faf9f7] shadow-sm px-5 py-5 flex flex-col items-center text-center"
             >
-              <div className={cn('flex items-center gap-2 mb-2', colorClass)}>
-                <span className={bgClass + ' rounded-lg p-1.5'}>
-                  <Icon className="w-4 h-4" strokeWidth={2} />
+              {/* Fixed-height block so icon + subtitle stay vertically aligned across all cards */}
+              <div className="min-h-[4.5rem] flex flex-col items-center justify-center mb-1">
+                <div className={cn('rounded-lg p-2 mb-2', bgClass, colorClass)}>
+                  <Icon className="w-5 h-5" strokeWidth={2} />
+                </div>
+                <span className={cn('text-sm font-normal font-serif antialiased', colorClass)}>
+                  {tag.label}
                 </span>
-                <span className="text-sm font-semibold font-sans">{tag.label}</span>
               </div>
-              <p className="text-xs text-muted-foreground font-sans leading-snug">
+              <p className="text-xs text-muted-foreground font-sans leading-snug font-light">
                 {tag.subtitle}
               </p>
             </motion.div>

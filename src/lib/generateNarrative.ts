@@ -28,7 +28,7 @@ Given trip data, return a JSON object with exactly this shape:
   "tagline": string,          // 4–10 words: evocative subtitle only. No trip name, no dates, no year. Examples: "From Parisian Splendor to Oxfordian Triumph", "A Romantic Valentine's Getaway"
   "vibe_heading": string,     // 2–4 words: the section headline above the vibe cards, e.g. "Intention Over Itinerary", "Adventure Awaits", "Slow & Savored"
   "vibe_tags": [              // Exactly 6 tags capturing the trip's character (like the Charleston itinerary)
-    { "label": string, "subtitle": string }  // label: 1–2 words (e.g. "Walkable", "Coffee First", "Golden Hour"). subtitle: 2–5 words only — punchy phrase, NOT a sentence. Examples: "Everything on foot", "Every morning starts right", "Rooftop cocktails at sunset", "Wander, don't museum", "Boutique over chain", "Designed for two"
+    { "label": string, "subtitle": string }  // label: 1–2 words (e.g. "Walkable", "Coffee First", "Golden Hour"). subtitle: 5 words max — very short punchy phrase. Examples: "Everything on foot", "Every morning starts right", "Rooftop cocktails at sunset", "Wander, don't museum", "Boutique over chain", "Designed for two"
   ],
   "days": [
     {
@@ -55,7 +55,7 @@ Rules:
 - tagline: exactly 4–10 words. Evocative phrase only — no trip name, no dates, no year. e.g. "From Parisian Splendor to Oxfordian Triumph", "A Romantic Valentine's Getaway".
 - Be specific to the actual places and activities. Do not use generic travel phrases.
 - Editorial captions should feel like a sentence from a travel essay, not a review.
-- Vibe tags: exactly 6. Each subtitle must be 2–5 words — concise and evocative (e.g. "Everything on foot", "Boutique over chain"). No full sentences.
+- Vibe tags: exactly 6. Each subtitle must be 5 words max — very short and evocative (e.g. "Everything on foot", "Boutique over chain", "Designed for two"). No full sentences.
 - vibe_heading sets the tone for the section (e.g. "Intention Over Itinerary" for a relaxed romantic trip).
 - Image queries should be highly specific and visual — include place names, time of day, mood.
 - Output valid JSON only. No markdown, no explanation.`

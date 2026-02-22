@@ -18,15 +18,12 @@ export function TimelineItem({ slot, index, isLast = false }: TimelineItemProps)
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true, margin: '-20px' }}
         transition={{ duration: 0.4, delay: index * 0.04, ease: 'easeOut' }}
-        className="flex gap-4 items-start opacity-50"
+        className="relative flex items-start opacity-50"
       >
-        <div className="flex flex-col items-center shrink-0 pt-2">
-          <div className="w-2 h-2 rounded-full bg-primary/40" />
-          {!isLast && <div className="w-px flex-1 bg-muted-foreground/20 mt-2 min-h-[28px]" />}
-        </div>
-        <div className="pb-8 min-w-0 flex-1 pt-1">
-          <p className="text-sm text-muted-foreground">{slot.time_label}</p>
-          <p className="font-sans font-medium text-foreground/70 mt-0.5">Still deciding…</p>
+        <div className="absolute -left-8 top-2.5 w-2.5 h-2.5 rounded-full bg-primary/40 shrink-0" />
+        <div className="pb-10 min-w-0 flex-1 pt-0.5">
+          <p className="text-sm font-bold font-sans text-primary">{slot.time_label}</p>
+          <p className="font-sans font-semibold text-[#333333] mt-1">Still deciding…</p>
         </div>
       </motion.div>
     )
@@ -34,7 +31,6 @@ export function TimelineItem({ slot, index, isLast = false }: TimelineItemProps)
 
   const { exact_time, narrative_time, editorial_caption } = lockedProposal
   const displayTime = exact_time ?? narrative_time ?? slot.time_label
-  const isClockTime = !!(exact_time ?? narrative_time)
 
   return (
     <motion.div
@@ -42,39 +38,24 @@ export function TimelineItem({ slot, index, isLast = false }: TimelineItemProps)
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true, margin: '-20px' }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: 'easeOut' }}
-      className="flex gap-4 items-start"
+      className="relative flex items-start"
     >
-      {/* Timeline dot + connecting line */}
-      <div className="flex flex-col items-center shrink-0 pt-2">
-        <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
-        {!isLast && <div className="w-px flex-1 bg-muted-foreground/25 mt-2 min-h-[36px]" />}
-      </div>
+      {/* Timeline dot (sits on the vertical line from DaySection) */}
+      <div className="absolute -left-8 top-2.5 w-2.5 h-2.5 rounded-full bg-primary shrink-0 shadow-sm" aria-hidden />
 
       {/* Content */}
-      <div className="pb-10 min-w-0 flex-1">
-        <p
-          className={
-            isClockTime
-              ? 'text-sm font-normal text-foreground mb-0.5'
-              : 'text-sm text-muted-foreground mb-0.5'
-          }
-        >
+      <div className="pb-10 min-w-0 flex-1 pt-0.5">
+        <p className="text-sm font-bold font-sans text-primary">
           {displayTime}
         </p>
 
-        <h4 className="font-sans font-semibold text-foreground text-lg leading-snug">
+        <h4 className="font-sans font-semibold text-[#333333] text-base sm:text-lg leading-snug mt-1">
           {lockedProposal.title}
         </h4>
 
-        {editorial_caption && (
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-            {editorial_caption}
-          </p>
-        )}
-
-        {lockedProposal.note && !editorial_caption && (
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-            {lockedProposal.note}
+        {(editorial_caption || lockedProposal.note) && (
+          <p className="text-sm font-normal text-[#6C757D] mt-1 leading-relaxed">
+            {editorial_caption || lockedProposal.note}
           </p>
         )}
 

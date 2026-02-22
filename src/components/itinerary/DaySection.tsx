@@ -71,13 +71,13 @@ export function DaySection({ day, flip = false }: DaySectionProps) {
           </div>
         )}
 
-        {/* Schedule column: day label + title + timeline (always present) */}
-        <div className="flex-1 min-w-0">
-          <header className="mb-10">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-medium mb-2">
-              Day {dayOrdinal(day.day_number)}
+        {/* Schedule column: day label + title + timeline (matches reference) */}
+        <div className="flex-1 min-w-0 relative">
+          <header className="mb-12">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-medium mb-3 font-sans">
+              DAY {dayOrdinal(day.day_number).toUpperCase()}
             </p>
-            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-[#2E2E2E] leading-tight">
               {titleWithDate}
             </h2>
             {day.city && (
@@ -87,7 +87,12 @@ export function DaySection({ day, flip = false }: DaySectionProps) {
             )}
           </header>
 
-          <div>
+          <div className="relative pl-8">
+            {/* Vertical timeline line: from first dot to bottom */}
+            <div
+              className="absolute left-[5px] top-2.5 bottom-0 w-px bg-[#D3D3D3]"
+              aria-hidden
+            />
             {sortedSlots.map((slot, i) => (
               <TimelineItem key={slot.id} slot={slot} index={i} isLast={i === sortedSlots.length - 1} />
             ))}

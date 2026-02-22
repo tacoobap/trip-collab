@@ -35,6 +35,15 @@ export function ItineraryPage() {
   const [scrolledPastHero, setScrolledPastHero] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
 
+  const [updateTextModalOpen, setUpdateTextModalOpen] = useState(false)
+  const [updateTextSelections, setUpdateTextSelections] = useState({
+    vibe: true,
+    dayDescriptions: true,
+    activityDescriptions: true,
+  })
+  const [updateTextDayScopeMode, setUpdateTextDayScopeMode] = useState<'all' | 'selected'>('all')
+  const [updateTextSelectedDayIds, setUpdateTextSelectedDayIds] = useState<string[]>([])
+
   useEffect(() => {
     const onScroll = () => {
       const hero = heroRef.current
@@ -158,6 +167,81 @@ export function ItineraryPage() {
     } finally {
       setGenerating(false)
     }
+  }
+
+  const handleUpdateText = async (
+    selections: typeof updateTextSelections,
+    dayScope: { mode: 'all' | 'selected'; selectedDayIds: string[] }
+  ) => {
+    if (!trip || generating) return
+    const effectiveDayIds =
+      dayScope.mode === 'all'
+        ? days.map((d) => d.id)
+        : dayScope.selectedDayIds
+
+    setGenerating(true)
+    setGenerateError('')
+    setUpdateTextModalOpen(false)
+    try {
+      setGenerateStatus('Updating…')
+      const result = await generateNarrative(trip, days)
+      setGenerateStatus('Saving…')
+
+      const tripUpdates: { vibe_heading?: string | null; vibe_tags?: typeof result.vibe_tags } = {}
+      if (selections.vibe) {
+        tripUpdates.vibe_heading = result.vibe_heading ?? null
+        tripUpdates.vibe_tags = result.vibe_tags ?? null
+      }
+      if (Object.keys(tripUpdates).length > 0) {
+        await updateDoc(doc(db, 'trips', trip.id), tripUpdates)
+      }
+      if (selections.dayDescriptions && result.days.length > 0 && effectiveDayIds.length > 0) {
+        const daysToUpdate = result.days.filter((d) => effectiveDayIds.includes(d.day_id))
+        await Promise.all(
+          daysToUpdate.map((d) =>
+            updateDoc(doc(db, 'days', d.day_id), { narrative_title: d.narrative_title })
+          )
+        )
+      }
+      if (selections.activityDescriptions && result.proposals.length > 0 && effectiveDayIds.length > 0) {
+        const allowedProposalIds = new Set<string>()
+        for (const day of days) {
+          if (!effectiveDayIds.includes(day.id)) continue
+          for (const slot of day.slots) {
+            for (const p of slot.proposals) allowedProposalIds.add(p.id)
+          }
+        }
+        const proposalsToUpdate = result.proposals.filter((p) => allowedProposalIds.has(p.proposal_id))
+        await Promise.all(
+          proposalsToUpdate.map((p) =>
+            updateDoc(doc(db, 'proposals', p.proposal_id), {
+              editorial_caption: p.editorial_caption,
+              narrative_time: p.suggested_time ?? null,
+            })
+          )
+        )
+      }
+
+      setGenerateStatus('Done!')
+      setTimeout(() => setGenerateStatus(''), 3000)
+    } catch (err) {
+      console.error('[handleUpdateText]', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setGenerateError(msg)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const openUpdateTextModal = () => {
+    setUpdateTextSelections({
+      vibe: true,
+      dayDescriptions: true,
+      activityDescriptions: true,
+    })
+    setUpdateTextDayScopeMode('all')
+    setUpdateTextSelectedDayIds(days.map((d) => d.id))
+    setUpdateTextModalOpen(true)
   }
 
   if (loading) {
@@ -343,7 +427,7 @@ export function ItineraryPage() {
                 )}
               </button>
               <button
-                onClick={handleGenerate}
+                onClick={trip.tagline ? openUpdateTextModal : handleGenerate}
                 disabled={generating}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50"
                 title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
@@ -362,6 +446,130 @@ export function ItineraryPage() {
             )}
           </div>
         </div>
+
+        {/* Update text modal — multi-select which sections and optionally which days */}
+        {updateTextModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setUpdateTextModalOpen(false)}
+          >
+            <div
+              className="bg-card border border-border rounded-xl shadow-xl max-w-sm w-full p-5 max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-semibold text-foreground mb-3">
+                Update text
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Choose which parts to regenerate:
+              </p>
+              <div className="space-y-2 mb-4">
+                {[
+                  { key: 'vibe' as const, label: 'Vibe' },
+                  { key: 'dayDescriptions' as const, label: 'Day descriptions' },
+                  { key: 'activityDescriptions' as const, label: 'Activity descriptions' },
+                ].map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-2 cursor-pointer text-sm text-foreground"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={updateTextSelections[key]}
+                      onChange={(e) =>
+                        setUpdateTextSelections((s) => ({ ...s, [key]: e.target.checked }))
+                      }
+                      className="rounded border-border"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+
+              {(updateTextSelections.dayDescriptions || updateTextSelections.activityDescriptions) && days.length > 0 && (
+                <div className="mb-6 pt-3 border-t border-border">
+                  <p className="text-xs font-medium text-foreground mb-2">Apply to:</p>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-foreground">
+                      <input
+                        type="radio"
+                        name="dayScope"
+                        checked={updateTextDayScopeMode === 'all'}
+                        onChange={() => setUpdateTextDayScopeMode('all')}
+                        className="border-border"
+                      />
+                      Whole trip
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-foreground">
+                      <input
+                        type="radio"
+                        name="dayScope"
+                        checked={updateTextDayScopeMode === 'selected'}
+                        onChange={() => setUpdateTextDayScopeMode('selected')}
+                        className="border-border"
+                      />
+                      Selected days
+                    </label>
+                    {updateTextDayScopeMode === 'selected' && (
+                      <div className="ml-5 mt-1 space-y-1.5">
+                        {days.map((day) => (
+                          <label
+                            key={day.id}
+                            className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={updateTextSelectedDayIds.includes(day.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setUpdateTextSelectedDayIds((ids) => [...ids, day.id])
+                                } else {
+                                  setUpdateTextSelectedDayIds((ids) => ids.filter((id) => id !== day.id))
+                                }
+                              }}
+                              className="rounded border-border"
+                            />
+                            {day.narrative_title || day.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUpdateTextModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleUpdateText(updateTextSelections, {
+                      mode: updateTextDayScopeMode,
+                      selectedDayIds: updateTextSelectedDayIds,
+                    })
+                  }
+                  disabled={
+                    (!updateTextSelections.vibe &&
+                      !updateTextSelections.dayDescriptions &&
+                      !updateTextSelections.activityDescriptions) ||
+                    ((updateTextSelections.dayDescriptions || updateTextSelections.activityDescriptions) &&
+                      updateTextDayScopeMode === 'selected' &&
+                      updateTextSelectedDayIds.length === 0)
+                  }
+                  className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 border border-primary rounded-md disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  Update
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Content ── */}
         {days.length === 0 ? (
@@ -382,7 +590,7 @@ export function ItineraryPage() {
             return (
               <div
                 key={day.id}
-                className={dayIndex % 2 === 0 ? 'bg-background' : 'bg-sand/40'}
+                className="bg-[#F8F6F2]"
               >
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-14">
                   {showDivider && <CityDivider city={day.city} />}
