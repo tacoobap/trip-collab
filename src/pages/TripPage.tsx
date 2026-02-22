@@ -2,22 +2,19 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
-import { TripNotesDrawer } from '@/components/planning/TripNotesDrawer'
 import { StaysDrawer } from '@/components/stays/StaysDrawer'
 import { NamePrompt } from './NamePrompt'
 import { useProposerName } from '@/hooks/useProposerName'
 import { useTrip } from '@/hooks/useTrip'
-import { useTripNotes } from '@/hooks/useTripNotes'
 import { useStays } from '@/hooks/useStays'
-import { Loader2 } from 'lucide-react'
+import { formatTripDate } from '@/lib/utils'
+import { Loader2, BedDouble } from 'lucide-react'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
   const { name, setName, clearName } = useProposerName()
   const { trip, days, travelers, loading, error } = useTrip(slug)
-  const { notes, addNote, deleteNote } = useTripNotes(trip?.id)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
-  const [notesOpen, setNotesOpen] = useState(false)
   const [staysOpen, setStaysOpen] = useState(false)
 
   if (loading) {
@@ -47,6 +44,10 @@ export function TripPage() {
     return <NamePrompt onSetName={setName} travelers={travelers} />
   }
 
+  const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric', year: 'numeric' })
+  const endFmt = formatTripDate(trip.end_date, { month: 'long', day: 'numeric', year: 'numeric' })
+  const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
+
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
@@ -54,11 +55,28 @@ export function TripPage() {
         travelers={travelers}
         currentName={name}
         onChangeName={clearName}
-        stayCount={stays.length}
-        onOpenStays={() => setStaysOpen(true)}
-        noteCount={notes.length}
-        onOpenNotes={() => setNotesOpen(true)}
       />
+      <div className="border-b border-border bg-warm-white/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
+              {trip.name}
+            </h2>
+            {dateRange && (
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {dateRange}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setStaysOpen(true)}
+            className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            title="Stays"
+          >
+            <BedDouble className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
       <main className="pt-6">
         <PlanningBoard trip={trip} days={days} currentName={name} />
       </main>
@@ -72,15 +90,6 @@ export function TripPage() {
         onAdd={addStay}
         onUpdate={updateStay}
         onDelete={deleteStay}
-      />
-
-      <TripNotesDrawer
-        open={notesOpen}
-        onClose={() => setNotesOpen(false)}
-        notes={notes}
-        currentName={name}
-        onAdd={(text) => addNote(text, name)}
-        onDelete={deleteNote}
       />
     </div>
   )

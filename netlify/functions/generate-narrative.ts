@@ -6,8 +6,9 @@ const SYSTEM_PROMPT = `You are crafting editorial copy for a boutique travel iti
 Given trip data, return a JSON object with exactly this shape:
 {
   "tagline": string,          // One line: evocative subtitle for the trip — e.g. "A Romantic Valentine's Getaway · 2026"
-  "vibe_tags": [              // 5–6 tags capturing the trip's character
-    { "label": string, "subtitle": string }  // label: 1–3 words. subtitle: one short line
+  "vibe_heading": string,      // 2–4 words: section headline above vibe cards, e.g. "Intention Over Itinerary", "Adventure Awaits", "Slow & Savored"
+  "vibe_tags": [               // Exactly 6 tags capturing the trip's character
+    { "label": string, "subtitle": string }  // label: 1–2 words (e.g. "Walkable", "Coffee First"). subtitle: 2–5 words only — punchy phrase, e.g. "Everything on foot", "Boutique over chain", "Designed for two"
   ],
   "days": [
     {
@@ -30,7 +31,8 @@ Given trip data, return a JSON object with exactly this shape:
 Rules:
 - Be specific to the actual places and activities. Do not use generic travel phrases.
 - Editorial captions should feel like a sentence from a travel essay, not a review.
-- Vibe tags should capture the overall spirit of the trip.
+- Vibe tags: exactly 6. Each subtitle must be 2–5 words — concise (e.g. "Everything on foot", "Boutique over chain"). No full sentences.
+- vibe_heading sets the tone (e.g. "Intention Over Itinerary" for a relaxed romantic trip).
 - Image queries should be highly specific and visual — include place names, time of day, mood.
 - Output valid JSON only. No markdown, no explanation.`
 

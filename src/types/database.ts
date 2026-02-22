@@ -40,6 +40,7 @@ export type Trip = {
   created_at: string
   image_url: string | null
   tagline: string | null
+  vibe_heading: string | null   // e.g. "Intention Over Itinerary"
   vibe_tags: VibeTag[] | null
 }
 

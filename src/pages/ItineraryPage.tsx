@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { DaySection } from '@/components/itinerary/DaySection'
 import { CityDivider } from '@/components/layout/CityDivider'
@@ -7,11 +7,8 @@ import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
 import { Loader2, Camera, Sparkles, BedDouble } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTrip } from '@/hooks/useTrip'
-import { useTripNotes } from '@/hooks/useTripNotes'
 import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { TripNotesDrawer } from '@/components/planning/TripNotesDrawer'
-import { StaysDrawer } from '@/components/stays/StaysDrawer'
 import { useProposerName } from '@/hooks/useProposerName'
 import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
@@ -25,11 +22,7 @@ export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
   const { trip, days, travelers, loading, error } = useTrip(slug)
   const { name, clearName } = useProposerName()
-  const { notes, addNote, deleteNote } = useTripNotes(trip?.id)
-  const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
-
-  const [notesOpen, setNotesOpen] = useState(false)
-  const [staysOpen, setStaysOpen] = useState(false)
+  const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
   const [heroUploading, setHeroUploading] = useState(false)
@@ -38,6 +31,20 @@ export function ItineraryPage() {
   const [generating, setGenerating] = useState(false)
   const [generateStatus, setGenerateStatus] = useState('')
   const [generateError, setGenerateError] = useState('')
+  const [scrolledPastHero, setScrolledPastHero] = useState(false)
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onScroll = () => {
+      const hero = heroRef.current
+      if (!hero) return
+      const threshold = hero.getBoundingClientRect().height - 1
+      setScrolledPastHero(window.scrollY >= threshold)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
 
   const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,6 +84,7 @@ export function ItineraryPage() {
       setGenerateStatus('Saving narrative…')
       await updateDoc(doc(db, 'trips', trip.id), {
         tagline: result.tagline ?? null,
+        vibe_heading: result.vibe_heading ?? null,
         vibe_tags: result.vibe_tags ?? null,
       })
 
@@ -184,19 +192,22 @@ export function ItineraryPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader
-        trip={trip}
-        travelers={travelers}
-        currentName={name}
-        onChangeName={clearName}
-        stayCount={stays.length}
-        onOpenStays={() => setStaysOpen(true)}
-        noteCount={notes.length}
-        onOpenNotes={() => setNotesOpen(true)}
-      />
+      {/* Fixed overlay when hero is in view */}
+      {!scrolledPastHero && (
+        <PageHeader
+          trip={trip}
+          travelers={travelers}
+          currentName={name}
+          onChangeName={clearName}
+          overHero
+        />
+      )}
 
-      {/* ── Hero ── */}
-      <div className="relative h-[62vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40">
+      {/* ── Full-viewport hero (Charleston-style) ── */}
+      <div
+        ref={heroRef}
+        className="relative min-h-screen h-[100vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40"
+      >
         {currentHero && (
           <motion.img
             src={currentHero}
@@ -213,45 +224,67 @@ export function ItineraryPage() {
           />
         )}
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/10" />
+        {/* Gradient overlay + soft fade into next section at bottom */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to top, hsl(var(--background)), transparent)',
+          }}
+        />
 
-        {/* Trip info — bottom left */}
-        <div className="absolute bottom-0 left-0 right-0 px-6 sm:px-12 pb-10">
-          <motion.h1
-            className="text-4xl sm:text-6xl font-serif font-bold text-white leading-tight mb-2"
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, duration: 0.6 }}
-          >
-            {trip.name}
-          </motion.h1>
-          {trip.tagline && (
-            <motion.p
-              className="text-white/70 text-base sm:text-lg italic mb-1"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42, duration: 0.5 }}
+        {/* Trip info — centered, elegant */}
+        <div className="absolute inset-0 flex items-center justify-center px-6 sm:px-12">
+          <div className="text-center max-w-2xl">
+            <motion.h1
+              className="font-serif text-4xl sm:text-5xl md:text-6xl font-medium text-white leading-tight tracking-tight mb-4"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
             >
-              {trip.tagline}
-            </motion.p>
-          )}
-          {trip.destinations.length > 0 && (
-            <motion.p
-              className="text-white/80 text-lg sm:text-xl"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
-            >
-              {trip.destinations.join(' · ')}
-            </motion.p>
-          )}
-          {dateRange && (
-            <motion.p
-              className="text-white/50 text-sm mt-1"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56, duration: 0.5 }}
-            >
-              {dateRange}
-            </motion.p>
-          )}
+              {trip.name}
+            </motion.h1>
+            {trip.tagline && (() => {
+              const withoutTripName = trip.tagline.replace(new RegExp(` · ${trip.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '').trim()
+              const displayLine = trip.start_date
+                ? `${withoutTripName} · ${new Date(trip.start_date).getFullYear()}`
+                : withoutTripName
+              return (
+                <motion.p
+                  className="font-serif text-sm sm:text-base md:text-lg text-white/80 italic font-normal tracking-wide mb-3"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35, duration: 0.45 }}
+                >
+                  {displayLine}
+                </motion.p>
+              )
+            })()}
+            {trip.destinations.length > 0 && (
+              <motion.p
+                className="text-white/80 text-base sm:text-lg font-sans font-light tracking-wide mb-1"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.45 }}
+              >
+                {trip.destinations.join(' · ')}
+              </motion.p>
+            )}
+            {dateRange && (
+              <motion.p
+                className="text-white/60 text-sm font-sans font-light"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55, duration: 0.45 }}
+              >
+                {dateRange}
+              </motion.p>
+            )}
+          </div>
         </div>
 
-        {/* Actions — top right */}
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+        {/* Actions — top right, below header (visible but subtle) */}
+        <div className="absolute top-14 right-4 z-10 flex flex-col items-end gap-1.5">
           <div className="flex gap-2">
             <input
               ref={heroInputRef}
@@ -263,104 +296,109 @@ export function ItineraryPage() {
             <button
               onClick={() => heroInputRef.current?.click()}
               disabled={heroUploading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-black/25 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 text-xs font-medium border border-white/15 transition-all"
+              title={currentHero ? 'Change cover photo' : 'Add cover photo'}
             >
               {heroUploading ? (
-                <><Loader2 className="w-3 h-3 animate-spin" /> {heroPct}%</>
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
               ) : (
-                <><Camera className="w-3 h-3" /> {currentHero ? 'Change photo' : 'Add cover photo'}</>
+                <><Camera className="w-3.5 h-3.5" /> {currentHero ? 'Photo' : 'Add photo'}</>
               )}
             </button>
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white text-xs font-medium border border-white/20 hover:bg-black/40 transition-all disabled:opacity-60"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-black/25 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 text-xs font-medium border border-white/15 transition-all disabled:opacity-50"
+              title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
             >
               {generating ? (
-                <><Loader2 className="w-3 h-3 animate-spin" /> {generateStatus || 'Generating…'}</>
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generateStatus || '…'}</>
               ) : (
-                <><Sparkles className="w-3 h-3" /> {trip.tagline ? 'Update text' : 'Generate narrative'}</>
+                <><Sparkles className="w-3.5 h-3.5" /> {trip.tagline ? 'Update text' : 'Generate text'}</>
               )}
             </button>
           </div>
           {generateError && (
-            <p className="text-xs text-red-300 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg max-w-xs text-right">
+            <p className="text-[10px] text-red-200/90 bg-black/40 backdrop-blur-sm px-2 py-1 rounded max-w-[200px] text-right">
               {generateError}
             </p>
           )}
         </div>
       </div>
 
-      {/* ── Vibe tags ── */}
-      {trip.vibe_tags && trip.vibe_tags.length > 0 && (
-        <VibeTagsSection tags={trip.vibe_tags} />
+      {/* Sticky header in flow when scrolled (same minimal design) */}
+      {scrolledPastHero && (
+        <PageHeader
+          trip={trip}
+          travelers={travelers}
+          currentName={name}
+          onChangeName={clearName}
+        />
       )}
 
-      {/* ── Content ── */}
-      {days.length === 0 ? (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-14 pb-16 text-center">
-          <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
-          <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
-            ← Head back to planning
-          </Link>
-        </div>
-      ) : (
-        days.map((day, dayIndex) => {
-          const showDivider = day.city !== lastCity
-          lastCity = day.city
-          const dayStay = stayForDay(day.date)
-          const showStay = !!dayStay && dayStay.id !== lastStayId
-          if (dayStay) lastStayId = dayStay.id
+      {/* ── Fade-in content block (Charleston-style transition) ── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: scrolledPastHero ? 1 : undefined }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, amount: 0 }}
+        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="relative -mt-16 pt-4"
+      >
+        {/* ── Vibe tags ── */}
+        {trip.vibe_tags && trip.vibe_tags.length > 0 && (
+          <VibeTagsSection
+            tags={trip.vibe_tags}
+            heading={trip.vibe_heading}
+          />
+        )}
 
-          return (
-            <div
-              key={day.id}
-              className={dayIndex % 2 === 0 ? 'bg-background' : 'bg-sand/40'}
-            >
-              <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-16 pb-20">
-                {showDivider && <CityDivider city={day.city} />}
+        {/* ── Content ── */}
+        {days.length === 0 ? (
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-12 text-center">
+            <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
+            <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
+              ← Head back to planning
+            </Link>
+          </div>
+        ) : (
+          days.map((day, dayIndex) => {
+            const showDivider = day.city !== lastCity
+            lastCity = day.city
+            const dayStay = stayForDay(day.date)
+            const showStay = !!dayStay && dayStay.id !== lastStayId
+            if (dayStay) lastStayId = dayStay.id
 
-                {showStay && dayStay && (
-                  <div className="mt-4 flex items-center gap-3 px-4 py-3 border border-border rounded-xl bg-muted/30 mb-2">
-                    <BedDouble className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground">Staying at</p>
-                      <p className="text-sm font-semibold text-foreground">{dayStay.name}</p>
+            return (
+              <div
+                key={day.id}
+                className={dayIndex % 2 === 0 ? 'bg-background' : 'bg-sand/40'}
+              >
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-14">
+                  {showDivider && <CityDivider city={day.city} />}
+
+                  {showStay && dayStay && (
+                    <div className="mt-4 flex items-center gap-3 px-4 py-3 border border-border rounded-xl bg-muted/30 mb-2">
+                      <BedDouble className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Staying at</p>
+                        <p className="text-sm font-semibold text-foreground">{dayStay.name}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="mt-6">
-                  <DaySection day={day} flip={dayIndex % 2 === 1} />
+                  <div className="mt-6">
+                    <DaySection day={day} flip={dayIndex % 2 === 1} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        })
-      )}
+            )
+          })
+        )}
 
-      {/* ── At a Glance ── */}
-      {days.length > 0 && <AtAGlanceSection days={days} />}
-
-      <StaysDrawer
-        open={staysOpen}
-        onClose={() => setStaysOpen(false)}
-        trip={trip}
-        stays={stays}
-        currentName={name}
-        onAdd={addStay}
-        onUpdate={updateStay}
-        onDelete={deleteStay}
-      />
-
-      <TripNotesDrawer
-        open={notesOpen}
-        onClose={() => setNotesOpen(false)}
-        notes={notes}
-        currentName={name}
-        onAdd={(text) => addNote(text, name ?? 'Anonymous')}
-        onDelete={deleteNote}
-      />
+        {/* ── At a Glance ── */}
+        {days.length > 0 && <AtAGlanceSection days={days} />}
+      </motion.div>
     </div>
   )
 }

@@ -105,4 +105,11 @@
   .font-sans {
     font-family: 'DM Sans', sans-serif;
   }
+  /* Charleston-style hero byline: light sans, uppercase, letter-spacing */
+  .hero-byline {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
 }
