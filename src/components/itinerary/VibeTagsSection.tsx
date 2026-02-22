@@ -13,27 +13,6 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { VibeTag } from '@/types/database'
-import { cn } from '@/lib/utils'
-
-// Charleston-style accent colors (icon + label per card)
-const CARD_COLORS = [
-  'text-[#8B4513]',   // sienna / reddish-brown (walkable)
-  'text-[#B8860B]',   // dark goldenrod (coffee)
-  'text-[#C9A227]',   // golden (golden hour)
-  'text-[#6B7B8C]',   // slate (architecture)
-  'text-[#6B8E23]',   // olive (dining)
-  'text-[#B76E79]',   // dusty rose (romantic)
-] as const
-
-const CARD_BG = [
-  'bg-[#8B4513]/8',
-  'bg-[#B8860B]/8',
-  'bg-[#C9A227]/8',
-  'bg-[#6B7B8C]/8',
-  'bg-[#6B8E23]/8',
-  'bg-[#B76E79]/8',
-] as const
-
 // Map label + subtitle keywords to Lucide icon (icon per card, based on text)
 const ICON_MAP: Array<{ keys: string[]; Icon: LucideIcon }> = [
   { keys: ['walkable', 'walk', 'foot', 'on foot'], Icon: Footprints },
@@ -67,51 +46,65 @@ export function VibeTagsSection({ tags, heading }: VibeTagsSectionProps) {
   const sectionTitle = heading ?? 'Intention Over Itinerary'
 
   return (
-    <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-8">
-      <motion.header
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-40px' }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="text-center mb-6"
-      >
-        <p className="text-[10px] uppercase tracking-[0.25em] text-[#b8860b]/90 mb-2 font-sans">
-          The Vibe
-        </p>
-        <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-normal text-foreground antialiased">
-          {sectionTitle}
-        </h2>
-      </motion.header>
+    <section className="py-16 md:py-24 px-6">
+      <div className="max-w-4xl mx-auto text-center">
+        <motion.header
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.6 }}
+        >
+          <span className="font-sans text-xs tracking-[0.25em] uppercase text-primary font-semibold">
+            The Vibe
+          </span>
+          <h2 className="font-serif text-3xl md:text-4xl text-foreground mt-3 mb-12">
+            {sectionTitle}
+          </h2>
+        </motion.header>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {tags.slice(0, 6).map((tag, i) => {
-          const Icon = vibeIcon(tag.label, tag.subtitle)
-          const colorClass = CARD_COLORS[i % CARD_COLORS.length]
-          const bgClass = CARD_BG[i % CARD_BG.length]
-          return (
-            <motion.div
-              key={tag.label}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-20px' }}
-              transition={{ duration: 0.4, delay: i * 0.06, ease: 'easeOut' }}
-              className="rounded-xl border border-border/50 bg-[#faf9f7] shadow-sm px-5 py-5 flex flex-col items-center text-center"
-            >
-              {/* Fixed-height block so icon + subtitle stay vertically aligned across all cards */}
-              <div className="min-h-[4.5rem] flex flex-col items-center justify-center mb-1">
-                <div className={cn('rounded-lg p-2 mb-2', bgClass, colorClass)}>
-                  <Icon className="w-5 h-5" strokeWidth={2} />
-                </div>
-                <span className={cn('text-sm font-normal font-serif antialiased', colorClass)}>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {tags.slice(0, 6).map((tag, i) => {
+            const Icon = vibeIcon(tag.label, tag.subtitle)
+            const colorHex = ['#b85c3a', '#8B6914', '#b8860b', '#3a5470', '#4a7060', '#a8304a'][i % 6]
+            const hoverBg = [
+              'rgba(184,92,58,0.05)',
+              'rgba(139,105,20,0.05)',
+              'rgba(184,134,11,0.05)',
+              'rgba(58,84,112,0.05)',
+              'rgba(74,112,96,0.05)',
+              'rgba(168,48,74,0.05)',
+            ][i % 6]
+            return (
+              <motion.div
+                key={tag.label}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-20px' }}
+                transition={{ duration: 0.5, delay: 0.08 * i }}
+                whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                className="p-6 rounded-xl bg-card border border-border transition-all duration-300 hover:shadow-md hover:border-transparent group cursor-default"
+                onMouseEnter={(e) => (e.currentTarget.style.background = hoverBg)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+              >
+                <Icon
+                  size={26}
+                  strokeWidth={1.5}
+                  className="mb-4 mx-auto transition-transform duration-300 group-hover:scale-110"
+                  style={{ color: colorHex }}
+                />
+                <h3
+                  className="font-serif text-lg mb-1 transition-colors duration-300"
+                  style={{ color: colorHex }}
+                >
                   {tag.label}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground font-sans leading-snug font-light">
-                {tag.subtitle}
-              </p>
-            </motion.div>
-          )
-        })}
+                </h3>
+                <p className="font-sans text-sm text-muted-foreground leading-relaxed">
+                  {tag.subtitle}
+                </p>
+              </motion.div>
+            )
+          })}
+        </div>
       </div>
     </section>
   )

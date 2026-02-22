@@ -590,7 +590,7 @@ export function ItineraryPage() {
             return (
               <div
                 key={day.id}
-                className="bg-[#F8F6F2]"
+                className={dayIndex % 2 === 0 ? 'bg-sand/30' : 'bg-background'}
               >
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-14">
                   {showDivider && <CityDivider city={day.city} />}
