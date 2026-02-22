@@ -42,17 +42,17 @@ export function VibeTagsSection({ tags }: VibeTagsSectionProps) {
   if (tags.length === 0) return null
 
   return (
-    <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 pb-6">
+    <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-16 pb-4">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-40px' }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
-        <p className="text-[10px] uppercase tracking-[0.3em] text-primary/80 mb-2">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/60 mb-2">
           The Vibe
         </p>
-        <p className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-10">
+        <p className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-8">
           {tags[0]?.label && tags.length >= 3
             ? `${tags.slice(0, 3).map(t => t.label).join(' · ')}`
             : 'What This Trip Is About'}

@@ -13,7 +13,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { SlotWithProposals, Proposal } from '@/types/database'
+import type { SlotWithProposals } from '@/types/database'
 import { SlotIconPicker, CATEGORY_ICONS } from './SlotIconPicker'
 import { ProposalCard } from './ProposalCard'
 import { AddProposalForm } from './AddProposalForm'
@@ -99,7 +99,7 @@ interface ProposalDrawerProps {
 
 export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted }: ProposalDrawerProps) {
   const [showAddForm, setShowAddForm] = useState(false)
-  const [lockLoading, setLockLoading] = useState(false)
+  const [_lockLoading, setLockLoading] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false)

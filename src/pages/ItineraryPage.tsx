@@ -195,73 +195,57 @@ export function ItineraryPage() {
         onOpenNotes={() => setNotesOpen(true)}
       />
 
-      {/* ── Hero: full-bleed feel with soft fade into page (reference design) ── */}
-      <div className="relative min-h-[calc(100vh-8rem)] max-h-[85vh] overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40">
+      {/* ── Hero ── */}
+      <div className="relative h-[62vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40">
         {currentHero && (
           <motion.img
             src={currentHero}
             alt={trip.name}
             className="absolute inset-0 w-full h-full object-cover"
-            initial={{ opacity: 0.92 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
+            initial={{ scale: 1 }}
+            animate={{ scale: 1.08 }}
+            transition={{
+              duration: 20,
+              ease: 'linear',
+              repeat: Infinity,
+              repeatType: 'reverse',
+            }}
           />
         )}
 
-        {/* Soft fade to page background (no dark overlay — image blends into content) */}
-        <div
-          className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"
-          aria-hidden
-        />
-        {/* Very subtle top vignette so centered text stays readable */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-transparent h-1/2" />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/10" />
 
-        {/* Trip info — centered, reference hierarchy */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 sm:px-12 text-center">
-          {travelers.length > 0 && (
-            <motion.p
-              className="text-[10px] sm:text-xs font-sans font-medium uppercase tracking-[0.25em] text-white/90 mb-2"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.5 }}
-            >
-              {travelers.slice(0, 4).join(' & ')}
-            </motion.p>
-          )}
+        {/* Trip info — bottom left */}
+        <div className="absolute bottom-0 left-0 right-0 px-6 sm:px-12 pb-10">
           <motion.h1
-            className="text-4xl sm:text-6xl md:text-7xl font-serif font-bold text-white leading-tight mb-2 drop-shadow-sm"
+            className="text-4xl sm:text-6xl font-serif font-bold text-white leading-tight mb-2"
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, duration: 0.6 }}
           >
             {trip.name}
           </motion.h1>
-          {(trip.tagline || dateRange) && (
+          {trip.tagline && (
             <motion.p
-              className="text-white/90 text-base sm:text-lg font-sans mb-1"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, duration: 0.5 }}
+              className="text-white/70 text-base sm:text-lg italic mb-1"
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42, duration: 0.5 }}
             >
-              {[trip.tagline, dateRange].filter(Boolean).join(' • ')}
+              {trip.tagline}
             </motion.p>
           )}
-          {trip.vibe_tags && trip.vibe_tags.length > 0 && (
+          {trip.destinations.length > 0 && (
             <motion.p
-              className="text-white/80 text-sm sm:text-base font-sans"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.5 }}
-            >
-              {trip.vibe_tags.map((t) => t.label).join(' • ')}
-            </motion.p>
-          )}
-          {trip.destinations.length > 0 && !(trip.vibe_tags && trip.vibe_tags.length > 0) && (
-            <motion.p
-              className="text-white/70 text-sm sm:text-base font-sans mt-0.5"
+              className="text-white/80 text-lg sm:text-xl"
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }}
             >
               {trip.destinations.join(' · ')}
             </motion.p>
           )}
-          {trip.destinations.length > 0 && (trip.vibe_tags?.length ?? 0) > 0 && (
+          {dateRange && (
             <motion.p
-              className="text-white/60 text-xs sm:text-sm font-sans mt-1"
+              className="text-white/50 text-sm mt-1"
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56, duration: 0.5 }}
             >
-              {trip.destinations.join(' · ')}
+              {dateRange}
             </motion.p>
           )}
         </div>
