@@ -76,7 +76,7 @@ export function TripPage() {
           </button>
         </div>
       </div>
-      <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto">
+      <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden">
         <PlanningBoard trip={trip} days={days} currentName={name} />
       </main>
 
