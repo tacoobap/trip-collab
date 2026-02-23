@@ -41,7 +41,7 @@ export function PickFromCollectionModal({
   onOpenChange,
   tripId,
   days = [],
-  slotCategory,
+  slotCategory: _slotCategory,
   currentName: _currentName,
   onSelect,
 }: PickFromCollectionModalProps) {

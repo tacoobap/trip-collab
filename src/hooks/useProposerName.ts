@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'tripboard_name'
-const NAMES_USED_KEY = 'tripboard_names_used'
+const STORAGE_KEY = 'trup_name'
+const NAMES_USED_KEY = 'trup_names_used'
 const MAX_NAMES_USED = 10
 
 function loadNamesUsed(): string[] {

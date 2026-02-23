@@ -1,4 +1,4 @@
-# Tripboard — Product & Build Plan
+# Trup — Product & Build Plan
 
 Collaborative trip itinerary planning. Friends propose ideas into slots, select favorites, and see a beautiful final itinerary.
 
@@ -172,7 +172,7 @@ On first visit to a trip, show a name prompt:
 "Who are you?"
 [ Rad ]  [ Tyler ]  [ + Someone else ]
 ```
-Store in `localStorage` as `tripboard_name`. Pass as `?name=Rad` in any links shared.
+Store in `localStorage` as `trup_name`. Pass as `?name=Rad` in any links shared.
 This name attaches to every proposal and vote they make.
 
 Color assignment: each unique name gets a consistent color (hash the name → pick from a palette). Rad might always be teal, Tyler always golden. These carry through avatars, vote indicators, and the "added by" credits.

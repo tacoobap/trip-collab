@@ -37,18 +37,18 @@ export function PageHeader({
       )}
     >
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-        {/* Left: Tripboard */}
+        {/* Left: Trup */}
         <Link
           to="/"
           className={cn(
             'flex items-center gap-1.5 shrink-0 transition-colors z-10',
             isDark ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
           )}
-          title="Tripboard home"
+          title="Trup home"
         >
           <Sparkles className="w-4 h-4" />
           <span className="hidden sm:block text-xs font-semibold tracking-wide uppercase">
-            Tripboard
+            Trup
           </span>
         </Link>
 

@@ -24,7 +24,6 @@ import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
 import { AddCollectionItemForm } from '@/components/collection/AddCollectionItemForm'
 import { EditCollectionItemForm } from '@/components/collection/EditCollectionItemForm'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 
 const CATEGORY_ORDER: CollectionItemCategory[] = ['food', 'activity', 'other']
 const CATEGORY_HEADINGS: Record<CollectionItemCategory, string> = {
