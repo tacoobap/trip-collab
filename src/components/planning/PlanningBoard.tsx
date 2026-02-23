@@ -52,6 +52,8 @@ export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
       </div>
 
       <ProposalDrawer
+        trip={trip}
+        days={days}
         slot={activeSlot}
         dayLabel={activeDayLabel}
         currentName={currentName}

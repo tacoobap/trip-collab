@@ -1,0 +1,125 @@
+import { Heart, Image, Pencil, Trash2 } from 'lucide-react'
+import type { CollectionItem } from '@/types/database'
+import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
+import { cn } from '@/lib/utils'
+
+interface CollectionItemCardProps {
+  item: CollectionItem
+  currentName: string
+  onLike: (itemId: string) => void
+  onEdit?: (item: CollectionItem) => void
+  onDelete?: (itemId: string) => void
+  className?: string
+}
+
+const CATEGORY_LABELS: Record<CollectionItem['category'], string> = {
+  food: 'Food',
+  activity: 'Activity',
+  other: 'Other',
+}
+
+export function CollectionItemCard({
+  item,
+  currentName,
+  onLike,
+  onEdit,
+  onDelete,
+  className,
+}: CollectionItemCardProps) {
+  const hasLiked = item.likes.includes(currentName)
+  const likeCount = item.likes.length
+
+  return (
+    <article
+      className={cn(
+        'rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow',
+        className
+      )}
+    >
+      <div className="aspect-[4/3] relative overflow-hidden">
+        {item.image_url ? (
+          <img
+            src={item.image_url}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-violet-100 text-violet-400 dark:bg-violet-950/40 dark:text-violet-500/70">
+            <Image className="w-12 h-12" strokeWidth={1.25} />
+          </div>
+        )}
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(item) }}
+              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background shadow-sm"
+              aria-label="Edit"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete(item.id) }}
+              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 shadow-sm"
+              aria-label="Delete"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="absolute top-2 left-2">
+          <span
+            className={cn(
+              'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shadow-sm backdrop-blur-sm',
+              item.category === 'food' && 'bg-amber-500/35 text-amber-900 border-amber-600/50 dark:bg-amber-600/50 dark:text-amber-100 dark:border-amber-500/70',
+              item.category === 'activity' && 'bg-emerald-500/35 text-emerald-900 border-emerald-600/50 dark:bg-emerald-600/50 dark:text-emerald-100 dark:border-emerald-500/70',
+              item.category === 'other' && 'bg-slate-500/35 text-slate-800 border-slate-600/50 dark:bg-slate-600/50 dark:text-slate-100 dark:border-slate-500/70'
+            )}
+          >
+            {CATEGORY_LABELS[item.category]}
+          </span>
+        </div>
+      </div>
+      <div className="p-3">
+        <h3 className="font-medium text-foreground truncate pr-8">{item.name}</h3>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => onLike(item.id)}
+            className={cn(
+              'inline-flex items-center gap-1 text-xs transition-colors',
+              hasLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
+            )}
+            aria-label={hasLiked ? 'Unlike' : 'Like'}
+          >
+            <Heart
+              className={cn('w-3.5 h-3.5', hasLiked && 'fill-current')}
+            />
+            <span>{likeCount > 0 ? likeCount : 'Like'}</span>
+          </button>
+          {likeCount > 0 && (
+            <div className="flex items-center -space-x-1.5" title={item.likes.join(', ')}>
+              {item.likes.map((name) => {
+                const color = getProposerColor(name)
+                const initial = getProposerInitial(name)
+                return (
+                  <div
+                    key={name}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold border-2 border-card shrink-0"
+                    style={{ backgroundColor: color.bg, color: color.text }}
+                    title={name}
+                  >
+                    {initial}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}

@@ -110,6 +110,23 @@ export type TripNote = {
   created_at: string
 }
 
+export type CollectionItemCategory = 'food' | 'activity' | 'other'
+
+export type CollectionItem = {
+  id: string
+  trip_id: string
+  name: string
+  category: CollectionItemCategory
+  image_url: string | null
+  google_maps_url: string | null
+  latitude: number | null
+  longitude: number | null
+  place_name: string | null
+  likes: string[]
+  created_at: string
+  created_by: string
+}
+
 export type SlotWithProposals = Slot & {
   proposals: Proposal[]
   locked_proposal?: Proposal | null

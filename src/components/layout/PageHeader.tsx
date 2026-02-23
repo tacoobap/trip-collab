@@ -20,6 +20,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   const location = useLocation()
   const isItinerary = location.pathname.endsWith('/itinerary')
+  const isCollection = location.pathname.includes('/collection')
 
   const isDark = overHero
   const linkActive = isDark ? 'text-white bg-white/15' : 'border-primary text-foreground'
@@ -57,10 +58,19 @@ export function PageHeader({
             to={`/trip/${trip.slug}`}
             className={cn(
               'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors',
-              !isItinerary ? linkActive : linkInactive
+              !isItinerary && !isCollection ? linkActive : linkInactive
             )}
           >
             Planning
+          </Link>
+          <Link
+            to={`/trip/${trip.slug}/collection`}
+            className={cn(
+              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors',
+              isCollection ? linkActive : linkInactive
+            )}
+          >
+            Collection
           </Link>
           <Link
             to={`/trip/${trip.slug}/itinerary`}

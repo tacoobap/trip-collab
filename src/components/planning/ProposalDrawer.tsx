@@ -13,10 +13,12 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { SlotWithProposals } from '@/types/database'
+import type { DayWithSlots, SlotWithProposals } from '@/types/database'
+import type { Trip } from '@/types/database'
 import { SlotIconPicker, CATEGORY_ICONS } from './SlotIconPicker'
 import { ProposalCard } from './ProposalCard'
 import { AddProposalForm } from './AddProposalForm'
+import { PickFromCollectionModal } from './PickFromCollectionModal'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -89,6 +91,8 @@ function InlineSlotLabel({ slot }: { slot: SlotWithProposals }) {
 // ── Main drawer ─────────────────────────────────────────────────────────────
 
 interface ProposalDrawerProps {
+  trip: Trip
+  days: DayWithSlots[]
   slot: SlotWithProposals | null
   dayLabel: string
   currentName: string
@@ -97,8 +101,9 @@ interface ProposalDrawerProps {
   onSlotDeleted?: () => void
 }
 
-export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted }: ProposalDrawerProps) {
+export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted }: ProposalDrawerProps) {
   const [showAddForm, setShowAddForm] = useState(false)
+  const [pickFromCollectionOpen, setPickFromCollectionOpen] = useState(false)
   const [_lockLoading, setLockLoading] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
@@ -129,13 +134,13 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate,
 
   const isLocked = slot.status === 'locked'
 
-  const handleAddProposal = async (data: { title: string }) => {
+  const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
     await addDoc(collection(db, 'proposals'), {
       slot_id: slot.id,
       proposer_name: currentName,
       title: data.title,
-      note: null,
-      url: null,
+      note: data.note ?? null,
+      url: data.url ?? null,
       votes: [],
       created_at: serverTimestamp(),
     })
@@ -146,6 +151,16 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate,
 
     setShowAddForm(false)
     onUpdate()
+  }
+
+  const handlePickFromCollection = async (item: { name: string; google_maps_url: string | null; place_name: string | null }) => {
+    if (!slot) return
+    await handleAddProposal({
+      title: item.name,
+      note: item.place_name ?? null,
+      url: item.google_maps_url ?? null,
+    })
+    setPickFromCollectionOpen(false)
   }
 
   const handleVote = async (proposalId: string) => {
@@ -369,14 +384,26 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate,
                 )}
 
                 {!isLocked && !showAddForm && (
-                  <div className="pt-3 pb-4">
-                    <Button
-                      onClick={() => setShowAddForm(true)}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      + Add an idea to the collection
-                    </Button>
+                  <div className="pt-3 pb-4 space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
+                      Add an idea
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setShowAddForm(true)}
+                        className="flex-1"
+                        variant="outline"
+                      >
+                        Write a new idea
+                      </Button>
+                      <Button
+                        onClick={() => setPickFromCollectionOpen(true)}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Pick from Collection
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -400,6 +427,17 @@ export function ProposalDrawer({ slot, dayLabel, currentName, onClose, onUpdate,
         )}
       </AnimatePresence>
 
+      {slot && (
+        <PickFromCollectionModal
+          open={pickFromCollectionOpen}
+          onOpenChange={setPickFromCollectionOpen}
+          tripId={trip.id}
+          days={days}
+          slotCategory={slot.category === 'food' || slot.category === 'activity' ? slot.category : undefined}
+          currentName={currentName}
+          onSelect={handlePickFromCollection}
+        />
+      )}
     </>
   )
 }
