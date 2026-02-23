@@ -144,7 +144,7 @@ export function ProposalCard({
               onClick={() => onDelete!(proposal.id)}
               className="text-xs text-destructive hover:text-destructive/80 px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
             >
-              Delete
+              Delete idea
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
@@ -180,12 +180,12 @@ export function ProposalCard({
               </button>
             )}
 
-            {/* Delete (not available when locked) */}
-            {onDelete && !isLocked && (
+            {/* Delete idea (also clears lock if this proposal was locked) */}
+            {onDelete && (
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="text-muted-foreground/50 hover:text-destructive/80 p-1.5 rounded-full hover:bg-destructive/10 transition-colors"
-                title="Delete idea"
+                title={isLocked ? 'Delete idea and unlock slot' : 'Delete idea'}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>

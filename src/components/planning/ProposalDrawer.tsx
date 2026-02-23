@@ -20,6 +20,7 @@ import { ProposalCard } from './ProposalCard'
 import { AddProposalForm } from './AddProposalForm'
 import { PickFromCollectionModal } from './PickFromCollectionModal'
 import { Button } from '@/components/ui/button'
+import { formatTimeLabel } from '@/lib/timeUtils'
 import { cn } from '@/lib/utils'
 
 const TIME_CHIPS = ['9:00 AM', '12:00 PM', '3:00 PM', '7:00 PM']
@@ -29,6 +30,7 @@ const TIME_CHIPS = ['9:00 AM', '12:00 PM', '3:00 PM', '7:00 PM']
 function InlineSlotLabel({ slot }: { slot: SlotWithProposals }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [timeError, setTimeError] = useState<string | null>(null)
 
   const lockedProposal = slot.status === 'locked'
     ? slot.proposals.find((p) => p.id === slot.locked_proposal_id) ?? null
@@ -42,32 +44,63 @@ function InlineSlotLabel({ slot }: { slot: SlotWithProposals }) {
   const [draft, setDraft] = useState(displayTime)
 
   const commit = async () => {
-    setEditing(false)
     const val = draft.trim()
-    if (!val || val === displayTime) return
+    if (!val || val === displayTime) {
+      setTimeError(null)
+      setEditing(false)
+      return
+    }
+    const formatted = formatTimeLabel(val)
+    if (!formatted) {
+      setTimeError('Use a time like 9:00 AM or 2:30 PM')
+      return
+    }
+    setTimeError(null)
+    setEditing(false)
     setSaving(true)
     try {
       if (lockedProposal) {
-        await updateDoc(doc(db, 'proposals', lockedProposal.id), { exact_time: val })
+        await updateDoc(doc(db, 'proposals', lockedProposal.id), { exact_time: formatted })
       } else {
-        await updateDoc(doc(db, 'slots', slot.id), { time_label: val })
+        await updateDoc(doc(db, 'slots', slot.id), { time_label: formatted })
       }
     } finally {
       setSaving(false)
     }
   }
 
+  const cancelEdit = () => {
+    setDraft(displayTime)
+    setTimeError(null)
+    setEditing(false)
+  }
+
   if (editing) {
     return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-        placeholder="e.g. 9:00 AM"
-        className="text-sm font-semibold bg-transparent border-b border-primary outline-none text-foreground w-28 min-w-0"
-      />
+      <span className="inline-flex flex-col gap-0.5">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value)
+            if (timeError) setTimeError(null)
+          }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') cancelEdit()
+          }}
+          placeholder="e.g. 9:00 AM"
+          className={cn(
+            'text-sm font-semibold bg-transparent border-b outline-none text-foreground w-28 min-w-0',
+            timeError ? 'border-destructive' : 'border-primary'
+          )}
+          aria-invalid={!!timeError}
+        />
+        {timeError && (
+          <span className="text-[10px] text-destructive leading-tight">{timeError}</span>
+        )}
+      </span>
     )
   }
 
@@ -366,7 +399,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                           isLocked={isThisLocked}
                           onVote={handleVote}
                           onLock={!isLocked ? handleLock : undefined}
-                          onDelete={!isThisLocked ? handleDeleteProposal : undefined}
+                          onDelete={handleDeleteProposal}
                           onEdit={handleEditProposal}
                         />
                       )

@@ -8,7 +8,7 @@ import { SlotCard } from './SlotCard'
 import { CityTag } from '@/components/shared/CityTag'
 import { Camera, Loader2, Plus, Check, X, Upload, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { parseTimeToMinutes } from '@/lib/timeUtils'
+import { parseTimeToMinutes, formatTimeLabel } from '@/lib/timeUtils'
 
 
 interface DayColumnProps {
@@ -38,6 +38,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
   const [addingSlot, setAddingSlot] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [savingSlot, setSavingSlot] = useState(false)
+  const [addSlotError, setAddSlotError] = useState<string | null>(null)
 
   const imageWorking = uploading || autoLoading
 
@@ -99,12 +100,19 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
 
   const handleAddSlot = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newLabel.trim()) return
+    const trimmed = newLabel.trim()
+    if (!trimmed) return
+    const formatted = formatTimeLabel(trimmed)
+    if (!formatted) {
+      setAddSlotError('Enter a time like 9:00 AM or 2:30 PM')
+      return
+    }
+    setAddSlotError(null)
     setSavingSlot(true)
     try {
       await addDoc(collection(db, 'slots'), {
         day_id: day.id,
-        time_label: newLabel.trim(),
+        time_label: formatted,
         category: 'activity',
         icon: null,
         status: 'open',
@@ -121,6 +129,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
   const cancelAddSlot = () => {
     setAddingSlot(false)
     setNewLabel('')
+    setAddSlotError(null)
   }
 
   return (
@@ -234,15 +243,24 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         {addingSlot ? (
           <form
             onSubmit={handleAddSlot}
-            className="flex items-center gap-2 border border-dashed border-primary/40 rounded-lg px-3 py-2.5 bg-primary/5"
+            className="flex flex-col gap-1.5"
           >
-            <input
-              autoFocus
-              placeholder="e.g. 9:00 AM"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
-            />
+            <div className="flex items-center gap-2 border border-dashed border-primary/40 rounded-lg px-3 py-2.5 bg-primary/5">
+              <input
+                autoFocus
+                placeholder="e.g. 9:00 AM or 2:30 PM"
+                value={newLabel}
+                onChange={(e) => {
+                  setNewLabel(e.target.value)
+                  if (addSlotError) setAddSlotError(null)
+                }}
+                className={cn(
+                  'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0',
+                  addSlotError && 'placeholder:text-destructive/70'
+                )}
+                aria-invalid={!!addSlotError}
+                aria-describedby={addSlotError ? 'add-slot-error' : undefined}
+              />
             <button
               type="submit"
               disabled={!newLabel.trim() || savingSlot}
@@ -262,6 +280,12 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
             >
               <X className="w-3 h-3" />
             </button>
+            </div>
+            {addSlotError && (
+              <p id="add-slot-error" className="text-xs text-destructive px-1">
+                {addSlotError}
+              </p>
+            )}
           </form>
         ) : (
           <button
