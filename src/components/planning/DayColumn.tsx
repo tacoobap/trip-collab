@@ -124,11 +124,11 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
   }
 
   return (
-    <div className="flex flex-col min-w-[200px] sm:min-w-[220px]">
+    <div className="flex flex-col min-w-[240px] sm:min-w-[260px]">
       {/* Day image thumbnail */}
       <div
-        className="relative mb-3 rounded-lg overflow-hidden"
-        style={{ height: day.image_url ? 80 : 0 }}
+        className="relative mb-4 rounded-lg overflow-hidden"
+        style={{ height: day.image_url ? 100 : 0 }}
       >
         {day.image_url && (
           <>
@@ -154,9 +154,9 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         onChange={handleImageChange}
       />
 
-      <div className="pb-3 mb-3 border-b border-border">
+      <div className="pb-4 mb-4 border-b border-border">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-serif font-semibold text-sm text-foreground leading-tight">
+          <h3 className="font-serif font-semibold text-base text-foreground leading-tight">
             Day {day.day_number}
           </h3>
           <div className="flex items-center gap-1.5">
@@ -211,7 +211,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
           </div>
         </div>
         {day.date && (
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground mt-1">
             {new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {
               weekday: 'short',
               month: 'short',
@@ -221,7 +221,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         )}
       </div>
 
-      <div className="flex flex-col gap-2 flex-1">
+      <div className="flex flex-col gap-3 flex-1">
         {sortedSlots.map((slot) => (
           <SlotCard
             key={slot.id}
@@ -234,14 +234,14 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         {addingSlot ? (
           <form
             onSubmit={handleAddSlot}
-            className="flex items-center gap-1.5 border border-dashed border-primary/40 rounded-lg px-2.5 py-2 bg-primary/5"
+            className="flex items-center gap-2 border border-dashed border-primary/40 rounded-lg px-3 py-2.5 bg-primary/5"
           >
             <input
               autoFocus
               placeholder="e.g. 9:00 AM"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
-              className="flex-1 text-xs bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
+              className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
             />
             <button
               type="submit"
@@ -266,7 +266,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         ) : (
           <button
             onClick={() => setAddingSlot(true)}
-            className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground border border-border/40 hover:border-border/70 rounded-lg py-2 transition-all"
+            className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground/50 hover:text-muted-foreground border border-border/40 hover:border-border/70 rounded-lg py-3 transition-all"
           >
             <Plus className="w-3 h-3" />
             Add slot

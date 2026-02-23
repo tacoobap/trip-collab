@@ -37,8 +37,8 @@ export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
 
   return (
     <>
-      <div className="overflow-x-auto pb-6">
-        <div className="flex gap-4 px-4 sm:px-6 min-w-max items-start">
+      <div className="overflow-x-auto pb-6 -mx-1">
+        <div className="flex gap-6 min-w-max items-start">
           {days.map((day) => (
             <DayColumn
               key={day.id}
