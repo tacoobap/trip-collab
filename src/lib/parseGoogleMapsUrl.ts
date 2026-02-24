@@ -1,11 +1,15 @@
 /**
  * Parse Google Maps URLs to extract latitude, longitude, and optionally place name.
- * Supports common patterns: ?q=lat,lng, /@lat,lng, /place/Name/@lat,lng
+ * Supports: /place/Name/@lat,lng, /search/Name/@lat,lng, ?q=lat,lng, ?q=Name@lat,lng
  */
 export interface ParsedMapsResult {
   latitude: number
   longitude: number
   placeName: string | null
+}
+
+function decodePlaceSegment(seg: string): string {
+  return decodeURIComponent(seg.replace(/\+/g, ' ')).trim() || ''
 }
 
 export function parseGoogleMapsUrl(url: string): ParsedMapsResult | null {
@@ -14,19 +18,22 @@ export function parseGoogleMapsUrl(url: string): ParsedMapsResult | null {
   if (!trimmed) return null
 
   try {
-    // /@lat,lng or /@lat,lng,zoom
+    // /@lat,lng or /@lat,lng,zoom — extract coords first
     const atMatch = trimmed.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)
     if (atMatch) {
       const lat = parseFloat(atMatch[1])
       const lng = parseFloat(atMatch[2])
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         let placeName: string | null = null
-        // /place/Place+Name/@lat,lng
-        const placeMatch = trimmed.match(/\/place\/([^/]+)(?:\/|$)/)
-        if (placeMatch) {
-          placeName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '))
+        // /place/Place+Name/ or /place/Place+Name/@...
+        const placeMatch = trimmed.match(/\/place\/([^/]+?)(?:\/|@|$)/)
+        if (placeMatch) placeName = decodePlaceSegment(placeMatch[1])
+        // /search/Place+Name/ (e.g. maps/search/A.+Wong/@...)
+        if (!placeName) {
+          const searchMatch = trimmed.match(/\/search\/([^/]+?)(?:\/|@|$)/)
+          if (searchMatch) placeName = decodePlaceSegment(searchMatch[1])
         }
-        return { latitude: lat, longitude: lng, placeName }
+        return { latitude: lat, longitude: lng, placeName: placeName || null }
       }
     }
 
