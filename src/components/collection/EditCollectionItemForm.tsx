@@ -19,6 +19,7 @@ const CATEGORIES: { value: CollectionItemCategory; label: string }[] = [
 interface EditCollectionItemFormProps {
   item: CollectionItem
   tripId: string
+  destinations: string[]
   onSuccess: () => void
   onCancel: () => void
 }
@@ -26,11 +27,13 @@ interface EditCollectionItemFormProps {
 export function EditCollectionItemForm({
   item,
   tripId,
+  destinations,
   onSuccess,
   onCancel,
 }: EditCollectionItemFormProps) {
   const [name, setName] = useState(item.name)
   const [category, setCategory] = useState<CollectionItemCategory>((item.category as CollectionItemCategory) || 'other')
+  const [destination, setDestination] = useState<string | null>(item.destination ?? null)
   const [mapsUrl, setMapsUrl] = useState(item.google_maps_url || '')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(item.image_url || null)
@@ -78,6 +81,7 @@ export function EditCollectionItemForm({
       const updateData: Partial<CollectionItem> = {
         name: name.trim(),
         category,
+        destination: destination?.trim() || null,
         google_maps_url: mapsUrl.trim() || null,
         latitude: parsed?.latitude ?? null,
         longitude: parsed?.longitude ?? null,
@@ -143,6 +147,42 @@ export function EditCollectionItemForm({
           ))}
         </div>
       </div>
+      {destinations.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Destination
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setDestination(null)}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-full border transition-colors',
+                destination === null
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground'
+              )}
+            >
+              None
+            </button>
+            {destinations.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDestination(d)}
+                className={cn(
+                  'px-3 py-1.5 text-sm rounded-full border transition-colors',
+                  destination === d
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">
           Google Maps link (optional)

@@ -22,7 +22,7 @@ function TripCard({ trip }: { trip: Trip }) {
         className="group bg-card border border-border rounded-2xl p-5 cursor-pointer hover:border-primary/30 hover:shadow-md transition-all h-full"
       >
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-serif font-semibold text-foreground text-base leading-snug group-hover:text-primary transition-colors">
+          <h3 className="font-serif font-semibold text-foreground text-lg leading-snug group-hover:text-primary transition-colors">
             {trip.name}
           </h3>
           <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -30,14 +30,14 @@ function TripCard({ trip }: { trip: Trip }) {
 
         <div className="mt-3 space-y-1.5">
           {trip.destinations.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="w-3 h-3 shrink-0" />
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="w-4 h-4 shrink-0" />
               <span>{trip.destinations.join(' · ')}</span>
             </div>
           )}
           {dateRange && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Calendar className="w-3 h-3 shrink-0" />
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Calendar className="w-4 h-4 shrink-0" />
               <span>{dateRange}</span>
             </div>
           )}
@@ -117,7 +117,7 @@ export function LandingPage() {
           /* ── Trip grid ── */
           <>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-serif font-semibold text-foreground">Trips</h2>
+              <h2 className="text-2xl font-serif font-semibold text-foreground">Trips</h2>
             </div>
 
             <motion.div
@@ -146,8 +146,8 @@ export function LandingPage() {
                   onClick={() => setNewTripOpen(true)}
                   className="w-full h-full min-h-[110px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer"
                 >
-                  <Plus className="w-5 h-5" />
-                  <span className="text-sm font-medium">Plan a new trip</span>
+                  <Plus className="w-6 h-6" />
+                  <span className="text-base font-medium">Plan a new trip</span>
                 </button>
               </motion.div>
             </motion.div>

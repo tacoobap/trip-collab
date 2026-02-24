@@ -12,7 +12,32 @@ interface UnsplashPhoto {
 }
 
 export async function searchImage(query: string): Promise<ImageSearchResult> {
+  // In production, use Netlify function so Unsplash key stays server-side (UNSPLASH_ACCESS_KEY in Netlify env)
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    const base = window.location.origin
+    const res = await fetch(
+      `${base}/.netlify/functions/search-image?query=${encodeURIComponent(query)}`
+    )
+    const data = (await res.json()) as
+      | { url: string; attribution: string; photographer_url: string; unsplash_url: string }
+      | { error: string }
+    if (!res.ok) {
+      const msg = 'error' in data ? data.error : `Image search failed: ${res.status}`
+      throw new Error(msg)
+    }
+    if (!('url' in data)) throw new Error('Invalid response from image search')
+    return {
+      url: data.url,
+      attribution: data.attribution,
+      photographer_url: data.photographer_url,
+      unsplash_url: data.unsplash_url,
+    }
+  }
+
   const accessKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY as string
+  // #region agent log
+  fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'imageSearch.ts:searchImage',message:'searchImage called',data:{query,hasAccessKey:!!accessKey},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!accessKey) throw new Error('VITE_UNSPLASH_ACCESS_KEY is not set in .env')
 
   const url = new URL('https://api.unsplash.com/search/photos')

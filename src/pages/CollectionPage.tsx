@@ -19,37 +19,44 @@ import { db } from '@/lib/firebase'
 import { suggestCollectionItems } from '@/lib/suggestCollectionItems'
 import type { CollectionSuggestion } from '@/lib/suggestCollectionItems'
 import { searchImage } from '@/lib/imageSearch'
-import type { CollectionItem, CollectionItemCategory } from '@/types/database'
+import type { CollectionItem } from '@/types/database'
 import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
 import { AddCollectionItemForm } from '@/components/collection/AddCollectionItemForm'
 import { EditCollectionItemForm } from '@/components/collection/EditCollectionItemForm'
 import { Textarea } from '@/components/ui/textarea'
 
-const CATEGORY_ORDER: CollectionItemCategory[] = ['food', 'activity', 'other']
-const CATEGORY_HEADINGS: Record<CollectionItemCategory, string> = {
-  food: 'Food',
-  activity: 'Activity',
-  other: 'Other',
-}
+const OTHER_LABEL = 'Other'
 
-function groupByCategory(items: CollectionItem[]) {
+function groupByDestination(
+  items: CollectionItem[],
+  destinationOrder: string[]
+): { label: string; items: CollectionItem[] }[] {
   const sorted = [...items].sort((a, b) => {
     const likesA = a.likes.length
     const likesB = b.likes.length
     if (likesB !== likesA) return likesB - likesA
     return (a.created_at || '').localeCompare(b.created_at || '')
   })
-  const groups: Record<CollectionItemCategory, CollectionItem[]> = {
-    food: [],
-    activity: [],
-    other: [],
+  const map = new Map<string, CollectionItem[]>()
+  for (const dest of destinationOrder) {
+    map.set(dest, [])
   }
+  map.set(OTHER_LABEL, [])
   for (const item of sorted) {
-    const cat = item.category || 'other'
-    if (cat in groups) groups[cat].push(item)
-    else groups.other.push(item)
+    const dest = item.destination?.trim() || null
+    const key = dest && destinationOrder.includes(dest) ? dest : OTHER_LABEL
+    const list = map.get(key) ?? []
+    list.push(item)
+    map.set(key, list)
   }
-  return groups
+  return destinationOrder
+    .filter((d) => (map.get(d)?.length ?? 0) > 0)
+    .map((label) => ({ label, items: map.get(label) ?? [] }))
+    .concat(
+      (map.get(OTHER_LABEL)?.length ?? 0) > 0
+        ? [{ label: OTHER_LABEL, items: map.get(OTHER_LABEL) ?? [] }]
+        : []
+    )
 }
 
 export function CollectionPage() {
@@ -99,6 +106,7 @@ export function CollectionPage() {
       trip_id: trip.id,
       name: s.name,
       category: s.category,
+      destination: null,
       image_url: suggestionImageUrls[index] ?? null,
       google_maps_url: null,
       latitude: null,
@@ -154,7 +162,8 @@ export function CollectionPage() {
     return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
   }
 
-  const groups = groupByCategory(items)
+  const destinationOrder = trip.destinations?.length ? trip.destinations : []
+  const sections = groupByDestination(items, destinationOrder)
   const hasAny = items.length > 0
 
   return (
@@ -213,29 +222,25 @@ export function CollectionPage() {
           </div>
         ) : (
           <div className="space-y-10">
-            {CATEGORY_ORDER.map((cat) => {
-              const list = groups[cat]
-              if (list.length === 0) return null
-              return (
-                <section key={cat}>
-                  <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
-                    {CATEGORY_HEADINGS[cat]}
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {list.map((item) => (
-                      <CollectionItemCard
-                        key={item.id}
-                        item={item}
-                        currentName={name}
-                        onLike={handleLike}
-                        onEdit={setEditItem}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
+            {sections.map(({ label, items: list }) => (
+              <section key={label}>
+                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
+                  {label}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {list.map((item) => (
+                    <CollectionItemCard
+                      key={item.id}
+                      item={item}
+                      currentName={name}
+                      onLike={handleLike}
+                      onEdit={setEditItem}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </main>
@@ -248,6 +253,7 @@ export function CollectionPage() {
           </DialogHeader>
           <AddCollectionItemForm
             tripId={trip.id}
+            destinations={trip.destinations ?? []}
             currentName={name}
             onSuccess={() => setAddOpen(false)}
             onCancel={() => setAddOpen(false)}
@@ -265,6 +271,7 @@ export function CollectionPage() {
             <EditCollectionItemForm
               item={editItem}
               tripId={trip.id}
+              destinations={trip.destinations ?? []}
               onSuccess={() => setEditItem(null)}
               onCancel={() => setEditItem(null)}
             />

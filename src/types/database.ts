@@ -117,6 +117,7 @@ export type CollectionItem = {
   trip_id: string
   name: string
   category: CollectionItemCategory
+  destination?: string | null  // one of trip.destinations, for grouping (optional for legacy items)
   image_url: string | null
   google_maps_url: string | null
   latitude: number | null
