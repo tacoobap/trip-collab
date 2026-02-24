@@ -227,7 +227,7 @@ export function CollectionPage() {
                 <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
                   {label}
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),min(100%,360px)))] gap-4">
                   {list.map((item) => (
                     <CollectionItemCard
                       key={item.id}

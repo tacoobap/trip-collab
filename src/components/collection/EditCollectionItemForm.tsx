@@ -86,7 +86,7 @@ export function EditCollectionItemForm({
         latitude: parsed?.latitude ?? null,
         longitude: parsed?.longitude ?? null,
         place_name: parsed?.placeName ?? null,
-        image_url: photoFile ? null : (fetchedImageUrl || item.image_url),
+        image_url: photoFile ? null : (item.image_url ?? fetchedImageUrl),
       }
       await updateDoc(doc(db, 'collection_items', item.id), updateData)
 
