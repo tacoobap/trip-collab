@@ -21,8 +21,7 @@ import type { CollectionSuggestion } from '@/lib/suggestCollectionItems'
 import { searchImage } from '@/lib/imageSearch'
 import type { CollectionItem } from '@/types/database'
 import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
-import { AddCollectionItemForm } from '@/components/collection/AddCollectionItemForm'
-import { EditCollectionItemForm } from '@/components/collection/EditCollectionItemForm'
+import { CollectionItemForm } from '@/components/collection/CollectionItemForm'
 import { Textarea } from '@/components/ui/textarea'
 
 const OTHER_LABEL = 'Other'
@@ -251,7 +250,8 @@ export function CollectionPage() {
           <DialogHeader>
             <DialogTitle>Add an idea</DialogTitle>
           </DialogHeader>
-          <AddCollectionItemForm
+          <CollectionItemForm
+            item={null}
             tripId={trip.id}
             destinations={trip.destinations ?? []}
             currentName={name}
@@ -268,10 +268,11 @@ export function CollectionPage() {
             <DialogTitle>Edit idea</DialogTitle>
           </DialogHeader>
           {editItem && (
-            <EditCollectionItemForm
+            <CollectionItemForm
               item={editItem}
               tripId={trip.id}
               destinations={trip.destinations ?? []}
+              currentName={name}
               onSuccess={() => setEditItem(null)}
               onCancel={() => setEditItem(null)}
             />

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Loader2, ImagePlus, X } from 'lucide-react'
-import { updateDoc, doc } from 'firebase/firestore'
+import { addDoc, collection, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
@@ -16,31 +16,39 @@ const CATEGORIES: { value: CollectionItemCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-interface EditCollectionItemFormProps {
-  item: CollectionItem
+export interface CollectionItemFormProps {
+  /** When null, form is in "add" mode; when set, "edit" mode. */
+  item: CollectionItem | null
   tripId: string
   destinations: string[]
+  currentName: string
   onSuccess: () => void
   onCancel: () => void
 }
 
-export function EditCollectionItemForm({
+export function CollectionItemForm({
   item,
   tripId,
   destinations,
+  currentName,
   onSuccess,
   onCancel,
-}: EditCollectionItemFormProps) {
-  const [name, setName] = useState(item.name)
-  const [category, setCategory] = useState<CollectionItemCategory>((item.category as CollectionItemCategory) || 'other')
-  const [destination, setDestination] = useState<string | null>(item.destination ?? null)
-  const [mapsUrl, setMapsUrl] = useState(item.google_maps_url || '')
+}: CollectionItemFormProps) {
+  const isEdit = item !== null
+
+  const [name, setName] = useState(item?.name ?? '')
+  const [category, setCategory] = useState<CollectionItemCategory>(
+    (item?.category as CollectionItemCategory) ?? 'other'
+  )
+  const [destination, setDestination] = useState<string | null>(item?.destination ?? null)
+  const [mapsUrl, setMapsUrl] = useState(item?.google_maps_url ?? '')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(item.image_url || null)
+  const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(item?.image_url ?? null)
   const [fetchImageLoading, setFetchImageLoading] = useState(false)
   const [fetchImageError, setFetchImageError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const parsed = mapsUrl.trim() ? parseGoogleMapsUrl(mapsUrl.trim()) : null
@@ -48,7 +56,7 @@ export function EditCollectionItemForm({
 
   useEffect(() => {
     if (!searchQuery) {
-      if (!mapsUrl.trim()) setFetchedImageUrl(item.image_url || null)
+      if (!mapsUrl.trim() && item?.image_url) setFetchedImageUrl(item.image_url)
       setFetchImageError(null)
       return
     }
@@ -70,42 +78,83 @@ export function EditCollectionItemForm({
         }
       })
     return () => { cancelled = true }
-  }, [searchQuery])
+  }, [searchQuery, mapsUrl.trim(), item?.image_url])
+
+  const handleMapsUrlChange = (value: string) => {
+    setMapsUrl(value)
+    if (!isEdit) {
+      const result = value.trim() ? parseGoogleMapsUrl(value.trim()) : null
+      if (result?.placeName && !name.trim()) setName(result.placeName)
+    }
+    const hasPlace = value.trim() && parseGoogleMapsUrl(value.trim())?.placeName
+    if (!hasPlace) setFetchedImageUrl(isEdit && item?.image_url ? item.image_url : null)
+    setSubmitError(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
+    setSubmitError(null)
     setLoading(true)
     setUploadPct(0)
     try {
-      const updateData: Partial<CollectionItem> = {
-        name: name.trim(),
-        category,
-        destination: destination?.trim() || null,
-        google_maps_url: mapsUrl.trim() || null,
-        latitude: parsed?.latitude ?? null,
-        longitude: parsed?.longitude ?? null,
-        place_name: parsed?.placeName ?? null,
-        image_url: photoFile ? null : (item.image_url ?? fetchedImageUrl),
+      if (isEdit && item) {
+        const updateData: Partial<CollectionItem> = {
+          name: name.trim(),
+          category,
+          destination: destination?.trim() || null,
+          google_maps_url: mapsUrl.trim() || null,
+          latitude: parsed?.latitude ?? null,
+          longitude: parsed?.longitude ?? null,
+          place_name: parsed?.placeName ?? null,
+          image_url: photoFile ? null : (item.image_url ?? fetchedImageUrl),
+        }
+        await updateDoc(doc(db, 'collection_items', item.id), updateData)
+        if (photoFile) {
+          setUploadPct(10)
+          const url = await uploadImage(
+            `trips/${tripId}/collection/${item.id}.jpg`,
+            photoFile,
+            (p) => setUploadPct(p)
+          )
+          await updateDoc(doc(db, 'collection_items', item.id), { image_url: url })
+        }
+      } else {
+        const docData = {
+          trip_id: tripId,
+          name: name.trim(),
+          category,
+          destination: destination?.trim() || null,
+          image_url: (photoFile ? null : fetchedImageUrl) as string | null,
+          google_maps_url: mapsUrl.trim() || null,
+          latitude: parsed?.latitude ?? null,
+          longitude: parsed?.longitude ?? null,
+          place_name: parsed?.placeName ?? null,
+          likes: [] as string[],
+          created_at: serverTimestamp(),
+          created_by: currentName,
+        }
+        const ref = await addDoc(collection(db, 'collection_items'), docData)
+        const docId = ref.id
+        if (photoFile) {
+          setUploadPct(10)
+          const url = await uploadImage(
+            `trips/${tripId}/collection/${docId}.jpg`,
+            photoFile,
+            (p) => setUploadPct(p)
+          )
+          await updateDoc(doc(db, 'collection_items', docId), { image_url: url })
+        }
       }
-      await updateDoc(doc(db, 'collection_items', item.id), updateData)
-
-      if (photoFile) {
-        setUploadPct(10)
-        const url = await uploadImage(
-          `trips/${tripId}/collection/${item.id}.jpg`,
-          photoFile,
-          (p) => setUploadPct(p)
-        )
-        await updateDoc(doc(db, 'collection_items', item.id), { image_url: url })
-      }
-
       onSuccess()
     } catch (err) {
-      console.error('Update collection item failed', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setSubmitError(msg)
+      console.error(isEdit ? 'Update collection item failed' : 'Add collection item failed', err)
     } finally {
       setLoading(false)
       setPhotoFile(null)
+      if (!isEdit) setFetchedImageUrl(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -118,8 +167,11 @@ export function EditCollectionItemForm({
         </label>
         <Input
           value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Husk, Rainbow Row walk"
+          onChange={(e) => {
+            setName(e.target.value)
+            setSubmitError(null)
+          }}
+          placeholder={isEdit ? 'e.g. Husk, Rainbow Row walk' : 'e.g. Husk, Rainbow Row walk (or paste Maps link below)'}
           maxLength={300}
           required
           className="w-full"
@@ -189,8 +241,8 @@ export function EditCollectionItemForm({
         </label>
         <Input
           value={mapsUrl}
-          onChange={(e) => setMapsUrl(e.target.value)}
-          placeholder="Paste a Google Maps URL"
+          onChange={(e) => handleMapsUrlChange(e.target.value)}
+          placeholder="Paste a Google Maps URL to extract name and location"
           type="url"
           className="w-full min-w-0"
         />
@@ -230,15 +282,57 @@ export function EditCollectionItemForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">
-          Replace photo (optional)
+          {isEdit ? 'Replace photo (optional)' : 'Photo (optional)'}
         </label>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          {fetchedImageUrl && !photoFile && (
+            <div className="flex items-center gap-2">
+              <img
+                src={fetchedImageUrl}
+                alt=""
+                className="w-14 h-14 rounded-lg object-cover border border-border"
+              />
+              <span className="text-xs text-muted-foreground">Image found</span>
+              <button
+                type="button"
+                onClick={() => setFetchedImageUrl(null)}
+                className="text-muted-foreground hover:text-foreground p-1"
+                aria-label="Remove image"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {photoFile && (
+            <div className="flex items-center gap-2">
+              <img
+                src={URL.createObjectURL(photoFile)}
+                alt=""
+                className="w-14 h-14 rounded-lg object-cover border border-border"
+              />
+              <span className="text-xs text-muted-foreground truncate max-w-28">{photoFile.name}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoFile(null)
+                  fileInputRef.current && (fileInputRef.current.value = '')
+                }}
+                className="text-muted-foreground hover:text-foreground p-1"
+                aria-label="Remove photo"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              setPhotoFile(e.target.files?.[0] ?? null)
+              setSubmitError(null)
+            }}
           />
           <Button
             type="button"
@@ -248,29 +342,27 @@ export function EditCollectionItemForm({
             className="gap-1.5"
           >
             <ImagePlus className="w-3.5 h-3.5" />
-            {photoFile ? photoFile.name : 'Choose new image'}
+            {photoFile ? photoFile.name : isEdit ? 'Choose new image' : 'Choose image'}
           </Button>
-          {photoFile && (
-            <button
-              type="button"
-              onClick={() => {
-                setPhotoFile(null)
-                fileInputRef.current && (fileInputRef.current.value = '')
-              }}
-              className="text-muted-foreground hover:text-foreground p-1"
-              aria-label="Remove"
-            >
-              <X className="w-4 h-4" />
-            </button>
+          {loading && photoFile && (
+            <span className="text-xs text-muted-foreground">Uploading… {uploadPct}%</span>
           )}
         </div>
-        {loading && photoFile && (
-          <p className="text-xs text-muted-foreground mt-1">Uploading… {uploadPct}%</p>
-        )}
       </div>
+      {submitError && (
+        <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+          {submitError}
+        </p>
+      )}
       <div className="flex gap-2 pt-2">
         <Button type="submit" disabled={!name.trim() || loading} className="flex-1">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save changes'}
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : isEdit ? (
+            'Save changes'
+          ) : (
+            'Add to collection'
+          )}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
