@@ -60,6 +60,10 @@ export function CollectionItemForm({
       setFetchImageError(null)
       return
     }
+    if (isEdit && item?.image_url) {
+      setFetchImageError(null)
+      return
+    }
     let cancelled = false
     setFetchImageLoading(true)
     setFetchImageError(null)
@@ -161,6 +165,33 @@ export function CollectionItemForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
+      <div className="min-w-0">
+        <label className="block text-sm font-medium text-foreground mb-1">
+          Google Maps link (optional)
+        </label>
+        <Input
+          value={mapsUrl}
+          onChange={(e) => handleMapsUrlChange(e.target.value)}
+          placeholder="Paste a Google Maps URL to extract name and location"
+          type="url"
+          className="w-full min-w-0"
+        />
+        {parsed && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Location: {parsed.latitude.toFixed(4)}, {parsed.longitude.toFixed(4)}
+            {parsed.placeName && ` · ${parsed.placeName}`}
+          </p>
+        )}
+        {fetchImageLoading && (
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Finding image…
+          </p>
+        )}
+        {fetchImageError && !fetchImageLoading && (
+          <p className="text-xs text-destructive mt-1">{fetchImageError}</p>
+        )}
+      </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">
           Name <span className="text-destructive">*</span>
@@ -171,7 +202,7 @@ export function CollectionItemForm({
             setName(e.target.value)
             setSubmitError(null)
           }}
-          placeholder={isEdit ? 'e.g. Husk, Rainbow Row walk' : 'e.g. Husk, Rainbow Row walk (or paste Maps link below)'}
+          placeholder={isEdit ? 'e.g. Husk, Rainbow Row walk' : 'e.g. Husk, Rainbow Row walk (or paste Maps link above)'}
           maxLength={300}
           required
           className="w-full"
@@ -235,51 +266,6 @@ export function CollectionItemForm({
           </div>
         </div>
       )}
-      <div className="min-w-0">
-        <label className="block text-sm font-medium text-foreground mb-1">
-          Google Maps link (optional)
-        </label>
-        <Input
-          value={mapsUrl}
-          onChange={(e) => handleMapsUrlChange(e.target.value)}
-          placeholder="Paste a Google Maps URL to extract name and location"
-          type="url"
-          className="w-full min-w-0"
-        />
-        {parsed && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Location: {parsed.latitude.toFixed(4)}, {parsed.longitude.toFixed(4)}
-            {parsed.placeName && ` · ${parsed.placeName}`}
-          </p>
-        )}
-        {fetchImageLoading && (
-          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Finding image…
-          </p>
-        )}
-        {fetchedImageUrl && !fetchImageLoading && (
-          <div className="mt-2 flex items-center gap-2">
-            <img
-              src={fetchedImageUrl}
-              alt=""
-              className="w-16 h-16 rounded-lg object-cover border border-border"
-            />
-            <span className="text-xs text-muted-foreground">Image found</span>
-            <button
-              type="button"
-              onClick={() => setFetchedImageUrl(null)}
-              className="text-muted-foreground hover:text-foreground p-1"
-              aria-label="Remove image"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-        {fetchImageError && !fetchImageLoading && (
-          <p className="text-xs text-destructive mt-1">{fetchImageError}</p>
-        )}
-      </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">
           {isEdit ? 'Replace photo (optional)' : 'Photo (optional)'}
