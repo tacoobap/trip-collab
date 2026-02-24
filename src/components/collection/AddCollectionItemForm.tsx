@@ -52,9 +52,6 @@ export function AddCollectionItemForm({
     : null
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:useEffect',message:'image effect',data:{searchQuery:searchQuery||null,hasSearchQuery:!!searchQuery},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!searchQuery) {
       setFetchedImageUrl(null)
       setFetchImageError(null)
@@ -73,9 +70,6 @@ export function AddCollectionItemForm({
       .catch((err) => {
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : 'Could not fetch image'
-          // #region agent log
-          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:searchImage.catch',message:'searchImage failed',data:{errorMessage:msg},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           setFetchImageError(msg)
           setFetchedImageUrl(null)
           setFetchImageLoading(false)
@@ -88,9 +82,6 @@ export function AddCollectionItemForm({
   const handleMapsUrlChange = (value: string) => {
     setMapsUrl(value)
     const result = value.trim() ? parseGoogleMapsUrl(value.trim()) : null
-    // #region agent log
-    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:handleMapsUrlChange',message:'Maps URL changed',data:{urlLength:value.length,placeName:result?.placeName ?? null,nameAtCall:name,willSetName:!!(result?.placeName && !name.trim())},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (result?.placeName && !name.trim()) setName(result.placeName)
     if (!result?.placeName) setFetchedImageUrl(null)
     setSubmitError(null)
@@ -102,9 +93,6 @@ export function AddCollectionItemForm({
     setSubmitError(null)
     setLoading(true)
     setUploadPct(0)
-    // #region agent log
-    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:handleSubmit.start',message:'submit start',data:{hasPhotoFile:!!photoFile,hasFetchedImageUrl:!!fetchedImageUrl},hypothesisId:'H3 H5',timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     try {
       const docData = {
         trip_id: tripId,
@@ -122,31 +110,19 @@ export function AddCollectionItemForm({
       }
       const ref = await addDoc(collection(db, 'collection_items'), docData)
       const docId = ref.id
-      // #region agent log
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:afterAddDoc',message:'doc created',data:{docId,willUploadPhoto:!!photoFile},hypothesisId:'H3',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       if (photoFile) {
         setUploadPct(10)
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:beforeUpload',message:'entering upload block',data:{},hypothesisId:'H3 H4',timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const url = await uploadImage(
           `trips/${tripId}/collection/${docId}.jpg`,
           photoFile,
           (p) => setUploadPct(p)
         )
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:afterUpload',message:'upload done',data:{urlLength:url?.length},hypothesisId:'H3',timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         await updateDoc(doc(db, 'collection_items', docId), { image_url: url })
       }
 
       onSuccess()
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'AddCollectionItemForm.tsx:catch',message:'submit failed',data:{errorMessage:err instanceof Error ? err.message : String(err)},hypothesisId:'H2 H3 H4',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const msg = err instanceof Error ? err.message : String(err)
       setSubmitError(msg)
       console.error('Add collection item failed', err)

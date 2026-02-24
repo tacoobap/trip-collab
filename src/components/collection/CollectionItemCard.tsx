@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import { Heart, Image, Pencil, Trash2 } from 'lucide-react'
 import type { CollectionItem } from '@/types/database'
 import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
@@ -29,6 +30,28 @@ export function CollectionItemCard({
   const hasLiked = item.likes.includes(currentName)
   const likeCount = item.likes.length
 
+  const [retryKey, setRetryKey] = useState(0)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    setRetryKey(0)
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
+    }
+  }, [item.id, item.image_url])
+
+  const imageSrc = item.image_url
+    ? `${item.image_url}${retryKey > 0 ? `?v=${retryKey}` : ''}`
+    : null
+
+  const handleImageError = () => {
+    if (retryKey < 2 && retryTimeoutRef.current === null) {
+      retryTimeoutRef.current = setTimeout(() => {
+        setRetryKey((k) => k + 1)
+        retryTimeoutRef.current = null
+      }, 1500)
+    }
+  }
+
   return (
     <article
       className={cn(
@@ -37,11 +60,12 @@ export function CollectionItemCard({
       )}
     >
       <div className="aspect-[4/3] relative overflow-hidden">
-        {item.image_url ? (
+        {imageSrc ? (
           <img
-            src={item.image_url}
+            src={imageSrc}
             alt=""
             className="w-full h-full object-cover"
+            onError={handleImageError}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-violet-100 text-violet-400 dark:bg-violet-950/40 dark:text-violet-500/70">

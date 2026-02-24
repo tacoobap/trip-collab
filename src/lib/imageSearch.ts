@@ -35,9 +35,6 @@ export async function searchImage(query: string): Promise<ImageSearchResult> {
   }
 
   const accessKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY as string
-  // #region agent log
-  fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'imageSearch.ts:searchImage',message:'searchImage called',data:{query,hasAccessKey:!!accessKey},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!accessKey) throw new Error('VITE_UNSPLASH_ACCESS_KEY is not set in .env')
 
   const url = new URL('https://api.unsplash.com/search/photos')

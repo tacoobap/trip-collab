@@ -36,12 +36,6 @@ export async function uploadImage(
   file: File,
   onProgress?: (pct: number) => void
 ): Promise<string> {
-  // #region agent log
-  const hasToken = !!GITHUB_TOKEN
-  const hasOwner = !!GITHUB_OWNER
-  const hasRepo = !!GITHUB_REPO
-  fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'imageUpload.ts:uploadImage.start',message:'upload start',data:{hasToken,hasOwner,hasRepo},hypothesisId:'H4',timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
     const missing = [
       !GITHUB_TOKEN && 'VITE_GITHUB_TOKEN',
@@ -80,13 +74,8 @@ export async function uploadImage(
   if (sha) body.sha = sha
 
   const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) })
-  const putOk = putRes.ok
-  const putStatus = putRes.status
-  const putBody = putOk ? '' : await putRes.text()
-  // #region agent log
-  fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'92ebb8'},body:JSON.stringify({sessionId:'92ebb8',location:'imageUpload.ts:afterPut',message:'GitHub PUT result',data:{putOk,putStatus,putBodyPreview:putBody?.slice(0,200)},hypothesisId:'H4',timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!putRes.ok) {
+    const putBody = await putRes.text()
     throw new Error(`GitHub upload failed: ${putRes.status} ${putBody}`)
   }
 

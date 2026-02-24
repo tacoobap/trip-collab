@@ -111,7 +111,7 @@ export function EditCollectionItemForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">
           Name <span className="text-destructive">*</span>
@@ -183,7 +183,7 @@ export function EditCollectionItemForm({
           </div>
         </div>
       )}
-      <div>
+      <div className="min-w-0">
         <label className="block text-sm font-medium text-foreground mb-1">
           Google Maps link (optional)
         </label>
@@ -192,7 +192,7 @@ export function EditCollectionItemForm({
           onChange={(e) => setMapsUrl(e.target.value)}
           placeholder="Paste a Google Maps URL"
           type="url"
-          className="w-full"
+          className="w-full min-w-0"
         />
         {parsed && (
           <p className="text-xs text-muted-foreground mt-1">
