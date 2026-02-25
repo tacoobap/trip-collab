@@ -54,7 +54,7 @@ export function SlotCard({ slot, onClick }: SlotCardProps) {
         )}
 
         {isProposed && slot.proposals.length > 0 && (
-          <p className="text-sm font-medium text-foreground line-clamp-2 break-words">
+          <p className="text-[13px] font-medium text-foreground line-clamp-2 break-words">
             {slot.proposals.map((p, i) => (
               <span key={p.id}>
                 {i > 0 && <span className="text-muted-foreground font-normal"> · </span>}
@@ -65,7 +65,7 @@ export function SlotCard({ slot, onClick }: SlotCardProps) {
         )}
 
         {isLocked && lockedProposal && (
-          <p className="text-base text-foreground line-clamp-1 font-medium">
+          <p className="text-[13px] text-foreground line-clamp-1 font-medium">
             {lockedProposal.title}
           </p>
         )}

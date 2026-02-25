@@ -290,17 +290,21 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl h-[85vh] max-h-[85vh] flex flex-col min-h-0"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl h-[85vh] max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
             >
+              {/* Drag handle (mobile) — hidden on sm and up */}
+              <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">
+                <div className="w-9 h-1 rounded-full bg-muted-foreground/30" aria-hidden />
+              </div>
               {/* Header */}
-              <div className="px-5 pt-4 pb-3 border-b border-border shrink-0">
+              <div className="px-5 pt-2 sm:pt-4 pb-3 border-b border-border shrink-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="relative flex items-center gap-2 min-w-0 flex-1">
                     <button
                       type="button"
                       onClick={() => setIconPickerOpen((v) => !v)}
                       title="Change icon"
-                      className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0"
+                      className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
                     >
                       {currentIcon}
                     </button>
@@ -332,17 +336,17 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                         </button>
                       </>
                     ) : (
-                      <button
-                        onClick={() => setConfirmDeleteSlot(true)}
-                        className="rounded-full w-8 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-destructive/70 hover:bg-destructive/10 transition-colors"
-                        title="Delete this slot"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          onClick={() => setConfirmDeleteSlot(true)}
+                          className="rounded-full w-8 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-destructive/70 hover:bg-destructive/10 transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px]"
+                          title="Delete this slot"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                     )}
                     <button
                       onClick={onClose}
-                      className="rounded-full w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors"
+                      className="rounded-full w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px]"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -421,10 +425,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
                       Add an idea
                     </p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col max-sm:flex-col sm:flex-row gap-2">
                       <Button
                         onClick={() => setShowAddForm(true)}
-                        className="flex-1"
+                        className="flex-1 max-sm:w-full"
                         variant="outline"
                       >
                         Write a new idea
@@ -432,7 +436,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                       <Button
                         onClick={() => setPickFromCollectionOpen(true)}
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 max-sm:w-full"
                       >
                         Pick from Collection
                       </Button>

@@ -45,7 +45,7 @@ export function AddProposalForm({ currentName, onSubmit, onCancel }: AddProposal
         <button
           type="submit"
           disabled={!title.trim() || loading}
-          className="shrink-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center transition-opacity disabled:opacity-30"
+          className="shrink-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center transition-opacity disabled:opacity-30 max-sm:min-h-[44px] max-sm:min-w-[44px]"
         >
           {loading
             ? <Loader2 className="w-3.5 h-3.5 text-primary-foreground animate-spin" />
@@ -56,7 +56,7 @@ export function AddProposalForm({ currentName, onSubmit, onCancel }: AddProposal
       <button
         type="button"
         onClick={onCancel}
-        className="w-full text-center text-xs text-muted-foreground/50 hover:text-muted-foreground mt-2 py-1 transition-colors"
+        className="w-full text-center text-xs text-muted-foreground/50 hover:text-muted-foreground mt-2 py-2 max-sm:min-h-[44px] transition-colors touch-manipulation"
       >
         Cancel
       </button>

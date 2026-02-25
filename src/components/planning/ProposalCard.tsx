@@ -159,7 +159,7 @@ export function ProposalCard({
             <button
               onClick={() => onVote(proposal.id)}
               className={cn(
-                'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-colors',
+                'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:px-3',
                 hasVoted
                   ? 'text-coral bg-coral/10 hover:bg-coral/20'
                   : 'text-muted-foreground/50 hover:text-coral hover:bg-coral/10'
@@ -173,7 +173,7 @@ export function ProposalCard({
             {onEdit && (
               <button
                 onClick={startEdit}
-                className="text-muted-foreground/50 hover:text-foreground p-1.5 rounded-full hover:bg-muted transition-colors"
+                className="text-muted-foreground/50 hover:text-foreground p-1.5 rounded-full hover:bg-muted transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center touch-manipulation"
                 title="Edit idea"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -184,7 +184,7 @@ export function ProposalCard({
             {onDelete && (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="text-muted-foreground/50 hover:text-destructive/80 p-1.5 rounded-full hover:bg-destructive/10 transition-colors"
+                className="text-muted-foreground/50 hover:text-destructive/80 p-1.5 rounded-full hover:bg-destructive/10 transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center touch-manipulation"
                 title={isLocked ? 'Delete idea and unlock slot' : 'Delete idea'}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -193,14 +193,14 @@ export function ProposalCard({
 
             {/* Lock (pick this one from the collection) / locked badge */}
             {isLocked ? (
-              <span className="flex items-center gap-1 text-xs text-sage font-medium px-2 py-1">
+              <span className="flex items-center gap-1 text-xs text-sage font-medium px-2 py-1 max-sm:min-h-[44px] max-sm:flex max-sm:items-center">
                 <Lock className="w-3 h-3" />
                 Locked
               </span>
             ) : onLock ? (
               <button
                 onClick={() => onLock(proposal.id)}
-                className="text-xs font-medium text-sage/80 hover:text-sage border border-sage/30 hover:border-sage/60 hover:bg-sage/10 px-2.5 py-1 rounded-full transition-colors shrink-0"
+                className="text-xs font-medium text-sage/80 hover:text-sage border border-sage/30 hover:border-sage/60 hover:bg-sage/10 px-2.5 py-1 rounded-full transition-colors shrink-0 touch-manipulation max-sm:min-h-[44px] max-sm:px-3"
               >
                 Lock it in
               </button>

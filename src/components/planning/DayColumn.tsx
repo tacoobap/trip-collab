@@ -133,7 +133,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
   }
 
   return (
-    <div className="flex flex-col w-[240px] min-w-[240px] sm:w-[260px] sm:min-w-[260px] flex-shrink-0">
+    <div className="flex flex-col w-[calc(100vw-2rem)] min-w-[260px] sm:w-[260px] sm:min-w-[260px] flex-shrink-0 max-sm:shrink-0">
       {/* Day image thumbnail */}
       <div
         className="relative mb-4 rounded-lg overflow-hidden"

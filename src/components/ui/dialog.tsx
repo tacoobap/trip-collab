@@ -20,12 +20,12 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-[1000] w-full max-w-[42rem] mx-auto flex justify-center min-w-0 max-h-[90vh] sm:max-h-none">
+      <div className="relative z-[1000] w-full max-w-[42rem] mx-auto flex justify-center items-center min-w-0 max-h-[90vh]">
         {children}
       </div>
     </div>
@@ -37,7 +37,7 @@ function DialogContent({ className, children, ...props }: React.HTMLAttributes<H
     <div
       className={cn(
         'bg-card rounded-xl border shadow-lg p-6 relative max-h-[90vh] overflow-y-auto w-full max-w-[42rem] min-w-0',
-        'max-sm:p-4 max-sm:max-h-[85dvh] max-sm:rounded-t-2xl max-sm:rounded-b-none',
+        'max-sm:max-h-[85dvh]',
         className
       )}
       {...props}
