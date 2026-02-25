@@ -171,14 +171,14 @@ export function CollectionPage() {
 
       {/* Hero */}
       <div className="border-b border-border bg-gradient-to-br from-muted/30 to-background">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 max-sm:py-5">
           <h1 className="font-serif text-lg sm:text-xl font-semibold text-foreground">
             Collection
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5 mb-6">
+          <p className="text-sm text-muted-foreground mt-0.5 mb-4 sm:mb-6">
             Save ideas for later and add them to the plan when you’re ready.
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 max-sm:flex-col max-sm:gap-2">
             <Button
               onClick={() => {
                 setSuggestOpen(true)
@@ -187,7 +187,7 @@ export function CollectionPage() {
                 setVibeSentence('')
               }}
               variant="default"
-              className="gap-2"
+              className="gap-2 max-sm:w-full max-sm:justify-center"
             >
               <Sparkles className="w-4 h-4" />
               Suggest something for me
@@ -195,7 +195,7 @@ export function CollectionPage() {
             <Button
               onClick={() => setAddOpen(true)}
               variant="outline"
-              className="gap-2"
+              className="gap-2 max-sm:w-full max-sm:justify-center"
             >
               <Plus className="w-4 h-4" />
               Add an idea
@@ -204,7 +204,7 @@ export function CollectionPage() {
         </div>
       </div>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 max-sm:py-4">
         {itemsLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -220,10 +220,10 @@ export function CollectionPage() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-10 max-sm:space-y-8">
             {sections.map(({ label, items: list }) => (
               <section key={label}>
-                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
+                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4 max-sm:mb-3">
                   {label}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

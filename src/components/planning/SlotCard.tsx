@@ -29,8 +29,8 @@ export function SlotCard({ slot, onClick }: SlotCardProps) {
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
       className={cn(
-        'w-full text-left rounded-lg p-4 transition-all cursor-pointer',
-        'flex flex-col justify-between min-h-[88px]',
+        'w-full text-left rounded-lg p-4 transition-all cursor-pointer touch-manipulation',
+        'flex flex-col justify-between min-h-[88px] max-sm:min-h-[72px]',
         isOpen && 'border border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40',
         isProposed && 'border border-border bg-muted/30 hover:border-border/80 hover:bg-muted/50',
         isLocked && 'border border-blue-500/40 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10'

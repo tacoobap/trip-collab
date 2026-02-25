@@ -322,7 +322,7 @@ export function ItineraryPage() {
         />
 
         {/* Trip info — centered, elegant */}
-        <div className="absolute inset-0 flex items-center justify-center px-6 sm:px-12">
+        <div className="absolute inset-0 flex items-center justify-center px-4 sm:px-12">
           <div className="text-center max-w-2xl">
             <motion.h1
               className="font-serif text-4xl sm:text-5xl md:text-6xl font-normal text-white leading-tight tracking-tight mb-4"
@@ -401,12 +401,12 @@ export function ItineraryPage() {
         )}
 
         {/* Photo + Update text — in their own section */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4">
-          <div className="rounded-xl border border-border bg-card/50 px-4 py-3 flex flex-col items-center gap-3">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 max-sm:pt-6 max-sm:px-3 max-sm:pb-3">
+          <div className="rounded-xl border border-border bg-card/50 px-4 py-3 flex flex-col items-center gap-3 max-sm:px-3 max-sm:py-2.5">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
               Customize
             </p>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-2 max-sm:gap-2 max-sm:w-full max-sm:flex-col">
               <input
                 ref={heroInputRef}
                 type="file"
@@ -417,7 +417,7 @@ export function ItineraryPage() {
               <button
                 onClick={() => heroInputRef.current?.click()}
                 disabled={heroUploading}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
                 title={currentHero ? 'Change cover photo' : 'Add cover photo'}
               >
                 {heroUploading ? (
@@ -429,7 +429,7 @@ export function ItineraryPage() {
               <button
                 onClick={trip.tagline ? openUpdateTextModal : handleGenerate}
                 disabled={generating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50 touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
                 title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
               >
                 {generating ? (

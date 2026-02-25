@@ -36,7 +36,7 @@ export function PageHeader({
           : 'sticky top-0 bg-warm-white/80 backdrop-blur-sm border-border'
       )}
     >
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3">
         {/* Left: Trup */}
         <Link
           to="/"
@@ -53,11 +53,11 @@ export function PageHeader({
         </Link>
 
         {/* Center: nav items */}
-        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 max-sm:gap-0">
           <Link
             to={`/trip/${trip.slug}`}
             className={cn(
-              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors',
+              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors touch-manipulation max-sm:px-2.5 max-sm:py-2.5 max-sm:min-h-[44px] max-sm:flex max-sm:items-center',
               !isItinerary && !isCollection ? linkActive : linkInactive
             )}
           >
@@ -66,7 +66,7 @@ export function PageHeader({
           <Link
             to={`/trip/${trip.slug}/collection`}
             className={cn(
-              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors',
+              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors touch-manipulation max-sm:px-2.5 max-sm:py-2.5 max-sm:min-h-[44px] max-sm:flex max-sm:items-center',
               isCollection ? linkActive : linkInactive
             )}
           >
@@ -75,7 +75,7 @@ export function PageHeader({
           <Link
             to={`/trip/${trip.slug}/itinerary`}
             className={cn(
-              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors',
+              'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors touch-manipulation max-sm:px-2.5 max-sm:py-2.5 max-sm:min-h-[44px] max-sm:flex max-sm:items-center',
               isItinerary ? linkActive : linkInactive
             )}
           >
@@ -84,20 +84,26 @@ export function PageHeader({
         </nav>
 
         {/* Right: single avatar (you); chevron goes to "Who are you?" page */}
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center shrink-0 max-sm:min-h-[44px] max-sm:items-center">
           {currentName && (
-            <div className="flex items-center gap-1.5">
-              <ProposerAvatar name={currentName} size="sm" />
-              {onChangeName && (
-                <button
-                  onClick={onChangeName}
-                  className={cn('flex items-center transition-colors group', nameBtn)}
-                  title="Change person"
-                >
-                  <ChevronDown className={cn('w-3 h-3 opacity-50 group-hover:opacity-100', isDark ? 'text-white' : '')} />
-                </button>
-              )}
-            </div>
+            onChangeName ? (
+              <button
+                onClick={onChangeName}
+                className={cn(
+                  'flex items-center gap-1.5 transition-colors group touch-manipulation max-sm:p-2 max-sm:-m-2 rounded-md',
+                  nameBtn
+                )}
+                title="Change person"
+                aria-label="Change who you are"
+              >
+                <ProposerAvatar name={currentName} size="sm" />
+                <ChevronDown className={cn('w-3 h-3 opacity-50 group-hover:opacity-100', isDark ? 'text-white' : '')} />
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <ProposerAvatar name={currentName} size="sm" />
+              </div>
+            )
           )}
         </div>
       </div>

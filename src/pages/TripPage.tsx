@@ -56,7 +56,7 @@ export function TripPage() {
         onChangeName={clearName}
       />
       <div className="border-b border-border bg-warm-white/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
           <div className="min-w-0">
             <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
               {trip.name}
@@ -69,14 +69,15 @@ export function TripPage() {
           </div>
           <button
             onClick={() => setStaysOpen(true)}
-            className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
             title="Stays"
+            aria-label="Stays"
           >
             <BedDouble className="w-4 h-4" />
           </button>
         </div>
       </div>
-      <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden">
+      <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8 max-sm:px-4">
         <PlanningBoard trip={trip} days={days} currentName={name} />
       </main>
 

@@ -177,8 +177,9 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
               <button
                 onClick={() => setPhotoMenuOpen((v) => !v)}
                 disabled={imageWorking}
-                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40"
+                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40 touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center max-sm:-m-1"
                 title={day.image_url ? 'Change day photo' : 'Add day photo'}
+                aria-label={day.image_url ? 'Change day photo' : 'Add day photo'}
               >
                 {uploading ? (
                   <span className="text-[10px] font-medium">{uploadPct}%</span>
@@ -290,7 +291,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         ) : (
           <button
             onClick={() => setAddingSlot(true)}
-            className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground/50 hover:text-muted-foreground border border-border/40 hover:border-border/70 rounded-lg py-3 transition-all"
+            className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground/50 hover:text-muted-foreground border border-border/40 hover:border-border/70 rounded-lg py-3 transition-all touch-manipulation max-sm:min-h-[48px]"
           >
             <Plus className="w-3 h-3" />
             Add slot

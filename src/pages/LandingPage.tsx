@@ -75,18 +75,18 @@ export function LandingPage() {
       )}
 
       {/* Header */}
-      <header className="border-b border-border px-4 sm:px-8 py-4 flex items-center justify-between">
+      <header className="border-b border-border px-4 sm:px-8 py-4 max-sm:py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
           <span className="text-lg font-serif font-bold text-foreground">Trup</span>
         </div>
-        <Button size="sm" onClick={() => setNewTripOpen(true)}>
+        <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
           <Plus className="w-4 h-4 mr-1.5" />
           New trip
         </Button>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 max-sm:py-6">
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -144,7 +144,8 @@ export function LandingPage() {
               >
                 <button
                   onClick={() => setNewTripOpen(true)}
-                  className="w-full h-full min-h-[110px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer"
+                  className="w-full h-full min-h-[110px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer touch-manipulation max-sm:min-h-[120px]"
+                  aria-label="Plan a new trip"
                 >
                   <Plus className="w-6 h-6" />
                   <span className="text-base font-medium">Plan a new trip</span>

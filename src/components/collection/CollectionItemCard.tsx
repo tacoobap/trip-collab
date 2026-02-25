@@ -74,25 +74,25 @@ export function CollectionItemCard({
             <Image className="w-12 h-12" strokeWidth={1.25} />
           </div>
         )}
-        <div className="absolute top-2 right-2 flex items-center gap-1">
+        <div className="absolute top-2 right-2 flex items-center gap-1 max-sm:top-2 max-sm:right-2 max-sm:gap-1.5">
           {onEdit && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onEdit(item) }}
-              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background shadow-sm"
+              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background shadow-sm touch-manipulation max-sm:w-10 max-sm:h-10 max-sm:min-w-[44px] max-sm:min-h-[44px]"
               aria-label="Edit"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="w-3.5 h-3.5 max-sm:w-4 max-sm:h-4" />
             </button>
           )}
           {onDelete && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(item.id) }}
-              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 shadow-sm"
+              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 shadow-sm touch-manipulation max-sm:w-10 max-sm:h-10 max-sm:min-w-[44px] max-sm:min-h-[44px]"
               aria-label="Delete"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5 max-sm:w-4 max-sm:h-4" />
             </button>
           )}
         </div>
@@ -116,7 +116,7 @@ export function CollectionItemCard({
             type="button"
             onClick={() => onLike(item.id)}
             className={cn(
-              'inline-flex items-center gap-1 text-xs transition-colors',
+              'inline-flex items-center gap-1 text-xs transition-colors touch-manipulation max-sm:py-2 max-sm:-my-1 max-sm:pr-1',
               hasLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
             )}
             aria-label={hasLiked ? 'Unlike' : 'Like'}
