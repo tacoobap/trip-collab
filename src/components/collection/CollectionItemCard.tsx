@@ -3,6 +3,7 @@ import { Heart, Image, Pencil, Trash2 } from 'lucide-react'
 import type { CollectionItem } from '@/types/database'
 import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
 import { cn } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
 
 interface CollectionItemCardProps {
   item: CollectionItem
@@ -29,6 +30,7 @@ export function CollectionItemCard({
 }: CollectionItemCardProps) {
   const hasLiked = item.likes.includes(currentName)
   const likeCount = item.likes.length
+  const [likesOpen, setLikesOpen] = useState(false)
 
   const [retryKey, setRetryKey] = useState(0)
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -125,7 +127,13 @@ export function CollectionItemCard({
             <span>{likeCount > 0 ? likeCount : 'Like'}</span>
           </button>
           {likeCount > 0 && (
-            <div className="flex items-center -space-x-1.5" title={item.likes.join(', ')}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setLikesOpen(true) }}
+              className="flex items-center -space-x-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              title={`Liked by: ${item.likes.join(', ')}`}
+              aria-label={`See who liked (${item.likes.join(', ')})`}
+            >
               {item.likes.map((name) => {
                 const color = getProposerColor(name)
                 const initial = getProposerInitial(name)
@@ -140,10 +148,39 @@ export function CollectionItemCard({
                   </div>
                 )
               })}
-            </div>
+            </button>
           )}
         </div>
       </div>
+
+      <Dialog open={likesOpen} onOpenChange={setLikesOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogClose onClick={() => setLikesOpen(false)} />
+          <DialogHeader>
+            <DialogTitle>Liked by</DialogTitle>
+          </DialogHeader>
+          <ul className="space-y-1.5">
+            {item.likes.map((name) => {
+              const color = getProposerColor(name)
+              const initial = getProposerInitial(name)
+              return (
+                <li
+                  key={name}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 border-card shrink-0"
+                    style={{ backgroundColor: color.bg, color: color.text }}
+                  >
+                    {initial}
+                  </span>
+                  <span className="text-foreground">{name}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </DialogContent>
+      </Dialog>
     </article>
   )
 }
