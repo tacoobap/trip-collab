@@ -95,7 +95,7 @@ export async function generateNarrative(
   days: DayWithSlots[]
 ): Promise<NarrativeResult> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string
-  if (!apiKey) throw new Error('VITE_GEMINI_API_KEY is not set in .env')
+  if (!apiKey) throw new Error('AI narrative is not configured. Set VITE_GEMINI_API_KEY in your deployment environment (e.g. Netlify or Vercel) and redeploy.')
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({
