@@ -10,9 +10,10 @@ interface SlotCardProps {
 }
 
 export function SlotCard({ slot, onClick }: SlotCardProps) {
-  const isOpen = slot.status === 'open'
-  const isProposed = slot.status === 'proposed'
   const isLocked = slot.status === 'locked'
+  const hasProposals = slot.proposals.length > 0
+  const isOpen = !isLocked && !hasProposals
+  const isProposed = !isLocked && hasProposals
 
   const lockedProposal = isLocked
     ? slot.proposals.find((p) => p.id === slot.locked_proposal_id)
@@ -54,14 +55,19 @@ export function SlotCard({ slot, onClick }: SlotCardProps) {
         )}
 
         {isProposed && slot.proposals.length > 0 && (
-          <p className="text-[13px] font-medium text-foreground line-clamp-2 break-words">
-            {slot.proposals.map((p, i) => (
-              <span key={p.id}>
-                {i > 0 && <span className="text-muted-foreground font-normal"> · </span>}
-                {p.title}
-              </span>
-            ))}
-          </p>
+          <>
+            <p className="text-[13px] font-medium text-foreground line-clamp-2 break-words">
+              {slot.proposals.map((p, i) => (
+                <span key={p.id}>
+                  {i > 0 && <span className="text-muted-foreground font-normal"> · </span>}
+                  {p.title}
+                </span>
+              ))}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground/70">
+              Not locked in yet — tap to decide together.
+            </p>
+          </>
         )}
 
         {isLocked && lockedProposal && (

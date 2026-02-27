@@ -75,11 +75,24 @@ service cloud.firestore {
           (resource.data.get('trip_id', '') != '' && tripMember(resource.data.trip_id))
           || (resource.data.day_id is string && tripMember(get(/databases/$(database)/documents/days/$(resource.data.day_id)).data.trip_id))
         );
-      allow create, update: if request.auth != null
+      // For new slots we always require trip_id on create.
+      allow create: if request.auth != null
         && request.resource.data.day_id is string
         && request.resource.data.trip_id is string
         && tripMember(request.resource.data.trip_id)
         && request.resource.data.status in ['open', 'proposed', 'locked'];
+      // For updates, allow both modern docs (with trip_id) and legacy docs
+      // where we resolve the trip via the day reference.
+      allow update: if request.auth != null
+        && request.resource.data.day_id is string
+        && request.resource.data.status in ['open', 'proposed', 'locked']
+        && (
+          (request.resource.data.get('trip_id', '') != '' && tripMember(request.resource.data.trip_id))
+          || (
+            resource.data.day_id is string
+            && tripMember(get(/databases/$(database)/documents/days/$(resource.data.day_id)).data.trip_id)
+          )
+        );
     }
 
     // ── Proposals (trip_id on create; legacy proposals resolved via slot→day) ─

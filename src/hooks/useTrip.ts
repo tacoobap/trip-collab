@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore'
-import { db, auth, firebaseProjectId } from '@/lib/firebase'
+import { collection, query, where, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore'
+import { db, auth } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
 
 export function useTrip(slug: string | undefined, currentUid?: string | null) {
@@ -18,30 +18,7 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     let unsubSlots: (() => void) | null = null
     let unsubProposals: (() => void) | null = null
 
-    // #region agent log
     const authUid = auth.currentUser?.uid ?? null
-    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:effect',message:'trip load start',data:{slug,authUid,projectId:firebaseProjectId},hypothesisId:'A,C',timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
-    // #region agent log
-    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '1bd92d',
-      },
-      body: JSON.stringify({
-        sessionId: '1bd92d',
-        runId: 'initial',
-        hypothesisId: 'H1,H2,H4',
-        location: 'src/hooks/useTrip.ts:effect',
-        message: 'useTrip effect start',
-        data: { slug, authUid, projectId: firebaseProjectId },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-
     const effectiveUid = currentUid ?? authUid
 
     if (!effectiveUid) {
@@ -49,6 +26,10 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
       setLoading(false)
       return
     }
+
+    // We have a UID – clear any previous auth-related errors and show loading
+    setError('')
+    setLoading(true)
 
     const tripsCol = collection(db, 'trips')
     getDocs(query(tripsCol, where('slug', '==', slug)))
@@ -68,34 +49,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
         const ownerUid = selectedData?.owner_uid
         const memberUids = selectedData?.member_uids
 
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:tripSelection',message:'trip selected from member lists',data:{tripId:selectedId,owner_uid:ownerUid,member_uids:memberUids,member_uids_type:Array.isArray(memberUids)?'array':'other',member_uids_json:JSON.stringify(memberUids)},hypothesisId:'B,E',timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': '1bd92d',
-          },
-          body: JSON.stringify({
-            sessionId: '1bd92d',
-            runId: 'initial',
-            hypothesisId: 'H1,H2,H3',
-            location: 'src/hooks/useTrip.ts:tripSelection',
-            message: 'trip selected from member lists',
-            data: {
-              tripId: selectedId,
-              owner_uid: ownerUid,
-              member_uids: memberUids,
-              member_uids_type: Array.isArray(memberUids) ? 'array' : typeof memberUids,
-              member_uids_length: Array.isArray(memberUids) ? memberUids.length : null,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
-
         const tripData = { id: selectedId, ...selectedData } as Trip
         setTrip(tripData)
 
@@ -110,32 +63,11 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
           (err) => {
             if (cancelled) return
             console.error('useTrip trip snapshot error:', err)
-            // #region agent log
-            fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:onSnapshotTrip',message:'trip doc snapshot error',data:{operation:'onSnapshot_trip',errorCode:err?.code,tripId:selectedId},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
-            // #region agent log
-            fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Debug-Session-Id': '1bd92d',
-              },
-              body: JSON.stringify({
-                sessionId: '1bd92d',
-                runId: 'initial',
-                hypothesisId: 'H4',
-                location: 'src/hooks/useTrip.ts:onSnapshotTrip',
-                message: 'trip snapshot error',
-                data: {
-                  operation: 'onSnapshot_trip',
-                  errorCode: err?.code ?? null,
-                  tripId: selectedId,
-                },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {})
-            // #endregion
-            setError(err?.code === 'permission-denied' ? "You don't have access to this trip." : 'Failed to load trip.')
+            setError(
+              err?.code === 'permission-denied'
+                ? "You don't have access to this trip."
+                : 'Failed to load trip.'
+            )
             setLoading(false)
           }
         )
@@ -146,32 +78,39 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
         let liveDays: Day[] = []
         let currentSlotIds: string[] = []
 
+        const ensureLegacyLockedProposals = async () => {
+          const lockedIds = new Set<string>()
+          liveSlots.forEach((slot) => {
+            if (slot.locked_proposal_id) lockedIds.add(slot.locked_proposal_id)
+          })
+
+          const toFetch = [...lockedIds].filter((id) => !liveProposals.has(id))
+          if (toFetch.length === 0) return
+
+          const results = await Promise.all(
+            toFetch.map(async (id) => {
+              try {
+                const snap = await getDoc(doc(db, 'proposals', id))
+                if (!snap.exists()) {
+                  return { id, found: false as const }
+                }
+                const proposal = { id: snap.id, ...snap.data() } as Proposal
+                liveProposals.set(id, proposal)
+                return { id, found: true as const }
+              } catch {
+                return { id, found: false as const }
+              }
+            })
+          )
+
+          if (results.some((r) => r.found)) {
+            rebuild()
+          }
+        }
+
         const rebuild = () => {
           if (cancelled) return
           const sorted = [...liveDays].sort((a, b) => a.day_number - b.day_number)
-
-          // #region agent log
-          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Debug-Session-Id': '9bccd3',
-            },
-            body: JSON.stringify({
-              sessionId: '9bccd3',
-              runId: 'initial',
-              hypothesisId: 'H1,H4',
-              location: 'src/hooks/useTrip.ts:rebuild',
-              message: 'rebuild days/slots/proposals',
-              data: {
-                days: sorted.length,
-                slots: [...liveSlots.values()].length,
-                proposals: [...liveProposals.values()].length,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion
 
           setDays(
             sorted.map((day) => ({
@@ -214,9 +153,10 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
               (slotsSnap) => {
                 if (cancelled) return
                 liveSlots.clear()
-                slotsSnap.docs.forEach((d) =>
-                  liveSlots.set(d.id, { id: d.id, ...d.data() } as Slot)
-                )
+                slotsSnap.docs.forEach((d) => {
+                  const slot = { id: d.id, ...d.data() } as Slot
+                  liveSlots.set(d.id, slot)
+                })
                 const newSlotIds = [...liveSlots.keys()].sort()
                 const slotIdsChanged =
                   JSON.stringify(newSlotIds) !== JSON.stringify(currentSlotIds)
@@ -248,29 +188,8 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
                       liveProposals.set(d.id, { id: d.id, ...d.data() } as Proposal)
                     )
 
-                    // #region agent log
-                    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'X-Debug-Session-Id': '9bccd3',
-                      },
-                      body: JSON.stringify({
-                        sessionId: '9bccd3',
-                        runId: 'initial',
-                        hypothesisId: 'H1',
-                        location: 'src/hooks/useTrip.ts:proposalsSnapshot',
-                        message: 'proposals snapshot received',
-                        data: {
-                          tripId: selectedId,
-                          proposalsFromSnapshot: propsSnap.docs.length,
-                        },
-                        timestamp: Date.now(),
-                      }),
-                    }).catch(() => {})
-                    // #endregion
-
                     rebuild()
+                    void ensureLegacyLockedProposals()
                   }
                 )
               }
@@ -281,32 +200,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
       .catch((err) => {
         if (cancelled) return
         console.error('useTrip error:', err)
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:catch',message:'member queries failed',data:{operation:'getDocs_memberTrips',errorCode:err?.code,slug,effectiveUid},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': '1bd92d',
-          },
-          body: JSON.stringify({
-            sessionId: '1bd92d',
-            runId: 'initial',
-            hypothesisId: 'H1,H2,H3,H4',
-            location: 'src/hooks/useTrip.ts:catch',
-            message: 'member queries failed',
-            data: {
-              operation: 'getDocs_memberTrips',
-              errorCode: err?.code ?? null,
-              slug,
-              effectiveUid,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
         const msg =
           err?.code === 'permission-denied'
             ? "You don't have access to this trip. If you were just added, check that your UID is in the trip's member_uids (as an array of strings) in Firestore."
