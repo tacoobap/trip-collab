@@ -15,20 +15,12 @@ export function SignInPage() {
     signUpWithEmailPassword,
     authError,
     clearAuthError,
-    setAuthError,
-    getSignInMethodsForEmail,
-    linkEmailPasswordToCurrentUser,
   } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
-  const [googleAccountAddPassword, setGoogleAccountAddPassword] = useState<{ email: string; password: string } | null>(null)
 
   useEffect(() => {
     if (user) navigate('/', { replace: true })
   }, [user, navigate])
-
-  useEffect(() => {
-    if (user) setGoogleAccountAddPassword(null)
-  }, [user])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -37,7 +29,6 @@ export function SignInPage() {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearAuthError()
-    setGoogleAccountAddPassword(null)
     if (!email.trim() || !password) return
     setSigningIn(true)
     try {
@@ -46,28 +37,6 @@ export function SignInPage() {
       } else {
         await signInWithEmailPassword(email, password)
       }
-    } catch (err) {
-      // On any email sign-in failure (not sign-up), show the Google/add-password card first, then verify
-      if (!isSignUp) {
-        const trimmedEmail = email.trim()
-        setGoogleAccountAddPassword({ email: trimmedEmail, password })
-        clearAuthError()
-        setSigningIn(false)
-        // If this account actually has a password (not Google-only), switch back to the error
-        getSignInMethodsForEmail(trimmedEmail)
-          .then((methods) => {
-            const hasPassword = methods.includes('password')
-            if (hasPassword) {
-              setGoogleAccountAddPassword(null)
-              setAuthError('Invalid email or password. If you usually sign in with Google, use "Sign in with Google" instead.')
-            }
-          })
-          .catch(() => {
-            // Keep card visible if we can't fetch methods (e.g. network)
-          })
-        return
-      }
-      throw err
     } finally {
       setSigningIn(false)
     }
@@ -78,24 +47,6 @@ export function SignInPage() {
     setSigningIn(true)
     try {
       await signInWithGoogle()
-    } finally {
-      setSigningIn(false)
-    }
-  }
-
-  const handleAddPasswordToGoogleAccount = async () => {
-    if (!googleAccountAddPassword) return
-    // #region agent log
-    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97004e'},body:JSON.stringify({sessionId:'97004e',location:'SignInPage.tsx:handleAddPasswordToGoogleAccount',message:'Add password clicked',data:{hasPayload:!!googleAccountAddPassword,email:googleAccountAddPassword?.email},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    clearAuthError()
-    setSigningIn(true)
-    try {
-      await signInWithGoogle()
-      await linkEmailPasswordToCurrentUser(googleAccountAddPassword.email, googleAccountAddPassword.password)
-      setGoogleAccountAddPassword(null)
-    } catch {
-      // authError set by context; keep googleAccountAddPassword so user can retry
     } finally {
       setSigningIn(false)
     }
@@ -118,137 +69,82 @@ export function SignInPage() {
           Sign in to see your trips and create new ones.
         </p>
 
-        {googleAccountAddPassword ? (
+        {authError && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mb-4 rounded-xl border border-border bg-muted/30 px-4 py-4 text-left text-sm text-foreground space-y-4"
+            className="mb-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-left text-sm text-destructive"
           >
-            {authError && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{authError}</span>
-              </div>
-            )}
-            <p>
-              This email is linked to Google. You don&apos;t have to create a password — you can sign in with Google below. If you&apos;d like to also sign in with email in the future, you can add a password to this account.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="w-full max-sm:min-h-[48px]"
-                onClick={handleSignInWithGoogle}
-                disabled={signingIn}
-              >
-                Sign in with Google
-              </Button>
-              <Button
-                type="button"
-                size="lg"
-                className="w-full max-sm:min-h-[48px]"
-                onClick={handleAddPasswordToGoogleAccount}
-                disabled={signingIn}
-              >
-                {signingIn ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Adding password…
-                  </>
-                ) : (
-                  'Add password to this account'
-                )}
-              </Button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setGoogleAccountAddPassword(null)}
-              className="text-sm text-muted-foreground hover:text-foreground underline"
-            >
-              Try a different email
-            </button>
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{authError}</span>
           </motion.div>
-        ) : (
-          <>
-            {authError && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mb-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-left text-sm text-destructive"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{authError}</span>
-              </motion.div>
-            )}
-
-            <form onSubmit={handleEmailSubmit} className="space-y-3 text-left mb-4">
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                disabled={signingIn}
-                className="w-full"
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                disabled={signingIn}
-                className="w-full"
-              />
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full max-sm:min-h-[48px]"
-                disabled={signingIn || !email.trim() || !password}
-              >
-                {signingIn ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {isSignUp ? 'Creating account…' : 'Signing in…'}
-                  </>
-                ) : isSignUp ? (
-                  'Create account'
-                ) : (
-                  'Sign in with email'
-                )}
-              </Button>
-            </form>
-
-            <button
-              type="button"
-              onClick={() => {
-                clearAuthError()
-                setIsSignUp((prev) => !prev)
-              }}
-              className="text-sm text-muted-foreground hover:text-foreground underline mb-4"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
-            </button>
-
-            <div className="flex items-center gap-2 my-4">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="w-full max-sm:min-h-[48px]"
-              onClick={handleSignInWithGoogle}
-              disabled={signingIn}
-            >
-              Sign in with Google
-            </Button>
-          </>
         )}
+
+        <form onSubmit={handleEmailSubmit} className="space-y-3 text-left mb-4">
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            disabled={signingIn}
+            className="w-full"
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={isSignUp ? 'new-password' : 'current-password'}
+            disabled={signingIn}
+            className="w-full"
+          />
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full max-sm:min-h-[48px]"
+            disabled={signingIn || !email.trim() || !password}
+          >
+            {signingIn ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {isSignUp ? 'Creating account…' : 'Signing in…'}
+              </>
+            ) : isSignUp ? (
+              'Create account'
+            ) : (
+              'Sign in with email'
+            )}
+          </Button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => {
+            clearAuthError()
+            setIsSignUp((prev) => !prev)
+          }}
+          className="text-sm text-muted-foreground hover:text-foreground underline mb-4"
+        >
+          {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+        </button>
+
+        <div className="flex items-center gap-2 my-4">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full max-sm:min-h-[48px]"
+          onClick={handleSignInWithGoogle}
+          disabled={signingIn}
+        >
+          Sign in with Google
+        </Button>
 
         <footer className="mt-12 text-center text-xs text-muted-foreground">
           <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>

@@ -14,9 +14,6 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
-  fetchSignInMethodsForEmail,
-  linkWithCredential,
-  EmailAuthProvider,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -31,9 +28,6 @@ interface AuthContextValue {
   getIdToken: () => Promise<string | null>
   authError: string | null
   clearAuthError: () => void
-  setAuthError: (message: string) => void
-  getSignInMethodsForEmail: (email: string) => Promise<string[]>
-  linkEmailPasswordToCurrentUser: (email: string, password: string) => Promise<void>
 }
 
 function getAuthErrorMessage(err: unknown): string {
@@ -134,31 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuthError = useCallback(() => setAuthError(null), [])
 
-  const setAuthErrorMessage = useCallback((message: string) => setAuthError(message), [])
-
-  const getSignInMethodsForEmail = useCallback(async (email: string) => {
-    return fetchSignInMethodsForEmail(auth, email.trim())
-  }, [])
-
-  const linkEmailPasswordToCurrentUser = useCallback(async (email: string, password: string) => {
-    setAuthError(null)
-    const u = auth.currentUser
-    if (!u) {
-      setAuthError('Please sign in with Google first, then add a password.')
-      throw new Error('No current user')
-    }
-    try {
-      await linkWithCredential(u, EmailAuthProvider.credential(email.trim(), password))
-    } catch (err) {
-      const message =
-        err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'auth/weak-password'
-          ? 'Please choose a password with at least 6 characters.'
-          : err instanceof Error ? err.message : 'Add password failed. Please try again.'
-      setAuthError(message)
-      throw err
-    }
-  }, [])
-
   const value: AuthContextValue = {
     user,
     loading,
@@ -169,9 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getIdToken,
     authError,
     clearAuthError,
-    setAuthError: setAuthErrorMessage,
-    getSignInMethodsForEmail,
-    linkEmailPasswordToCurrentUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
