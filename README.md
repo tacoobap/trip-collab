@@ -83,6 +83,10 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 - `src/types/database.ts` — Shared Firestore/document types.
 - `netlify/functions/` — Serverless: `search-image` (Unsplash proxy), `generate-narrative` (optional server-side Gemini).
 
+## Next up (productionizing)
+
+- Introduce a minimal `tripService` with a `getTripBySlug(slug)` helper and refactor `useTrip` to call it for the initial trip load (keeping the existing subscription wiring as-is for now).
+
 ## Deploy
 
 The app is set up for **Netlify**: build command `npm run build`, publish directory `dist`. Configure environment variables in the Netlify dashboard (same keys as `.env.example`, without the `VITE_` prefix for server-side function secrets like `GEMINI_API_KEY` and `UNSPLASH_ACCESS_KEY`).

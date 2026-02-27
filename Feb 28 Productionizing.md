@@ -38,6 +38,11 @@
 
 - ✅ `src/services/staysService.ts` created and wired into `src/hooks/useStays.ts`.
 - ✅ `src/services/collectionService.ts` created and wired into `src/hooks/useCollectionItems.ts`.
+- ✅ Verified stays and collection flows in dev; fixed `StayInput` import regression and removed temporary debug instrumentation.
+
+### Next up (short-term)
+
+- Introduce a minimal `tripService` with a `getTripBySlug(slug)` helper and refactor `useTrip` to call it for the initial trip load, keeping the existing subscription wiring as-is for now.
 
 ### Overview
 
