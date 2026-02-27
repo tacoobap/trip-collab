@@ -44,6 +44,8 @@ export function CollectionItemForm({
   )
   const [destination, setDestination] = useState<string | null>(item?.destination ?? null)
   const [mapsUrl, setMapsUrl] = useState(item?.google_maps_url ?? '')
+  const [url, setUrl] = useState(item?.url ?? '')
+  const [note, setNote] = useState(item?.note ?? '')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(item?.image_url ?? null)
   const [fetchImageLoading, setFetchImageLoading] = useState(false)
@@ -110,6 +112,8 @@ export function CollectionItemForm({
           category,
           destination: destination?.trim() || null,
           google_maps_url: mapsUrl.trim() || null,
+          url: url.trim() || null,
+          note: note.trim() || null,
           latitude: parsed?.latitude ?? null,
           longitude: parsed?.longitude ?? null,
           place_name: parsed?.placeName ?? null,
@@ -133,6 +137,8 @@ export function CollectionItemForm({
           destination: destination?.trim() || null,
           image_url: (photoFile ? null : fetchedImageUrl) as string | null,
           google_maps_url: mapsUrl.trim() || null,
+          url: url.trim() || null,
+          note: note.trim() || null,
           latitude: parsed?.latitude ?? null,
           longitude: parsed?.longitude ?? null,
           place_name: parsed?.placeName ?? null,
@@ -209,6 +215,39 @@ export function CollectionItemForm({
           required
           className="w-full"
         />
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Website or link (optional)
+          </label>
+          <Input
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value)
+              setSubmitError(null)
+            }}
+            placeholder="e.g. restaurant website, booking page, blog post"
+            type="url"
+            className="w-full"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Description or notes (optional)
+          </label>
+          <textarea
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value)
+              setSubmitError(null)
+            }}
+            rows={3}
+            maxLength={500}
+            placeholder="Add a short blurb, why you saved this, or anything to remember later."
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">

@@ -103,6 +103,8 @@ export type CollectionItem = {
   likes: string[]
   created_at: string
   created_by: string
+  url?: string | null          // optional external link (e.g. website, booking page)
+  note?: string | null         // optional freeform description/notes
 }
 
 export type SlotWithProposals = Slot & {

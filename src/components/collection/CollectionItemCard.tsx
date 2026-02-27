@@ -57,7 +57,7 @@ export function CollectionItemCard({
   return (
     <article
       className={cn(
-        'rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow',
+        'rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col',
         className
       )}
     >
@@ -109,9 +109,26 @@ export function CollectionItemCard({
           </span>
         </div>
       </div>
-      <div className="p-3">
+      <div className="p-3 flex-1 flex flex-col">
         <h3 className="font-medium text-foreground truncate pr-8">{item.name}</h3>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        {item.note && (
+          <p className="mt-1 text-sm text-muted-foreground line-clamp-3">
+            {item.note}
+          </p>
+        )}
+        {item.url && (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center text-xs font-medium text-primary hover:text-primary/80 underline-offset-2 hover:underline"
+          >
+            <span className="truncate max-w-[80%]">
+              {item.url.replace(/^https?:\/\//, '')}
+            </span>
+          </a>
+        )}
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
           <button
             type="button"
             onClick={() => onLike(item.id)}

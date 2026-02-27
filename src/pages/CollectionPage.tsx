@@ -110,6 +110,8 @@ export function CollectionPage() {
       destination: null,
       image_url: suggestionImageUrls[index] ?? null,
       google_maps_url: null,
+      url: null,
+      note: s.one_line_description ?? null,
       latitude: null,
       longitude: null,
       place_name: null,
