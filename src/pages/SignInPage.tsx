@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function SignInPage() {
+  const navigate = useNavigate()
   const {
     user,
     signInWithGoogle,
@@ -26,8 +27,9 @@ export function SignInPage() {
       const _e = { sessionId: '9141c3', location: 'SignInPage.tsx:user_set', message: 'SignInPage sees user', data: { uid: user.uid }, hypothesisId: 'E' };
       console.info('[SSO-DEBUG]', _e);
       fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._e,timestamp:Date.now()})}).catch(()=>{});
+      navigate('/', { replace: true })
     }
-  }, [user]);
+  }, [user, navigate]);
   // #endregion
 
   useEffect(() => {
@@ -51,21 +53,27 @@ export function SignInPage() {
         await signInWithEmailPassword(email, password)
       }
     } catch (err) {
-      if (!isSignUp && err && typeof err === 'object' && 'code' in err) {
-        const code = (err as { code: string }).code
-        if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
-          try {
-            const methods = await getSignInMethodsForEmail(email.trim())
-            const hasGoogle = methods.includes('google.com')
-            const hasPassword = methods.includes('password')
-            if (hasGoogle && !hasPassword) {
-              setGoogleAccountAddPassword({ email: email.trim(), password })
-              clearAuthError()
-              return
-            }
-          } catch {
-            // leave authError as set by signInWithEmailPassword
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? (err as { code: string }).code
+          : undefined
+      const isCredentialError =
+        code === 'auth/invalid-credential' ||
+        code === 'auth/user-not-found' ||
+        code === 'auth/wrong-password'
+      if (!isSignUp && isCredentialError) {
+        try {
+          const methods = await getSignInMethodsForEmail(email.trim())
+          const hasGoogle = methods.includes('google.com')
+          const hasPassword = methods.includes('password')
+          if (hasGoogle && !hasPassword) {
+            setGoogleAccountAddPassword({ email: email.trim(), password })
+            clearAuthError()
+            return
           }
+        } catch (e) {
+          console.error('Could not fetch sign-in methods for email', e)
+          // leave authError as set by signInWithEmailPassword
         }
       }
       throw err

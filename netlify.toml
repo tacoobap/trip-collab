@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+# Allow auth popup to close (Google sign-in); COOP block would otherwise prevent window.close()
+[[headers]]
+  for = "/*"
+  [headers.values]
+  Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
