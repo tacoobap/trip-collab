@@ -10,8 +10,13 @@ import {
   type User,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
+  fetchSignInMethodsForEmail,
+  linkWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -20,10 +25,28 @@ interface AuthContextValue {
   user: User | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithEmailPassword: (email: string, password: string) => Promise<void>
+  signUpWithEmailPassword: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   getIdToken: () => Promise<string | null>
   authError: string | null
   clearAuthError: () => void
+  getSignInMethodsForEmail: (email: string) => Promise<string[]>
+  linkEmailPasswordToCurrentUser: (email: string, password: string) => Promise<void>
+}
+
+function getAuthErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code: string }).code
+    const message = (err as { message?: string }).message ?? ''
+    if (code === 'auth/email-already-in-use') return 'This email is already in use. Sign in instead.'
+    if (code === 'auth/invalid-email') return 'Please enter a valid email address.'
+    if (code === 'auth/weak-password') return 'Please choose a password with at least 6 characters.'
+    if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') return 'Invalid email or password. If you usually sign in with Google, use "Sign in with Google" instead.'
+    if (code === 'auth/too-many-requests') return 'Too many attempts. Try again later.'
+    if (message) return message
+  }
+  return err instanceof Error ? err.message : 'Sign-in failed. Please try again.'
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -53,10 +76,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      // #region agent log
+      const _c = { sessionId: '9141c3', location: 'AuthContext.tsx:onAuthStateChanged', message: 'onAuthStateChanged', data: { hasUser: !!u, uid: u?.uid ?? null }, hypothesisId: 'C' };
+      console.info('[SSO-DEBUG]', _c);
+      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._c,timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setUser(u)
       if (u) {
         try {
+          // #region agent log
+          const _d1 = { sessionId: '9141c3', location: 'AuthContext.tsx:syncUserProfile_start', message: 'syncUserProfile start', data: { uid: u.uid }, hypothesisId: 'D' };
+          console.info('[SSO-DEBUG]', _d1);
+          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._d1,timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           await syncUserProfile(u)
+          // #region agent log
+          const _d2 = { sessionId: '9141c3', location: 'AuthContext.tsx:syncUserProfile_end', message: 'syncUserProfile end', data: { uid: u.uid }, hypothesisId: 'D' };
+          console.info('[SSO-DEBUG]', _d2);
+          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._d2,timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
         } catch (err) {
           console.error('Failed to sync user profile', err)
         }
@@ -69,11 +107,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null)
     try {
+      // #region agent log
+      const _a1 = { sessionId: '9141c3', location: 'AuthContext.tsx:signInWithGoogle_before_popup', message: 'before signInWithPopup', data: {}, hypothesisId: 'A,B' };
+      console.info('[SSO-DEBUG]', _a1);
+      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._a1,timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       await signInWithPopup(auth, new GoogleAuthProvider())
+      // #region agent log
+      const _a2 = { sessionId: '9141c3', location: 'AuthContext.tsx:signInWithGoogle_after_popup', message: 'signInWithPopup resolved', data: {}, hypothesisId: 'A,B' };
+      console.info('[SSO-DEBUG]', _a2);
+      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._a2,timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
     } catch (err) {
+      // #region agent log
+      const _aErr = { sessionId: '9141c3', location: 'AuthContext.tsx:signInWithGoogle_catch', message: 'signInWithGoogle error', data: { errMsg: err instanceof Error ? err.message : String(err), code: (err as { code?: string })?.code }, hypothesisId: 'A' };
+      console.info('[SSO-DEBUG]', _aErr);
+      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._aErr,timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const message =
         err instanceof Error ? err.message : 'Sign-in failed. Please try again.'
       setAuthError(message)
+      throw err
+    }
+  }, [])
+
+  const signInWithEmailPassword = useCallback(async (email: string, password: string) => {
+    setAuthError(null)
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password)
+    } catch (err) {
+      setAuthError(getAuthErrorMessage(err))
+      throw err
+    }
+  }, [])
+
+  const signUpWithEmailPassword = useCallback(async (email: string, password: string) => {
+    setAuthError(null)
+    try {
+      await createUserWithEmailAndPassword(auth, email.trim(), password)
+    } catch (err) {
+      setAuthError(getAuthErrorMessage(err))
       throw err
     }
   }, [])
@@ -90,14 +163,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuthError = useCallback(() => setAuthError(null), [])
 
+  const getSignInMethodsForEmail = useCallback(async (email: string) => {
+    return fetchSignInMethodsForEmail(auth, email.trim())
+  }, [])
+
+  const linkEmailPasswordToCurrentUser = useCallback(async (email: string, password: string) => {
+    setAuthError(null)
+    const u = auth.currentUser
+    if (!u) {
+      setAuthError('Please sign in with Google first, then add a password.')
+      throw new Error('No current user')
+    }
+    try {
+      await linkWithCredential(u, EmailAuthProvider.credential(email.trim(), password))
+    } catch (err) {
+      const message =
+        err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'auth/weak-password'
+          ? 'Please choose a password with at least 6 characters.'
+          : err instanceof Error ? err.message : 'Add password failed. Please try again.'
+      setAuthError(message)
+      throw err
+    }
+  }, [])
+
   const value: AuthContextValue = {
     user,
     loading,
     signInWithGoogle,
+    signInWithEmailPassword,
+    signUpWithEmailPassword,
     signOut,
     getIdToken,
     authError,
     clearAuthError,
+    getSignInMethodsForEmail,
+    linkEmailPasswordToCurrentUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
