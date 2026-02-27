@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db, auth, firebaseProjectId } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
 
 export function useTrip(slug: string | undefined) {
@@ -18,6 +18,11 @@ export function useTrip(slug: string | undefined) {
     let unsubSlots: (() => void) | null = null
     let unsubProposals: (() => void) | null = null
 
+    // #region agent log
+    const authUid = auth.currentUser?.uid ?? null
+    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:effect',message:'trip load start',data:{slug,authUid,projectId:firebaseProjectId},hypothesisId:'A,C',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     getDocs(query(collection(db, 'trips'), where('slug', '==', slug)))
       .then((tripSnap) => {
         if (cancelled) return
@@ -29,7 +34,13 @@ export function useTrip(slug: string | undefined) {
         }
 
         const tripDoc = tripSnap.docs[0]
-        const tripData = { id: tripDoc.id, ...tripDoc.data() } as Trip
+        const d = tripDoc.data()
+        // #region agent log
+        const ownerUid = d?.owner_uid
+        const memberUids = d?.member_uids
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:then',message:'trip doc received',data:{tripId:tripDoc.id,owner_uid:ownerUid,member_uids:memberUids,member_uids_type:Array.isArray(memberUids)?'array':'other',member_uids_json:JSON.stringify(memberUids)},hypothesisId:'B,E',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        const tripData = { id: tripDoc.id, ...d } as Trip
         setTrip(tripData)
 
         // Subscribe to trip doc so updates (e.g. vibe_heading, vibe_tags) flow to UI
@@ -43,6 +54,9 @@ export function useTrip(slug: string | undefined) {
           (err) => {
             if (cancelled) return
             console.error('useTrip trip snapshot error:', err)
+            // #region agent log
+            fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:onSnapshotTrip',message:'trip doc snapshot error',data:{operation:'onSnapshot_trip',errorCode:err?.code,tripId:tripDoc.id},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             setError(err?.code === 'permission-denied' ? "You don't have access to this trip." : 'Failed to load trip.')
             setLoading(false)
           }
@@ -144,6 +158,9 @@ export function useTrip(slug: string | undefined) {
       .catch((err) => {
         if (cancelled) return
         console.error('useTrip error:', err)
+        // #region agent log
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:catch',message:'getDocs trips failed',data:{operation:'getDocs_trips',errorCode:err?.code,slug,authUid:auth.currentUser?.uid ?? null},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const msg =
           err?.code === 'permission-denied'
             ? "You don't have access to this trip. If you were just added, check that your UID is in the trip's member_uids (as an array of strings) in Firestore."

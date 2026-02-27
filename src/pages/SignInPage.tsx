@@ -17,7 +17,7 @@ export function SignInPage() {
     clearAuthError,
     setAuthError,
     getSignInMethodsForEmail,
-    signInWithGoogleRedirectToAddPassword,
+    linkEmailPasswordToCurrentUser,
   } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
   const [googleAccountAddPassword, setGoogleAccountAddPassword] = useState<{ email: string; password: string } | null>(null)
@@ -83,13 +83,22 @@ export function SignInPage() {
     }
   }
 
-  const handleAddPasswordToGoogleAccount = () => {
+  const handleAddPasswordToGoogleAccount = async () => {
     if (!googleAccountAddPassword) return
     // #region agent log
     fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97004e'},body:JSON.stringify({sessionId:'97004e',location:'SignInPage.tsx:handleAddPasswordToGoogleAccount',message:'Add password clicked',data:{hasPayload:!!googleAccountAddPassword,email:googleAccountAddPassword?.email},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
     // #endregion
-    signInWithGoogleRedirectToAddPassword(googleAccountAddPassword.email, googleAccountAddPassword.password)
-    // Page redirects to Google; after sign-in we return and AuthContext links the password
+    clearAuthError()
+    setSigningIn(true)
+    try {
+      await signInWithGoogle()
+      await linkEmailPasswordToCurrentUser(googleAccountAddPassword.email, googleAccountAddPassword.password)
+      setGoogleAccountAddPassword(null)
+    } catch {
+      // authError set by context; keep googleAccountAddPassword so user can retry
+    } finally {
+      setSigningIn(false)
+    }
   }
 
   return (
