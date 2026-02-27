@@ -51,7 +51,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     }
 
     const tripsCol = collection(db, 'trips')
-
     Promise.all([
       getDocs(query(tripsCol, where('owner_uid', '==', effectiveUid))),
       getDocs(query(tripsCol, where('member_uids', 'array-contains', effectiveUid))),
@@ -103,7 +102,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
             break
           }
         }
-
         if (!selectedId || !selectedData) {
           setError('Trip not found.')
           setLoading(false)
@@ -217,7 +215,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
             if (cancelled) return
             liveDays = daysSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Day))
             const dayIds = liveDays.map((d) => d.id)
-
             // Tear down inner listeners and reset slot state
             unsubSlots?.()
             unsubSlots = null
@@ -243,7 +240,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
                 const slotIdsChanged =
                   JSON.stringify(newSlotIds) !== JSON.stringify(currentSlotIds)
                 currentSlotIds = newSlotIds
-
                 if (!slotIdsChanged) {
                   // Slot statuses changed (e.g. a slot was locked) — rebuild immediately
                   rebuild()
@@ -262,7 +258,7 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
                 unsubProposals = onSnapshot(
                   query(
                     collection(db, 'proposals'),
-                    where('slot_id', 'in', newSlotIds)
+                    where('trip_id', '==', selectedId)
                   ),
                   (propsSnap) => {
                     if (cancelled) return
