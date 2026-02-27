@@ -31,6 +31,7 @@ interface AuthContextValue {
   getIdToken: () => Promise<string | null>
   authError: string | null
   clearAuthError: () => void
+  setAuthError: (message: string) => void
   getSignInMethodsForEmail: (email: string) => Promise<string[]>
   linkEmailPasswordToCurrentUser: (email: string, password: string) => Promise<void>
 }
@@ -76,25 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      // #region agent log
-      const _c = { sessionId: '9141c3', location: 'AuthContext.tsx:onAuthStateChanged', message: 'onAuthStateChanged', data: { hasUser: !!u, uid: u?.uid ?? null }, hypothesisId: 'C' };
-      console.info('[SSO-DEBUG]', _c);
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._c,timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setUser(u)
       if (u) {
         try {
-          // #region agent log
-          const _d1 = { sessionId: '9141c3', location: 'AuthContext.tsx:syncUserProfile_start', message: 'syncUserProfile start', data: { uid: u.uid }, hypothesisId: 'D' };
-          console.info('[SSO-DEBUG]', _d1);
-          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._d1,timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           await syncUserProfile(u)
-          // #region agent log
-          const _d2 = { sessionId: '9141c3', location: 'AuthContext.tsx:syncUserProfile_end', message: 'syncUserProfile end', data: { uid: u.uid }, hypothesisId: 'D' };
-          console.info('[SSO-DEBUG]', _d2);
-          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._d2,timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         } catch (err) {
           console.error('Failed to sync user profile', err)
         }
@@ -107,23 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null)
     try {
-      // #region agent log
-      const _a1 = { sessionId: '9141c3', location: 'AuthContext.tsx:signInWithGoogle_before_popup', message: 'before signInWithPopup', data: {}, hypothesisId: 'A,B' };
-      console.info('[SSO-DEBUG]', _a1);
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._a1,timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       await signInWithPopup(auth, new GoogleAuthProvider())
-      // #region agent log
-      const _a2 = { sessionId: '9141c3', location: 'AuthContext.tsx:signInWithGoogle_after_popup', message: 'signInWithPopup resolved', data: {}, hypothesisId: 'A,B' };
-      console.info('[SSO-DEBUG]', _a2);
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._a2,timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     } catch (err) {
-      // #region agent log
-      const _aErr = { sessionId: '9141c3', location: 'AuthContext.tsx:signInWithGoogle_catch', message: 'signInWithGoogle error', data: { errMsg: err instanceof Error ? err.message : String(err), code: (err as { code?: string })?.code }, hypothesisId: 'A' };
-      console.info('[SSO-DEBUG]', _aErr);
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._aErr,timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const message =
         err instanceof Error ? err.message : 'Sign-in failed. Please try again.'
       setAuthError(message)
@@ -163,6 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuthError = useCallback(() => setAuthError(null), [])
 
+  const setAuthErrorMessage = useCallback((message: string) => setAuthError(message), [])
+
   const getSignInMethodsForEmail = useCallback(async (email: string) => {
     return fetchSignInMethodsForEmail(auth, email.trim())
   }, [])
@@ -196,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getIdToken,
     authError,
     clearAuthError,
+    setAuthError: setAuthErrorMessage,
     getSignInMethodsForEmail,
     linkEmailPasswordToCurrentUser,
   }

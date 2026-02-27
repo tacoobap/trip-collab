@@ -15,22 +15,16 @@ export function SignInPage() {
     signUpWithEmailPassword,
     authError,
     clearAuthError,
+    setAuthError,
     getSignInMethodsForEmail,
     linkEmailPasswordToCurrentUser,
   } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
   const [googleAccountAddPassword, setGoogleAccountAddPassword] = useState<{ email: string; password: string } | null>(null)
 
-  // #region agent log
   useEffect(() => {
-    if (user) {
-      const _e = { sessionId: '9141c3', location: 'SignInPage.tsx:user_set', message: 'SignInPage sees user', data: { uid: user.uid }, hypothesisId: 'E' };
-      console.info('[SSO-DEBUG]', _e);
-      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9141c3'},body:JSON.stringify({..._e,timestamp:Date.now()})}).catch(()=>{});
-      navigate('/', { replace: true })
-    }
-  }, [user, navigate]);
-  // #endregion
+    if (user) navigate('/', { replace: true })
+  }, [user, navigate])
 
   useEffect(() => {
     if (user) setGoogleAccountAddPassword(null)
@@ -53,28 +47,25 @@ export function SignInPage() {
         await signInWithEmailPassword(email, password)
       }
     } catch (err) {
-      const code =
-        err && typeof err === 'object' && 'code' in err
-          ? (err as { code: string }).code
-          : undefined
-      const isCredentialError =
-        code === 'auth/invalid-credential' ||
-        code === 'auth/user-not-found' ||
-        code === 'auth/wrong-password'
-      if (!isSignUp && isCredentialError) {
-        try {
-          const methods = await getSignInMethodsForEmail(email.trim())
-          const hasGoogle = methods.includes('google.com')
-          const hasPassword = methods.includes('password')
-          if (hasGoogle && !hasPassword) {
-            setGoogleAccountAddPassword({ email: email.trim(), password })
-            clearAuthError()
-            return
-          }
-        } catch (e) {
-          console.error('Could not fetch sign-in methods for email', e)
-          // leave authError as set by signInWithEmailPassword
-        }
+      // On any email sign-in failure (not sign-up), show the Google/add-password card first, then verify
+      if (!isSignUp) {
+        const trimmedEmail = email.trim()
+        setGoogleAccountAddPassword({ email: trimmedEmail, password })
+        clearAuthError()
+        setSigningIn(false)
+        // If this account actually has a password (not Google-only), switch back to the error
+        getSignInMethodsForEmail(trimmedEmail)
+          .then((methods) => {
+            const hasPassword = methods.includes('password')
+            if (hasPassword) {
+              setGoogleAccountAddPassword(null)
+              setAuthError('Invalid email or password. If you usually sign in with Google, use "Sign in with Google" instead.')
+            }
+          })
+          .catch(() => {
+            // Keep card visible if we can't fetch methods (e.g. network)
+          })
+        return
       }
       throw err
     } finally {

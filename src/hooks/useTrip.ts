@@ -134,8 +134,12 @@ export function useTrip(slug: string | undefined) {
       })
       .catch((err) => {
         if (cancelled) return
-        console.error(err)
-        setError('Failed to load trip.')
+        console.error('useTrip error:', err)
+        const msg =
+          err?.code === 'permission-denied'
+            ? "You don't have access to this trip. If you were just added, check that your UID is in the trip's member_uids (as an array of strings) in Firestore."
+            : 'Failed to load trip.'
+        setError(msg)
         setLoading(false)
       })
 

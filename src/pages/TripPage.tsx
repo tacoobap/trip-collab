@@ -34,6 +34,11 @@ export function TripPage() {
           <p className="text-lg font-serif font-semibold text-foreground mb-2">
             {error || 'Trip not found'}
           </p>
+          {user && (
+            <p className="text-xs text-muted-foreground mb-4 font-mono break-all max-w-md mx-auto">
+              Signed-in UID: {user.uid}
+            </p>
+          )}
           {!user && (
             <p className="text-sm text-muted-foreground mb-4">
               Sign in to view this trip.
