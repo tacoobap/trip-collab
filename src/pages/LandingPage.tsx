@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2, LogOut } from 'lucide-react'
 import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
@@ -60,7 +60,6 @@ function mergeTrips(owned: Trip[], shared: Trip[]): Trip[] {
 }
 
 export function LandingPage() {
-  const navigate = useNavigate()
   const { user, loading: authLoading, signOut } = useAuth()
   const [newTripOpen, setNewTripOpen] = useState(false)
   const [trips, setTrips] = useState<Trip[]>([])
@@ -100,52 +99,7 @@ export function LandingPage() {
 
   // Signed out: marketing + sign-in
   if (!authLoading && !user) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        {!firebaseReady && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-800">
-              <strong>Firebase not connected.</strong> Create a{' '}
-              <code className="bg-amber-100 px-1 rounded font-mono text-xs">.env</code> file
-              with your Firebase config keys, then restart the dev server.
-            </div>
-          </div>
-        )}
-        <header className="border-b border-border px-4 sm:px-8 py-4 max-sm:py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <span className="text-lg font-serif font-bold text-foreground">Trup</span>
-          </div>
-        </header>
-        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-16 max-sm:py-10 flex flex-col items-center justify-center text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-md"
-          >
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="text-3xl font-serif font-bold text-foreground mb-3">
-              Plan trips together.
-            </h1>
-            <p className="text-muted-foreground leading-relaxed mb-8">
-              Propose ideas, vote on favorites, lock in the plan —
-              no spreadsheets required.
-            </p>
-            <Button size="lg" onClick={() => navigate('/sign-in')} className="max-sm:min-h-[48px]">
-              Sign in with Google
-            </Button>
-            <footer className="mt-16 text-center text-xs text-muted-foreground">
-              <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>
-              {' · '}
-              <Link to="/terms" className="hover:text-foreground underline">Terms</Link>
-            </footer>
-          </motion.div>
-        </main>
-      </div>
-    )
+    return <Navigate to="/" replace />
   }
 
   return (

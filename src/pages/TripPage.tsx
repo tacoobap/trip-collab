@@ -8,6 +8,8 @@ import { useDisplayName } from '@/hooks/useDisplayName'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
+import { Button } from '@/components/ui/button'
+import { joinTrip } from '@/lib/trips'
 import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
 import { Loader2, BedDouble } from 'lucide-react'
@@ -16,9 +18,44 @@ export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
   const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
   const { user, getIdToken } = useAuth()
-  const { trip, days, loading, error } = useTrip(slug)
+  const { trip, days, loading, error, isMember } = useTrip(slug, user?.uid)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const handleJoinTrip = async () => {
+    if (!trip || !user || joining) return
+    setJoining(true)
+    setJoinError('')
+    try {
+      await joinTrip(trip.id, user.uid)
+    } catch (err) {
+      console.error('Failed to join trip', err)
+      setJoinError('Failed to join trip. Please try again.')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  const handleCopyInviteLink = async () => {
+    if (!trip) return
+    if (typeof window === 'undefined') return
+    const url = `${window.location.origin}/trip/${trip.slug}`
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 2000)
+      } else {
+        window.prompt('Copy this link', url)
+      }
+    } catch (err) {
+      console.error('Failed to copy invite link', err)
+      window.prompt('Copy this link', url)
+    }
+  }
 
   if (loading) {
     return (
@@ -52,7 +89,10 @@ export function TripPage() {
           )}
           <div className="flex flex-col gap-2">
             {!user && (
-              <a href="/sign-in" className="text-sm text-primary hover:underline">
+              <a
+                href={slug ? `/sign-in?from=/trip/${slug}` : '/sign-in'}
+                className="text-sm text-primary hover:underline"
+              >
                 Sign in with Google
               </a>
             )}
@@ -92,15 +132,47 @@ export function TripPage() {
               </p>
             )}
           </div>
-          <button
-            onClick={() => setStaysOpen(true)}
-            className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
-            title="Stays"
-            aria-label="Stays"
-          >
-            <BedDouble className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {user && isMember === false && (
+              <Button
+                size="sm"
+                onClick={handleJoinTrip}
+                disabled={joining}
+                className="max-sm:min-h-[40px]"
+              >
+                {joining ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    Joining…
+                  </>
+                ) : (
+                  'Join this trip'
+                )}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCopyInviteLink}
+              className="max-sm:min-h-[40px]"
+            >
+              {copied ? 'Link copied' : 'Invite link'}
+            </Button>
+            <button
+              onClick={() => setStaysOpen(true)}
+              className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+              title="Stays"
+              aria-label="Stays"
+            >
+              <BedDouble className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+        {joinError && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3 text-xs text-destructive">
+            {joinError}
+          </div>
+        )}
       </div>
       <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8 max-sm:px-4">
         <PlanningBoard trip={trip} days={days} currentName={displayName ?? ''} getToken={getIdToken} />

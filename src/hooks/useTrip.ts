@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, onSnapshot, doc } from 'firebase/fir
 import { db, auth, firebaseProjectId } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
 
-export function useTrip(slug: string | undefined) {
+export function useTrip(slug: string | undefined, currentUid?: string | null) {
   const [trip, setTrip] = useState<Trip | null>(null)
   const [days, setDays] = useState<DayWithSlots[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,29 +23,130 @@ export function useTrip(slug: string | undefined) {
     fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:effect',message:'trip load start',data:{slug,authUid,projectId:firebaseProjectId},hypothesisId:'A,C',timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
-    getDocs(query(collection(db, 'trips'), where('slug', '==', slug)))
-      .then((tripSnap) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '1bd92d',
+      },
+      body: JSON.stringify({
+        sessionId: '1bd92d',
+        runId: 'initial',
+        hypothesisId: 'H1,H2,H4',
+        location: 'src/hooks/useTrip.ts:effect',
+        message: 'useTrip effect start',
+        data: { slug, authUid, projectId: firebaseProjectId },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
+    const effectiveUid = currentUid ?? authUid
+
+    if (!effectiveUid) {
+      setError('Sign in to view this trip.')
+      setLoading(false)
+      return
+    }
+
+    const tripsCol = collection(db, 'trips')
+
+    Promise.all([
+      getDocs(query(tripsCol, where('owner_uid', '==', effectiveUid))),
+      getDocs(query(tripsCol, where('member_uids', 'array-contains', effectiveUid))),
+    ])
+      .then(([ownedSnap, sharedSnap]) => {
         if (cancelled) return
 
-        if (tripSnap.empty) {
+        const ownedDocs = ownedSnap.docs
+        const sharedDocs = sharedSnap.docs
+
+        // #region agent log
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:members',message:'member trips loaded',data:{slug,ownedCount:ownedDocs.length,sharedCount:sharedDocs.length,effectiveUid},hypothesisId:'A,B',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        // #region agent log
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': '1bd92d',
+          },
+          body: JSON.stringify({
+            sessionId: '1bd92d',
+            runId: 'initial',
+            hypothesisId: 'H1,H2',
+            location: 'src/hooks/useTrip.ts:members',
+            message: 'member trips loaded',
+            data: {
+              slug,
+              ownedCount: ownedDocs.length,
+              sharedCount: sharedDocs.length,
+              effectiveUid,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
+
+        const seen = new Set<string>()
+        let selectedId: string | null = null
+        let selectedData: any = null
+
+        for (const snap of [...ownedDocs, ...sharedDocs]) {
+          if (seen.has(snap.id)) continue
+          seen.add(snap.id)
+          const data = snap.data()
+          if (data.slug === slug) {
+            selectedId = snap.id
+            selectedData = data
+            break
+          }
+        }
+
+        if (!selectedId || !selectedData) {
           setError('Trip not found.')
           setLoading(false)
           return
         }
 
-        const tripDoc = tripSnap.docs[0]
-        const d = tripDoc.data()
+        const ownerUid = selectedData?.owner_uid
+        const memberUids = selectedData?.member_uids
+
         // #region agent log
-        const ownerUid = d?.owner_uid
-        const memberUids = d?.member_uids
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:then',message:'trip doc received',data:{tripId:tripDoc.id,owner_uid:ownerUid,member_uids:memberUids,member_uids_type:Array.isArray(memberUids)?'array':'other',member_uids_json:JSON.stringify(memberUids)},hypothesisId:'B,E',timestamp:Date.now()})}).catch(()=>{});
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:tripSelection',message:'trip selected from member lists',data:{tripId:selectedId,owner_uid:ownerUid,member_uids:memberUids,member_uids_type:Array.isArray(memberUids)?'array':'other',member_uids_json:JSON.stringify(memberUids)},hypothesisId:'B,E',timestamp:Date.now()})}).catch(()=>{});
         // #endregion
-        const tripData = { id: tripDoc.id, ...d } as Trip
+        // #region agent log
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': '1bd92d',
+          },
+          body: JSON.stringify({
+            sessionId: '1bd92d',
+            runId: 'initial',
+            hypothesisId: 'H1,H2,H3',
+            location: 'src/hooks/useTrip.ts:tripSelection',
+            message: 'trip selected from member lists',
+            data: {
+              tripId: selectedId,
+              owner_uid: ownerUid,
+              member_uids: memberUids,
+              member_uids_type: Array.isArray(memberUids) ? 'array' : typeof memberUids,
+              member_uids_length: Array.isArray(memberUids) ? memberUids.length : null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
+
+        const tripData = { id: selectedId, ...selectedData } as Trip
         setTrip(tripData)
 
         // Subscribe to trip doc so updates (e.g. vibe_heading, vibe_tags) flow to UI
         unsubTrip = onSnapshot(
-          doc(db, 'trips', tripDoc.id),
+          doc(db, 'trips', selectedId),
           (snap) => {
             if (cancelled) return
             const next = { id: snap.id, ...snap.data() } as Trip
@@ -55,7 +156,29 @@ export function useTrip(slug: string | undefined) {
             if (cancelled) return
             console.error('useTrip trip snapshot error:', err)
             // #region agent log
-            fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:onSnapshotTrip',message:'trip doc snapshot error',data:{operation:'onSnapshot_trip',errorCode:err?.code,tripId:tripDoc.id},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+            fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:onSnapshotTrip',message:'trip doc snapshot error',data:{operation:'onSnapshot_trip',errorCode:err?.code,tripId:selectedId},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            // #region agent log
+            fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Debug-Session-Id': '1bd92d',
+              },
+              body: JSON.stringify({
+                sessionId: '1bd92d',
+                runId: 'initial',
+                hypothesisId: 'H4',
+                location: 'src/hooks/useTrip.ts:onSnapshotTrip',
+                message: 'trip snapshot error',
+                data: {
+                  operation: 'onSnapshot_trip',
+                  errorCode: err?.code ?? null,
+                  tripId: selectedId,
+                },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {})
             // #endregion
             setError(err?.code === 'permission-denied' ? "You don't have access to this trip." : 'Failed to load trip.')
             setLoading(false)
@@ -89,7 +212,7 @@ export function useTrip(slug: string | undefined) {
         }
 
         unsubDays = onSnapshot(
-          query(collection(db, 'days'), where('trip_id', '==', tripDoc.id)),
+          query(collection(db, 'days'), where('trip_id', '==', selectedId)),
           (daysSnap) => {
             if (cancelled) return
             liveDays = daysSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Day))
@@ -159,7 +282,30 @@ export function useTrip(slug: string | undefined) {
         if (cancelled) return
         console.error('useTrip error:', err)
         // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:catch',message:'getDocs trips failed',data:{operation:'getDocs_trips',errorCode:err?.code,slug,authUid:auth.currentUser?.uid ?? null},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:catch',message:'member queries failed',data:{operation:'getDocs_memberTrips',errorCode:err?.code,slug,effectiveUid},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        // #region agent log
+        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': '1bd92d',
+          },
+          body: JSON.stringify({
+            sessionId: '1bd92d',
+            runId: 'initial',
+            hypothesisId: 'H1,H2,H3,H4',
+            location: 'src/hooks/useTrip.ts:catch',
+            message: 'member queries failed',
+            data: {
+              operation: 'getDocs_memberTrips',
+              errorCode: err?.code ?? null,
+              slug,
+              effectiveUid,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
         // #endregion
         const msg =
           err?.code === 'permission-denied'
@@ -176,7 +322,7 @@ export function useTrip(slug: string | undefined) {
       unsubSlots?.()
       unsubProposals?.()
     }
-  }, [slug])
+  }, [slug, currentUid])
 
   const travelers = useMemo(() => {
     const names = new Set<string>()
@@ -188,5 +334,12 @@ export function useTrip(slug: string | undefined) {
     return [...names]
   }, [days])
 
-  return { trip, days, travelers, loading, error }
+  const isMember = useMemo(() => {
+    if (!trip || !currentUid) return null
+    const members = trip.member_uids
+    if (!Array.isArray(members)) return false
+    return members.includes(currentUid)
+  }, [trip, currentUid])
+
+  return { trip, days, travelers, loading, error, isMember }
 }

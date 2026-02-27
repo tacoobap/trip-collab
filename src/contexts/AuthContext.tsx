@@ -89,10 +89,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider())
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Sign-in failed. Please try again.'
-      setAuthError(message)
-      throw err
+      if (err && typeof err === 'object' && 'code' in err) {
+        const code = (err as { code: string }).code
+        if (
+          code === 'auth/popup-closed-by-user' ||
+          code === 'auth/cancelled-popup-request'
+        ) {
+          return
+        }
+      }
+      setAuthError(getAuthErrorMessage(err))
     }
   }, [])
 
@@ -102,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signInWithEmailAndPassword(auth, email.trim(), password)
     } catch (err) {
       setAuthError(getAuthErrorMessage(err))
-      throw err
     }
   }, [])
 
@@ -112,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await createUserWithEmailAndPassword(auth, email.trim(), password)
     } catch (err) {
       setAuthError(getAuthErrorMessage(err))
-      throw err
     }
   }, [])
 

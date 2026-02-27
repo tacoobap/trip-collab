@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 export function SignInPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     user,
     signInWithGoogle,
@@ -17,14 +18,18 @@ export function SignInPage() {
     clearAuthError,
   } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
-
-  useEffect(() => {
-    if (user) navigate('/', { replace: true })
-  }, [user, navigate])
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
+
+  const redirectTo = (() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('from') || '/home'
+  })()
+
+  useEffect(() => {
+    if (user) navigate(redirectTo, { replace: true })
+  }, [user, navigate, redirectTo])
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,6 +85,22 @@ export function SignInPage() {
           </motion.div>
         )}
 
+        <Button
+          type="button"
+          size="lg"
+          className="w-full max-sm:min-h-[48px] mb-3"
+          onClick={handleSignInWithGoogle}
+          disabled={signingIn}
+        >
+          Sign in with Google
+        </Button>
+
+        <div className="flex items-center gap-2 my-4">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground">or continue with email</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
         <form onSubmit={handleEmailSubmit} className="space-y-3 text-left mb-4">
           <Input
             type="email"
@@ -101,6 +122,7 @@ export function SignInPage() {
           />
           <Button
             type="submit"
+            variant="secondary"
             size="lg"
             className="w-full max-sm:min-h-[48px]"
             disabled={signingIn || !email.trim() || !password}
@@ -124,27 +146,11 @@ export function SignInPage() {
             clearAuthError()
             setIsSignUp((prev) => !prev)
           }}
-          className="text-sm text-muted-foreground hover:text-foreground underline mb-4"
+          className="text-sm text-muted-foreground hover:text-foreground underline mb-2"
+          disabled={signingIn}
         >
           {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
         </button>
-
-        <div className="flex items-center gap-2 my-4">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-muted-foreground">or</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="w-full max-sm:min-h-[48px]"
-          onClick={handleSignInWithGoogle}
-          disabled={signingIn}
-        >
-          Sign in with Google
-        </Button>
 
         <footer className="mt-12 text-center text-xs text-muted-foreground">
           <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>
