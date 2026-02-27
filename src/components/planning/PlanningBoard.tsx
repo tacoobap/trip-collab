@@ -136,7 +136,6 @@ export function PlanningBoard({ trip, days, currentName, getToken }: PlanningBoa
               aria-hidden
             />
             <div className="pointer-events-none absolute right-2 bottom-8 max-sm:bottom-6 z-10 flex items-center gap-1 text-xs text-muted-foreground max-sm:right-3">
-              <span className="hidden sm:inline">More days</span>
               <span className="text-muted-foreground/70">→</span>
             </div>
           </>

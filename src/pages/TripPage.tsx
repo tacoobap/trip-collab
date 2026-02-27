@@ -173,6 +173,11 @@ export function TripPage() {
             {joinError}
           </div>
         )}
+        {user && isMember === false && !joinError && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3 text-xs text-muted-foreground">
+            You’re viewing this trip from an invite link. Click <span className="font-medium">Join this trip</span> above to add it to your trips and start planning together.
+          </div>
+        )}
       </div>
       <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8 max-sm:px-4">
         <PlanningBoard trip={trip} days={days} currentName={displayName ?? ''} getToken={getIdToken} />

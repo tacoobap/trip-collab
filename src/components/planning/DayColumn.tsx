@@ -234,13 +234,43 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
       </div>
 
       <div className="flex flex-col gap-3 flex-1">
-        {sortedSlots.map((slot) => (
-          <SlotCard
-            key={slot.id}
-            slot={slot}
-            onClick={() => onSlotClick(slot, `Day ${day.day_number}`)}
-          />
-        ))}
+        {sortedSlots.map((slot) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Debug-Session-Id': '9bccd3',
+            },
+            body: JSON.stringify({
+              sessionId: '9bccd3',
+              runId: 'initial',
+              hypothesisId: 'H1,H2,H3',
+              location: 'src/components/planning/DayColumn.tsx:renderSlot',
+              message: 'rendering slot card',
+              data: {
+                dayId: day.id,
+                dayNumber: day.day_number,
+                slotId: slot.id,
+                status: slot.status,
+                timeLabel: slot.time_label,
+                lockedProposalId: slot.locked_proposal_id,
+                proposalsCount: slot.proposals.length,
+                proposalIds: slot.proposals.map((p) => p.id),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+          // #endregion
+
+          return (
+            <SlotCard
+              key={slot.id}
+              slot={slot}
+              onClick={() => onSlotClick(slot, `Day ${day.day_number}`)}
+            />
+          )
+        })}
 
         {/* Add slot */}
         {addingSlot ? (

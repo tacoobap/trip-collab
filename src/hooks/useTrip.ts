@@ -51,62 +51,19 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     }
 
     const tripsCol = collection(db, 'trips')
-    Promise.all([
-      getDocs(query(tripsCol, where('owner_uid', '==', effectiveUid))),
-      getDocs(query(tripsCol, where('member_uids', 'array-contains', effectiveUid))),
-    ])
-      .then(([ownedSnap, sharedSnap]) => {
+    getDocs(query(tripsCol, where('slug', '==', slug)))
+      .then((snap) => {
         if (cancelled) return
 
-        const ownedDocs = ownedSnap.docs
-        const sharedDocs = sharedSnap.docs
-
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dc2e0b'},body:JSON.stringify({sessionId:'dc2e0b',location:'useTrip.ts:members',message:'member trips loaded',data:{slug,ownedCount:ownedDocs.length,sharedCount:sharedDocs.length,effectiveUid},hypothesisId:'A,B',timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        // #region agent log
-        fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': '1bd92d',
-          },
-          body: JSON.stringify({
-            sessionId: '1bd92d',
-            runId: 'initial',
-            hypothesisId: 'H1,H2',
-            location: 'src/hooks/useTrip.ts:members',
-            message: 'member trips loaded',
-            data: {
-              slug,
-              ownedCount: ownedDocs.length,
-              sharedCount: sharedDocs.length,
-              effectiveUid,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
-
-        const seen = new Set<string>()
-        let selectedId: string | null = null
-        let selectedData: any = null
-
-        for (const snap of [...ownedDocs, ...sharedDocs]) {
-          if (seen.has(snap.id)) continue
-          seen.add(snap.id)
-          const data = snap.data()
-          if (data.slug === slug) {
-            selectedId = snap.id
-            selectedData = data
-            break
-          }
-        }
-        if (!selectedId || !selectedData) {
+        if (snap.empty) {
           setError('Trip not found.')
           setLoading(false)
           return
         }
+
+        const docSnap = snap.docs[0]
+        const selectedId = docSnap.id
+        const selectedData = docSnap.data()
 
         const ownerUid = selectedData?.owner_uid
         const memberUids = selectedData?.member_uids
@@ -192,6 +149,30 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
         const rebuild = () => {
           if (cancelled) return
           const sorted = [...liveDays].sort((a, b) => a.day_number - b.day_number)
+
+          // #region agent log
+          fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Debug-Session-Id': '9bccd3',
+            },
+            body: JSON.stringify({
+              sessionId: '9bccd3',
+              runId: 'initial',
+              hypothesisId: 'H1,H4',
+              location: 'src/hooks/useTrip.ts:rebuild',
+              message: 'rebuild days/slots/proposals',
+              data: {
+                days: sorted.length,
+                slots: [...liveSlots.values()].length,
+                proposals: [...liveProposals.values()].length,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+          // #endregion
+
           setDays(
             sorted.map((day) => ({
               ...day,
@@ -266,6 +247,29 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
                     propsSnap.docs.forEach((d) =>
                       liveProposals.set(d.id, { id: d.id, ...d.data() } as Proposal)
                     )
+
+                    // #region agent log
+                    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-Debug-Session-Id': '9bccd3',
+                      },
+                      body: JSON.stringify({
+                        sessionId: '9bccd3',
+                        runId: 'initial',
+                        hypothesisId: 'H1',
+                        location: 'src/hooks/useTrip.ts:proposalsSnapshot',
+                        message: 'proposals snapshot received',
+                        data: {
+                          tripId: selectedId,
+                          proposalsFromSnapshot: propsSnap.docs.length,
+                        },
+                        timestamp: Date.now(),
+                      }),
+                    }).catch(() => {})
+                    // #endregion
+
                     rebuild()
                   }
                 )

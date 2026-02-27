@@ -168,6 +168,30 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const isLocked = slot.status === 'locked'
 
   const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '9bccd3',
+      },
+      body: JSON.stringify({
+        sessionId: '9bccd3',
+        runId: 'initial',
+        hypothesisId: 'H1',
+        location: 'src/components/planning/ProposalDrawer.tsx:handleAddProposal',
+        message: 'adding proposal',
+        data: {
+          slotId: slot.id,
+          tripId: trip.id,
+          slotStatusBefore: slot.status,
+          title: data.title,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     await addDoc(collection(db, 'proposals'), {
       slot_id: slot.id,
       trip_id: trip.id,
@@ -261,6 +285,28 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const handleLock = async (proposalId: string) => {
     setLockLoading(true)
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': '9bccd3',
+        },
+        body: JSON.stringify({
+          sessionId: '9bccd3',
+          runId: 'initial',
+          hypothesisId: 'H3',
+          location: 'src/components/planning/ProposalDrawer.tsx:handleLock',
+          message: 'locking proposal for slot',
+          data: {
+            slotId: slot.id,
+            proposalId,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+
       await updateDoc(doc(db, 'slots', slot.id), {
         status: 'locked',
         locked_proposal_id: proposalId,
