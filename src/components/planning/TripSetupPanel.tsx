@@ -94,6 +94,7 @@ export function TripSetupPanel({ trip }: TripSetupPanelProps) {
           const slotRef = doc(collection(db, 'slots'))
           batch.set(slotRef, {
             day_id: dayRef.id,
+            trip_id: trip.id,
             time_label: slot.time_label,
             category: slot.category,
             status: 'open',

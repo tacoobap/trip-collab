@@ -3,99 +3,139 @@ rules_version = '2';
 // ─────────────────────────────────────────────────────────────────────────────
 // Trup · Firestore Security Rules
 //
-// Current posture: COLLABORATIVE / FRIENDS-ONLY
-//   - Anyone with the link can read and write trip data.
-//   - There is no user authentication in the app.
-//   - Rules focus on preventing accidental data destruction and basic abuse.
-//
-// To harden later:
-//   - Add Firebase Authentication and scope writes to request.auth != null
-//   - Restrict trips to members listed in trips/{id}.member_emails
-//   - Add per-field validation (string lengths, enum values, etc.)
+// Members-only: read/write allowed only for authenticated trip members
+// (owner_uid or in member_uids). Legacy trips without owner_uid are not readable.
 // ─────────────────────────────────────────────────────────────────────────────
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper: true if the user is owner or in member_uids for the given trip
+    function tripMember(tripId) {
+      let trip = get(/databases/$(database)/documents/trips/$(tripId));
+      return trip != null
+        && (
+          trip.data.get('owner_uid', '') == request.auth.uid
+          || request.auth.uid in trip.data.get('member_uids', [])
+        );
+    }
+
+    // ── Users (profile per uid) ───────────────────────────────────────────────
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // ── Trips ─────────────────────────────────────────────────────────────────
     match /trips/{tripId} {
-      allow read: if true;
-
-      // Anyone can create a trip; updates must keep required fields intact
-      allow create: if request.resource.data.keys().hasAll(['name', 'slug', 'destinations'])
-                    && request.resource.data.name is string
-                    && request.resource.data.name.size() <= 200
-                    && request.resource.data.slug is string;
-
-      allow update: if request.resource.data.keys().hasAll(['name', 'slug', 'destinations'])
-                    && request.resource.data.name is string
-                    && request.resource.data.name.size() <= 200;
-
-      // Prevent accidental deletion from the client
+      allow read: if request.auth != null
+        && (
+          resource.data.get('owner_uid', '') == request.auth.uid
+          || request.auth.uid in resource.data.get('member_uids', [])
+        );
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['name', 'slug', 'destinations', 'owner_uid', 'member_uids'])
+        && request.resource.data.owner_uid == request.auth.uid
+        && request.auth.uid in request.resource.data.member_uids
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200
+        && request.resource.data.slug is string;
+      allow update: if request.auth != null
+        && (
+          resource.data.get('owner_uid', '') == request.auth.uid
+          || request.auth.uid in resource.data.get('member_uids', [])
+        )
+        && request.resource.data.keys().hasAll(['name', 'slug', 'destinations'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 200;
       allow delete: if false;
     }
 
     // ── Days ──────────────────────────────────────────────────────────────────
     match /days/{dayId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.trip_id is string
-                            && request.resource.data.label is string
-                            && request.resource.data.label.size() <= 200;
-      allow delete: if false;
+      allow read, delete: if request.auth != null && tripMember(resource.data.trip_id);
+      allow create, update: if request.auth != null
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.label is string
+        && request.resource.data.label.size() <= 200;
     }
 
-    // ── Slots ─────────────────────────────────────────────────────────────────
+    // ── Slots (trip_id on create; legacy slots resolved via day_id) ───────────
     match /slots/{slotId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.day_id is string
-                            && request.resource.data.status in ['open', 'proposed', 'locked'];
-      allow delete: if true;
+      allow read, delete: if request.auth != null
+        && (
+          (resource.data.get('trip_id', '') != '' && tripMember(resource.data.trip_id))
+          || (resource.data.day_id is string && tripMember(get(/databases/$(database)/documents/days/$(resource.data.day_id)).data.trip_id))
+        );
+      allow create, update: if request.auth != null
+        && request.resource.data.day_id is string
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.status in ['open', 'proposed', 'locked'];
     }
 
-    // ── Proposals ─────────────────────────────────────────────────────────────
+    // ── Proposals (trip_id on create; legacy proposals resolved via slot→day) ─
     match /proposals/{proposalId} {
-      allow read: if true;
-      allow create: if request.resource.data.slot_id is string
-                    && request.resource.data.title is string
-                    && request.resource.data.title.size() >= 1
-                    && request.resource.data.title.size() <= 300
-                    && request.resource.data.proposer_name is string
-                    && request.resource.data.proposer_name.size() >= 1
-                    && request.resource.data.proposer_name.size() <= 100;
-      allow update: if true;
-      allow delete: if true;
+      allow read, delete: if request.auth != null
+        && (
+          (resource.data.get('trip_id', '') != '' && tripMember(resource.data.trip_id))
+          || (resource.data.slot_id is string && tripMember(get(/databases/$(database)/documents/days/$(get(/databases/$(database)/documents/slots/$(resource.data.slot_id)).data.day_id)).data.trip_id))
+        );
+      allow create: if request.auth != null
+        && request.resource.data.slot_id is string
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 300
+        && request.resource.data.proposer_name is string
+        && request.resource.data.proposer_name.size() >= 1
+        && request.resource.data.proposer_name.size() <= 100;
+      allow update: if request.auth != null
+        && (
+          (resource.data.get('trip_id', '') != '' && tripMember(resource.data.trip_id))
+          || (resource.data.slot_id is string && tripMember(get(/databases/$(database)/documents/days/$(get(/databases/$(database)/documents/slots/$(resource.data.slot_id)).data.day_id)).data.trip_id))
+        );
     }
 
     // ── Trip Notes ────────────────────────────────────────────────────────────
     match /trip_notes/{noteId} {
-      allow read: if true;
-      allow create: if request.resource.data.trip_id is string
-                    && request.resource.data.text is string
-                    && request.resource.data.text.size() >= 1
-                    && request.resource.data.text.size() <= 5000;
+      allow read, delete: if request.auth != null && tripMember(resource.data.trip_id);
+      allow create: if request.auth != null
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 5000;
       allow update: if false;
-      allow delete: if true;
     }
 
     // ── Stays ─────────────────────────────────────────────────────────────────
     match /stays/{stayId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.trip_id is string
-                            && request.resource.data.name is string
-                            && request.resource.data.name.size() >= 1
-                            && request.resource.data.name.size() <= 200;
-      allow delete: if true;
+      allow read, write: if request.auth != null && tripMember(resource.data.trip_id);
+      allow create: if request.auth != null
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 200;
+      allow update: if request.auth != null && tripMember(resource.data.trip_id)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 200;
+      allow delete: if request.auth != null && tripMember(resource.data.trip_id);
     }
 
-    // ── Collection items (trip-scoped unassigned ideas) ────────────────────────
+    // ── Collection items ──────────────────────────────────────────────────────
     match /collection_items/{itemId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.trip_id is string
-                            && request.resource.data.name is string
-                            && request.resource.data.name.size() >= 1
-                            && request.resource.data.name.size() <= 300
-                            && request.resource.data.category in ['food', 'activity', 'other'];
-      allow delete: if true;
+      allow read, delete: if request.auth != null && tripMember(resource.data.trip_id);
+      allow create, update: if request.auth != null
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 300
+        && request.resource.data.category in ['food', 'activity', 'other'];
     }
 
     // ── Deny everything else ──────────────────────────────────────────────────

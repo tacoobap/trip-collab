@@ -125,6 +125,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
         const slotRef = doc(collection(db, 'slots'))
         batch.set(slotRef, {
           day_id: dayRef.id,
+          trip_id: trip.id,
           time_label: preset.time_label,
           category: 'activity',
           icon: preset.icon ?? null,

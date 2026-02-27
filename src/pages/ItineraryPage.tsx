@@ -6,11 +6,12 @@ import { VibeTagsSection } from '@/components/itinerary/VibeTagsSection'
 import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
 import { Loader2, Camera, Sparkles, BedDouble } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { NamePrompt } from '@/pages/NamePrompt'
-import { useProposerName } from '@/hooks/useProposerName'
+import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -21,8 +22,9 @@ import { formatTripDate } from '@/lib/utils'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
+  const { user, getIdToken } = useAuth()
   const { trip, days, loading, error } = useTrip(slug)
-  const { name, setName, clearName, namesUsed } = useProposerName()
+  const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
   const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
@@ -55,7 +57,6 @@ export function ItineraryPage() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
-
 
   const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -138,7 +139,7 @@ export function ItineraryPage() {
         setGenerateStatus(`Finding photos… (${i + 1}/${daysNeedingImages.length})`)
         const fullDay = days.find((day) => day.id === d.day_id)
         try {
-          const img = await searchImage(d.image_query)
+          const img = await searchImage(d.image_query, getIdToken)
           await updateDoc(doc(db, 'days', d.day_id), {
             image_url: img.url,
             image_attribution: img.attribution,
@@ -146,7 +147,7 @@ export function ItineraryPage() {
         } catch {
           if (fullDay?.city) {
             try {
-              const img = await searchImage(fullDay.city)
+              const img = await searchImage(fullDay.city, getIdToken)
               await updateDoc(doc(db, 'days', d.day_id), {
                 image_url: img.url,
                 image_attribution: img.attribution,
@@ -255,12 +256,24 @@ export function ItineraryPage() {
   if (error || !trip) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center px-4">
-        <p className="text-muted-foreground">{error || 'Trip not found'}</p>
+        <div>
+          <p className="text-muted-foreground mb-2">{error || 'Trip not found'}</p>
+          {!user && (
+            <a href="/sign-in" className="text-sm text-primary hover:underline">
+              Sign in with Google
+            </a>
+          )}
+          <div className="mt-2">
+            <a href="/" className="text-sm text-primary hover:underline">
+              ← Back to home
+            </a>
+          </div>
+        </div>
       </div>
     )
   }
 
-  if (!name) {
+  if (!displayName && !isSignedIn) {
     return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
   }
 
@@ -285,7 +298,7 @@ export function ItineraryPage() {
       {!scrolledPastHero && (
         <PageHeader
           trip={trip}
-          currentName={name}
+          currentName={displayName ?? ''}
           onChangeName={clearName}
           overHero
         />
@@ -378,7 +391,7 @@ export function ItineraryPage() {
       {scrolledPastHero && (
         <PageHeader
           trip={trip}
-          currentName={name}
+          currentName={displayName ?? ''}
           onChangeName={clearName}
         />
       )}

@@ -1,4 +1,5 @@
 import type { Handler } from '@netlify/functions'
+import { getAuthUidFromEvent, requireAuthResponse } from './lib/verifyAuth'
 
 interface UnsplashPhoto {
   urls: { regular: string; full: string }
@@ -13,6 +14,12 @@ interface UnsplashSearchResponse {
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
+  }
+
+  const uid = await getAuthUidFromEvent(event)
+  const authError = requireAuthResponse(uid)
+  if (authError) {
+    return { statusCode: authError.statusCode, body: authError.body, headers: { 'Content-Type': 'application/json' } }
   }
 
   const accessKey = process.env.UNSPLASH_ACCESS_KEY

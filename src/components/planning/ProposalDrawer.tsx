@@ -170,6 +170,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
     await addDoc(collection(db, 'proposals'), {
       slot_id: slot.id,
+      trip_id: trip.id,
       proposer_name: currentName,
       title: data.title,
       note: data.note ?? null,

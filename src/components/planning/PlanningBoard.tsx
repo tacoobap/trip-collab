@@ -9,11 +9,12 @@ interface PlanningBoardProps {
   trip: Trip
   days: DayWithSlots[]
   currentName: string
+  getToken?: () => Promise<string | null>
 }
 
 const VISIBLE_PILLS_HINT_THRESHOLD = 5
 
-export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
+export function PlanningBoard({ trip, days, currentName, getToken }: PlanningBoardProps) {
   const [activeSlot, setActiveSlot] = useState<SlotWithProposals | null>(null)
   const [activeDayLabel, setActiveDayLabel] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -161,6 +162,7 @@ export function PlanningBoard({ trip, days, currentName }: PlanningBoardProps) {
                 tripId={trip.id}
                 currentName={currentName}
                 onSlotClick={handleSlotClick}
+                getToken={getToken}
               />
             </div>
           ))}

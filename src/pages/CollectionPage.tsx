@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import { NamePrompt } from './NamePrompt'
-import { useProposerName } from '@/hooks/useProposerName'
+import { useDisplayName } from '@/hooks/useDisplayName'
 import { useTrip } from '@/hooks/useTrip'
 import { useCollectionItems } from '@/hooks/useCollectionItems'
 import { updateDoc, doc, addDoc, collection, serverTimestamp, deleteDoc } from 'firebase/firestore'
@@ -60,7 +61,8 @@ function groupByDestination(
 
 export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { name, setName, clearName, namesUsed } = useProposerName()
+  const { user, getIdToken } = useAuth()
+  const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
   const { trip, days, loading: tripLoading, error } = useTrip(slug)
   const { items, loading: itemsLoading } = useCollectionItems(trip?.id)
   const [addOpen, setAddOpen] = useState(false)
@@ -92,7 +94,7 @@ export function CollectionPage() {
   useEffect(() => {
     if (suggestions.length === 0) return
     suggestions.forEach((s, i) => {
-      searchImage(s.name)
+      searchImage(s.name, getIdToken)
         .then((res) => setSuggestionImageUrls((prev) => ({ ...prev, [i]: res.url })))
         .catch(() => {})
     })
@@ -113,19 +115,19 @@ export function CollectionPage() {
       place_name: null,
       likes: [],
       created_at: serverTimestamp(),
-      created_by: name,
+      created_by: displayName ?? '',
     })
     setSavedIds((prev) => new Set(prev).add(index))
   }
 
   const handleLike = async (itemId: string) => {
-    if (!name) return
+    if (!displayName) return
     const item = items.find((i) => i.id === itemId)
     if (!item) return
-    const hasLiked = item.likes.includes(name)
+    const hasLiked = item.likes.includes(displayName)
     const newLikes = hasLiked
-      ? item.likes.filter((n) => n !== name)
-      : [...item.likes, name]
+      ? item.likes.filter((n) => n !== displayName)
+      : [...item.likes, displayName]
     await updateDoc(doc(db, 'collection_items', itemId), { likes: newLikes })
   }
 
@@ -149,15 +151,25 @@ export function CollectionPage() {
           <p className="text-lg font-serif font-semibold text-foreground mb-2">
             {error || 'Trip not found'}
           </p>
-          <a href="/" className="text-sm text-primary hover:underline">
-            ← Back to home
-          </a>
+          {!user && (
+            <p className="text-sm text-muted-foreground mb-4">Sign in to view this trip.</p>
+          )}
+          <div className="flex flex-col gap-2">
+            {!user && (
+              <a href="/sign-in" className="text-sm text-primary hover:underline">
+                Sign in with Google
+              </a>
+            )}
+            <a href="/" className="text-sm text-primary hover:underline">
+              ← Back to home
+            </a>
+          </div>
         </div>
       </div>
     )
   }
 
-  if (!name) {
+  if (!displayName && !isSignedIn) {
     return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
   }
 
@@ -167,7 +179,7 @@ export function CollectionPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader trip={trip} currentName={name} onChangeName={clearName} />
+      <PageHeader trip={trip} currentName={displayName ?? ''} onChangeName={clearName} />
 
       {/* Hero */}
       <div className="border-b border-border bg-gradient-to-br from-muted/30 to-background">
@@ -231,7 +243,7 @@ export function CollectionPage() {
                     <CollectionItemCard
                       key={item.id}
                       item={item}
-                      currentName={name}
+                      currentName={displayName ?? ''}
                       onLike={handleLike}
                       onEdit={setEditItem}
                       onDelete={handleDelete}
@@ -254,7 +266,8 @@ export function CollectionPage() {
             item={null}
             tripId={trip.id}
             destinations={trip.destinations ?? []}
-            currentName={name}
+            currentName={displayName ?? ''}
+            getToken={getIdToken}
             onSuccess={() => setAddOpen(false)}
             onCancel={() => setAddOpen(false)}
           />
@@ -272,7 +285,8 @@ export function CollectionPage() {
               item={editItem}
               tripId={trip.id}
               destinations={trip.destinations ?? []}
-              currentName={name}
+              currentName={displayName ?? ''}
+              getToken={getIdToken}
               onSuccess={() => setEditItem(null)}
               onCancel={() => setEditItem(null)}
             />

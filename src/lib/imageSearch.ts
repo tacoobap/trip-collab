@@ -11,12 +11,21 @@ interface UnsplashPhoto {
   user: { name: string; links: { html: string } }
 }
 
-export async function searchImage(query: string): Promise<ImageSearchResult> {
+export async function searchImage(
+  query: string,
+  getToken?: () => Promise<string | null>
+): Promise<ImageSearchResult> {
   // In production, use Netlify function so Unsplash key stays server-side (UNSPLASH_ACCESS_KEY in Netlify env)
   if (import.meta.env.PROD && typeof window !== 'undefined') {
     const base = window.location.origin
+    const headers: Record<string, string> = {}
+    if (getToken) {
+      const token = await getToken()
+      if (token) headers['Authorization'] = `Bearer ${token}`
+    }
     const res = await fetch(
-      `${base}/.netlify/functions/search-image?query=${encodeURIComponent(query)}`
+      `${base}/.netlify/functions/search-image?query=${encodeURIComponent(query)}`,
+      { headers }
     )
     const data = (await res.json()) as
       | { url: string; attribution: string; photographer_url: string; unsplash_url: string }

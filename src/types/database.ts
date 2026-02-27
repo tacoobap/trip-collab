@@ -1,30 +1,3 @@
-export type Database = {
-  public: {
-    Tables: {
-      trips: {
-        Row: Trip
-        Insert: Omit<Trip, 'id' | 'created_at'>
-        Update: Partial<Omit<Trip, 'id' | 'created_at'>>
-      }
-      days: {
-        Row: Day
-        Insert: Omit<Day, 'id'>
-        Update: Partial<Omit<Day, 'id'>>
-      }
-      slots: {
-        Row: Slot
-        Insert: Omit<Slot, 'id'>
-        Update: Partial<Omit<Slot, 'id'>>
-      }
-      proposals: {
-        Row: Proposal
-        Insert: Omit<Proposal, 'id' | 'created_at'>
-        Update: Partial<Omit<Proposal, 'id' | 'created_at'>>
-      }
-    }
-  }
-}
-
 export type VibeTag = {
   label: string
   subtitle: string
@@ -42,6 +15,8 @@ export type Trip = {
   tagline: string | null
   vibe_heading: string | null   // e.g. "Intention Over Itinerary"
   vibe_tags: VibeTag[] | null
+  owner_uid?: string   // required on create; present after migration
+  member_uids?: string[]
 }
 
 export type Day = {
@@ -59,6 +34,7 @@ export type Day = {
 export type Slot = {
   id: string
   day_id: string
+  trip_id?: string   // denormalized for rules; set on create
   time_label: string
   category: 'food' | 'activity' | 'travel' | 'accommodation' | 'vibe'
   icon: string | null   // custom emoji; falls back to category default when null
@@ -70,6 +46,7 @@ export type Slot = {
 export type Proposal = {
   id: string
   slot_id: string
+  trip_id?: string   // denormalized for rules; set on create
   proposer_name: string
   title: string
   note: string | null

@@ -1,5 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getAuthUidFromEvent, requireAuthResponse } from './lib/verifyAuth'
 
 const SYSTEM_PROMPT = `You are crafting editorial copy for a boutique travel itinerary in the style of a premium travel magazine — think Condé Nast Traveler meets a handwritten trip journal. Your writing is specific, evocative, and personal — never generic.
 
@@ -80,12 +81,18 @@ function buildPrompt(trip: InputTrip, days: InputDay[]): string {
   }
 
   lines.push('\nGenerate the narrative JSON for this trip.')
-  return lines.filter((l) => l !== null).join('\n')
+  return lines.filter((l) => l !== '').join('\n')
 }
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
+  }
+
+  const uid = await getAuthUidFromEvent(event)
+  const authError = requireAuthResponse(uid)
+  if (authError) {
+    return { statusCode: authError.statusCode, body: authError.body, headers: { 'Content-Type': 'application/json' } }
   }
 
   const apiKey = process.env.GEMINI_API_KEY

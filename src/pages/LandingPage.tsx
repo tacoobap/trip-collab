@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2, LogOut } from 'lucide-react'
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { db, firebaseReady } from '@/lib/firebase'
+import { useAuth } from '@/contexts/AuthContext'
 import { NewTripDialog } from '@/components/trips/NewTripDialog'
 import { Button } from '@/components/ui/button'
 import type { Trip } from '@/types/database'
@@ -47,19 +48,105 @@ function TripCard({ trip }: { trip: Trip }) {
   )
 }
 
+function mergeTrips(owned: Trip[], shared: Trip[]): Trip[] {
+  const byId = new Map<string, Trip>()
+  for (const t of [...owned, ...shared]) {
+    byId.set(t.id, t)
+  }
+  return [...byId.values()].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+}
+
 export function LandingPage() {
+  const navigate = useNavigate()
+  const { user, loading: authLoading, signOut } = useAuth()
   const [newTripOpen, setNewTripOpen] = useState(false)
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getDocs(query(collection(db, 'trips'), orderBy('created_at', 'desc')))
-      .then((snap) => {
-        setTrips(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip)))
+    if (!firebaseReady || !user) {
+      setLoading(false)
+      if (!user) setTrips([])
+      return
+    }
+    const uid = user.uid
+    Promise.all([
+      getDocs(
+        query(
+          collection(db, 'trips'),
+          where('owner_uid', '==', uid),
+          orderBy('created_at', 'desc')
+        )
+      ),
+      getDocs(
+        query(
+          collection(db, 'trips'),
+          where('member_uids', 'array-contains', uid),
+          orderBy('created_at', 'desc')
+        )
+      ),
+    ])
+      .then(([ownedSnap, sharedSnap]) => {
+        const owned = ownedSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip))
+        const shared = sharedSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip))
+        setTrips(mergeTrips(owned, shared))
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [user])
+
+  // Signed out: marketing + sign-in
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {!firebaseReady && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              <strong>Firebase not connected.</strong> Create a{' '}
+              <code className="bg-amber-100 px-1 rounded font-mono text-xs">.env</code> file
+              with your Firebase config keys, then restart the dev server.
+            </div>
+          </div>
+        )}
+        <header className="border-b border-border px-4 sm:px-8 py-4 max-sm:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <span className="text-lg font-serif font-bold text-foreground">Trup</span>
+          </div>
+        </header>
+        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-16 max-sm:py-10 flex flex-col items-center justify-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md"
+          >
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-3xl font-serif font-bold text-foreground mb-3">
+              Plan trips together.
+            </h1>
+            <p className="text-muted-foreground leading-relaxed mb-8">
+              Propose ideas, vote on favorites, lock in the plan —
+              no spreadsheets required.
+            </p>
+            <Button size="lg" onClick={() => navigate('/sign-in')} className="max-sm:min-h-[48px]">
+              Sign in with Google
+            </Button>
+            <footer className="mt-16 text-center text-xs text-muted-foreground">
+              <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>
+              {' · '}
+              <Link to="/terms" className="hover:text-foreground underline">Terms</Link>
+            </footer>
+          </motion.div>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -74,25 +161,28 @@ export function LandingPage() {
         </div>
       )}
 
-      {/* Header */}
       <header className="border-b border-border px-4 sm:px-8 py-4 max-sm:py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
           <span className="text-lg font-serif font-bold text-foreground">Trup</span>
         </div>
-        <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
-          <Plus className="w-4 h-4 mr-1.5" />
-          New trip
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
+            <Plus className="w-4 h-4 mr-1.5" />
+            New trip
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => signOut()} className="max-sm:min-h-[44px]" aria-label="Sign out">
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 max-sm:py-6">
-        {loading ? (
+        {authLoading || loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : trips.length === 0 ? (
-          /* ── Empty state ── */
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -102,24 +192,21 @@ export function LandingPage() {
               <Sparkles className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-3xl font-serif font-bold text-foreground mb-3">
-              Plan trips together.
+              Plan your first trip
             </h1>
             <p className="text-muted-foreground leading-relaxed max-w-sm mb-8">
-              Propose ideas, vote on favorites, lock in the plan —
-              no spreadsheets required.
+              Create a trip to start planning with your group.
             </p>
             <Button size="lg" onClick={() => setNewTripOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Plan your first trip
+              Plan a trip
             </Button>
           </motion.div>
         ) : (
-          /* ── Trip grid ── */
           <>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-serif font-semibold text-foreground">Trips</h2>
+              <h2 className="text-2xl font-serif font-semibold text-foreground">My trips</h2>
             </div>
-
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -135,8 +222,6 @@ export function LandingPage() {
                   <TripCard trip={trip} />
                 </motion.div>
               ))}
-
-              {/* New trip card */}
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -155,6 +240,12 @@ export function LandingPage() {
           </>
         )}
       </main>
+
+      <footer className="border-t border-border py-4 px-4 sm:px-8 text-center text-xs text-muted-foreground">
+        <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>
+        {' · '}
+        <Link to="/terms" className="hover:text-foreground underline">Terms</Link>
+      </footer>
 
       <NewTripDialog open={newTripOpen} onOpenChange={setNewTripOpen} />
     </div>

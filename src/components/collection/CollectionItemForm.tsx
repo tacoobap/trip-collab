@@ -22,6 +22,7 @@ export interface CollectionItemFormProps {
   tripId: string
   destinations: string[]
   currentName: string
+  getToken?: () => Promise<string | null>
   onSuccess: () => void
   onCancel: () => void
 }
@@ -31,6 +32,7 @@ export function CollectionItemForm({
   tripId,
   destinations,
   currentName,
+  getToken,
   onSuccess,
   onCancel,
 }: CollectionItemFormProps) {
@@ -67,7 +69,7 @@ export function CollectionItemForm({
     let cancelled = false
     setFetchImageLoading(true)
     setFetchImageError(null)
-    searchImage(searchQuery)
+    searchImage(searchQuery, getToken)
       .then((res) => {
         if (!cancelled) {
           setFetchedImageUrl(res.url)

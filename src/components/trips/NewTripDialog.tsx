@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { MapPin, Plus, Loader2 } from 'lucide-react'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useAuth } from '@/contexts/AuthContext'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ interface NewTripDialogProps {
 
 export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [tripName, setTripName] = useState('')
   const [destination, setDestination] = useState('')
   const [destinations, setDestinations] = useState<string[]>([])
@@ -55,7 +57,7 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!tripName.trim()) return
+    if (!tripName.trim() || !user) return
 
     setLoading(true)
     setError('')
@@ -71,6 +73,8 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
         start_date: startDate || null,
         end_date: endDate || null,
         created_at: serverTimestamp(),
+        owner_uid: user.uid,
+        member_uids: [user.uid],
       })
       handleClose()
       navigate(`/trip/${slug}`)
@@ -191,7 +195,7 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
             <Button
               type="submit"
               className="flex-1"
-              disabled={!tripName.trim() || loading}
+              disabled={!tripName.trim() || !user || loading}
             >
               {loading ? (
                 <>

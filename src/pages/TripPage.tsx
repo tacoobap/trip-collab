@@ -4,7 +4,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
 import { StaysDrawer } from '@/components/stays/StaysDrawer'
 import { NamePrompt } from './NamePrompt'
-import { useProposerName } from '@/hooks/useProposerName'
+import { useDisplayName } from '@/hooks/useDisplayName'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { formatTripDate } from '@/lib/utils'
@@ -12,7 +13,8 @@ import { Loader2, BedDouble } from 'lucide-react'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { name, setName, clearName, namesUsed } = useProposerName()
+  const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
+  const { user, getIdToken } = useAuth()
   const { trip, days, loading, error } = useTrip(slug)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
@@ -32,15 +34,27 @@ export function TripPage() {
           <p className="text-lg font-serif font-semibold text-foreground mb-2">
             {error || 'Trip not found'}
           </p>
-          <a href="/" className="text-sm text-primary hover:underline">
-            ← Back to home
-          </a>
+          {!user && (
+            <p className="text-sm text-muted-foreground mb-4">
+              Sign in to view this trip.
+            </p>
+          )}
+          <div className="flex flex-col gap-2">
+            {!user && (
+              <a href="/sign-in" className="text-sm text-primary hover:underline">
+                Sign in with Google
+              </a>
+            )}
+            <a href="/" className="text-sm text-primary hover:underline">
+              ← Back to home
+            </a>
+          </div>
         </div>
       </div>
     )
   }
 
-  if (!name) {
+  if (!displayName && !isSignedIn) {
     return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
   }
 
@@ -52,7 +66,7 @@ export function TripPage() {
     <div className="min-h-screen bg-background">
       <PageHeader
         trip={trip}
-        currentName={name}
+        currentName={displayName ?? ''}
         onChangeName={clearName}
       />
       <div className="border-b border-border bg-warm-white/50">
@@ -78,7 +92,7 @@ export function TripPage() {
         </div>
       </div>
       <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8 max-sm:px-4">
-        <PlanningBoard trip={trip} days={days} currentName={name} />
+        <PlanningBoard trip={trip} days={days} currentName={displayName ?? ''} getToken={getIdToken} />
       </main>
 
       <StaysDrawer
@@ -86,7 +100,7 @@ export function TripPage() {
         onClose={() => setStaysOpen(false)}
         trip={trip}
         stays={stays}
-        currentName={name}
+        currentName={displayName ?? ''}
         onAdd={addStay}
         onUpdate={updateStay}
         onDelete={deleteStay}

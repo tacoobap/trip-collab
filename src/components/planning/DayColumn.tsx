@@ -16,9 +16,10 @@ interface DayColumnProps {
   tripId: string
   currentName: string
   onSlotClick: (slot: SlotWithProposals, dayLabel: string) => void
+  getToken?: () => Promise<string | null>
 }
 
-export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick }: DayColumnProps) {
+export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick, getToken }: DayColumnProps) {
   const getDisplayTime = (slot: SlotWithProposals) => {
     const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
     return locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
@@ -78,14 +79,14 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
         ...eventTitles.slice(0, 4),
       ].filter(Boolean).join(', ')
 
-      const img = await searchImage(query)
+      const img = await searchImage(query, getToken)
       await updateDoc(doc(db, 'days', day.id), {
         image_url: img.url,
         image_attribution: img.attribution,
       })
     } catch {
       try {
-        const img = await searchImage([day.city, day.label].filter(Boolean).join(' '))
+        const img = await searchImage([day.city, day.label].filter(Boolean).join(' '), getToken)
         await updateDoc(doc(db, 'days', day.id), {
           image_url: img.url,
           image_attribution: img.attribution,
@@ -112,6 +113,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick 
     try {
       await addDoc(collection(db, 'slots'), {
         day_id: day.id,
+        trip_id: tripId,
         time_label: formatted,
         category: 'activity',
         icon: null,
