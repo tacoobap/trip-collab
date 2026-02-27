@@ -10,11 +10,13 @@ interface PlanningBoardProps {
   days: DayWithSlots[]
   currentName: string
   getToken?: () => Promise<string | null>
+  isMember: boolean
+  isOwner: boolean
 }
 
 const VISIBLE_PILLS_HINT_THRESHOLD = 5
 
-export function PlanningBoard({ trip, days, currentName, getToken }: PlanningBoardProps) {
+export function PlanningBoard({ trip, days, currentName, getToken, isMember, isOwner }: PlanningBoardProps) {
   const [activeSlot, setActiveSlot] = useState<SlotWithProposals | null>(null)
   const [activeDayLabel, setActiveDayLabel] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -89,7 +91,7 @@ export function PlanningBoard({ trip, days, currentName, getToken }: PlanningBoa
   }
 
   if (days.length === 0) {
-    return <TripSetupPanel trip={trip} />
+    return <TripSetupPanel trip={trip} canEdit={isMember} />
   }
 
   return (
@@ -162,6 +164,7 @@ export function PlanningBoard({ trip, days, currentName, getToken }: PlanningBoa
                 currentName={currentName}
                 onSlotClick={handleSlotClick}
                 getToken={getToken}
+                canEdit={isMember}
               />
             </div>
           ))}
@@ -177,6 +180,8 @@ export function PlanningBoard({ trip, days, currentName, getToken }: PlanningBoa
         currentName={currentName}
         onClose={() => setActiveSlot(null)}
         onUpdate={() => {}}
+        canEdit={isMember}
+        canDeleteSlot={isOwner}
       />
     </>
   )

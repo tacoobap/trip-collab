@@ -17,9 +17,10 @@ interface DayColumnProps {
   currentName: string
   onSlotClick: (slot: SlotWithProposals, dayLabel: string) => void
   getToken?: () => Promise<string | null>
+  canEdit?: boolean
 }
 
-export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick, getToken }: DayColumnProps) {
+export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick, getToken, canEdit = true }: DayColumnProps) {
   const getDisplayTime = (slot: SlotWithProposals) => {
     const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
     return locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
@@ -174,7 +175,8 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
             {day.city && (
               <CityTag city={day.city} className="bg-muted/80 text-muted-foreground border-border" />
             )}
-            {/* Camera button + popover menu */}
+            {/* Camera button + popover menu — only for members */}
+            {canEdit && (
             <div className="relative">
               <button
                 onClick={() => setPhotoMenuOpen((v) => !v)}
@@ -220,6 +222,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
                 </>
               )}
             </div>
+            )}
           </div>
         </div>
         {day.date && (
@@ -242,8 +245,8 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
           />
         ))}
 
-        {/* Add slot */}
-        {addingSlot ? (
+        {/* Add slot — only for members */}
+        {canEdit && (addingSlot ? (
           <form
             onSubmit={handleAddSlot}
             className="flex flex-col gap-1.5"
@@ -298,7 +301,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
             <Plus className="w-3 h-3" />
             Add slot
           </button>
-        )}
+        ))}
       </div>
     </div>
   )

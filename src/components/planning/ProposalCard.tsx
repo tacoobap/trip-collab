@@ -9,7 +9,7 @@ interface ProposalCardProps {
   proposal: Proposal
   currentName: string
   isLocked?: boolean
-  onVote: (proposalId: string) => void
+  onVote?: (proposalId: string) => void
   onLock?: (proposalId: string) => void
   onDelete?: (proposalId: string) => void
   onEdit?: (proposalId: string, data: { title: string; note: string | null; url: string | null }) => Promise<void>
@@ -156,6 +156,7 @@ export function ProposalCard({
         ) : (
           <>
             {/* Like (collection-style: always show count) */}
+            {onVote && (
             <button
               onClick={() => onVote(proposal.id)}
               className={cn(
@@ -168,6 +169,7 @@ export function ProposalCard({
               <Heart className={cn('w-3.5 h-3.5', hasVoted && 'fill-coral')} />
               <span>{voteCount}</span>
             </button>
+            )}
 
             {/* Edit */}
             {onEdit && (

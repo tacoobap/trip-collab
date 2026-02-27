@@ -27,7 +27,7 @@ const TIME_CHIPS = ['9:00 AM', '12:00 PM', '3:00 PM', '7:00 PM']
 
 // ── Inline slot label (editable time in drawer header) ──────────────────────
 
-function InlineSlotLabel({ slot }: { slot: SlotWithProposals }) {
+function InlineSlotLabel({ slot, canEdit }: { slot: SlotWithProposals; canEdit: boolean }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [timeError, setTimeError] = useState<string | null>(null)
@@ -107,16 +107,17 @@ function InlineSlotLabel({ slot }: { slot: SlotWithProposals }) {
   return (
     <button
       type="button"
-      onClick={() => setEditing(true)}
-      title="Change time"
-      className="group flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+      onClick={() => canEdit && setEditing(true)}
+      disabled={!canEdit}
+      title={canEdit ? 'Change time' : undefined}
+      className="group flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors disabled:pointer-events-none disabled:hover:text-foreground"
     >
       <span>{displayTime}</span>
-      {saving ? (
+      {canEdit && (saving ? (
         <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />
       ) : (
         <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
-      )}
+      ))}
     </button>
   )
 }
@@ -132,9 +133,11 @@ interface ProposalDrawerProps {
   onClose: () => void
   onUpdate: () => void
   onSlotDeleted?: () => void
+  canEdit?: boolean
+  canDeleteSlot?: boolean
 }
 
-export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted }: ProposalDrawerProps) {
+export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted, canEdit = true, canDeleteSlot = false }: ProposalDrawerProps) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [pickFromCollectionOpen, setPickFromCollectionOpen] = useState(false)
   const [_lockLoading, setLockLoading] = useState(false)
@@ -301,15 +304,19 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               <div className="px-5 pt-2 sm:pt-4 pb-3 border-b border-border shrink-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="relative flex items-center gap-2 min-w-0 flex-1">
-                    <button
-                      type="button"
-                      onClick={() => setIconPickerOpen((v) => !v)}
-                      title="Change icon"
-                      className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
-                    >
-                      {currentIcon}
-                    </button>
-                    <InlineSlotLabel slot={slot} />
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => setIconPickerOpen((v) => !v)}
+                        title="Change icon"
+                        className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+                      >
+                        {currentIcon}
+                      </button>
+                    ) : (
+                      <span className="text-lg leading-none shrink-0">{currentIcon}</span>
+                    )}
+                    <InlineSlotLabel slot={slot} canEdit={canEdit} />
                     <span className="text-xs text-muted-foreground/40 truncate">· {dayLabel}</span>
                     <SlotIconPicker
                       open={iconPickerOpen}
@@ -320,7 +327,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    {confirmDeleteSlot ? (
+                    {canDeleteSlot && (confirmDeleteSlot ? (
                       <>
                         <button
                           onClick={handleDeleteSlot}
@@ -344,7 +351,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                    )}
+                    ))}
                     <button
                       onClick={onClose}
                       className="rounded-full w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px]"
@@ -354,7 +361,8 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   </div>
                 </div>
 
-                {/* Time quick-picks */}
+                {/* Time quick-picks — only for members */}
+                {canEdit && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
                   {TIME_CHIPS.map((t) => (
                     <button
@@ -373,6 +381,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   ))}
                   <span className="text-[11px] text-muted-foreground/30">or type above ↑</span>
                 </div>
+                )}
               </div>
 
               {/* Ideas collection — flex-1 + min-h-0 so it gets bounded height and scrolls */}
@@ -402,10 +411,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                           proposal={proposal}
                           currentName={currentName}
                           isLocked={isThisLocked}
-                          onVote={handleVote}
-                          onLock={!isLocked ? handleLock : undefined}
-                          onDelete={handleDeleteProposal}
-                          onEdit={handleEditProposal}
+                          onVote={canEdit ? handleVote : undefined}
+                          onLock={canEdit && !isLocked ? handleLock : undefined}
+                          onDelete={canEdit ? handleDeleteProposal : undefined}
+                          onEdit={canEdit ? handleEditProposal : undefined}
                         />
                       )
                     })}
@@ -421,7 +430,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   </div>
                 )}
 
-                {!isLocked && !showAddForm && (
+                {canEdit && !isLocked && !showAddForm && (
                   <div className="pt-3 pb-4 space-y-2">
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
                       Add an idea
@@ -446,8 +455,8 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                 )}
               </div>
 
-              {/* Footer — only when locked */}
-              {isLocked && (
+              {/* Footer — only when locked and member can edit */}
+              {canEdit && isLocked && (
                 <div className="px-5 py-4 border-t border-border shrink-0">
                   <Button
                     onClick={handleUnlock}

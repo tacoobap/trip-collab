@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 interface CollectionItemCardProps {
   item: CollectionItem
   currentName: string
-  onLike: (itemId: string) => void
+  onLike?: (itemId: string) => void
   onEdit?: (item: CollectionItem) => void
   onDelete?: (itemId: string) => void
   className?: string
@@ -30,6 +30,7 @@ export function CollectionItemCard({
 }: CollectionItemCardProps) {
   const hasLiked = item.likes.includes(currentName)
   const likeCount = item.likes.length
+  const canLike = !!onLike
   const [likesOpen, setLikesOpen] = useState(false)
 
   const [retryKey, setRetryKey] = useState(0)
@@ -129,6 +130,7 @@ export function CollectionItemCard({
           </a>
         )}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {canLike ? (
           <button
             type="button"
             onClick={() => onLike(item.id)}
@@ -143,6 +145,12 @@ export function CollectionItemCard({
             />
             <span>{likeCount > 0 ? likeCount : 'Like'}</span>
           </button>
+          ) : likeCount > 0 ? (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Heart className="w-3.5 h-3.5 fill-red-500/70" />
+              <span>{likeCount}</span>
+            </span>
+          ) : null}
           {likeCount > 0 && (
             <button
               type="button"

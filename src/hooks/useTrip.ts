@@ -231,5 +231,10 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     return members.includes(currentUid)
   }, [trip, currentUid])
 
-  return { trip, days, travelers, loading, error, isMember }
+  const isOwner = useMemo(() => {
+    if (!trip || !currentUid) return false
+    return trip.owner_uid === currentUid
+  }, [trip, currentUid])
+
+  return { trip, days, travelers, loading, error, isMember, isOwner }
 }

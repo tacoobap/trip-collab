@@ -63,7 +63,7 @@ export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
   const { user, getIdToken } = useAuth()
   const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
-  const { trip, days, loading: tripLoading, error } = useTrip(slug)
+  const { trip, days, loading: tripLoading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { items, loading: itemsLoading } = useCollectionItems(trip?.id)
   const [addOpen, setAddOpen] = useState(false)
   const [editItem, setEditItem] = useState<CollectionItem | null>(null)
@@ -192,28 +192,39 @@ export function CollectionPage() {
           <p className="text-sm text-muted-foreground mt-0.5 mb-4 sm:mb-6">
             Save ideas for later and add them to the plan when you’re ready.
           </p>
+          {!isMember && user && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                Only trip members can add or edit ideas. Join this trip to contribute to the collection.
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap gap-3 max-sm:flex-col max-sm:gap-2">
-            <Button
-              onClick={() => {
-                setSuggestOpen(true)
-                setSuggestions([])
-                setSavedIds(new Set())
-                setVibeSentence('')
-              }}
-              variant="default"
-              className="gap-2 max-sm:w-full max-sm:justify-center"
-            >
-              <Sparkles className="w-4 h-4" />
-              Suggest something for me
-            </Button>
-            <Button
-              onClick={() => setAddOpen(true)}
-              variant="outline"
-              className="gap-2 max-sm:w-full max-sm:justify-center"
-            >
-              <Plus className="w-4 h-4" />
-              Add an idea
-            </Button>
+            {isMember && (
+              <>
+                <Button
+                  onClick={() => {
+                    setSuggestOpen(true)
+                    setSuggestions([])
+                    setSavedIds(new Set())
+                    setVibeSentence('')
+                  }}
+                  variant="default"
+                  className="gap-2 max-sm:w-full max-sm:justify-center"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Suggest something for me
+                </Button>
+                <Button
+                  onClick={() => setAddOpen(true)}
+                  variant="outline"
+                  className="gap-2 max-sm:w-full max-sm:justify-center"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add an idea
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -228,10 +239,12 @@ export function CollectionPage() {
             <p className="text-muted-foreground text-sm mb-4">
               No ideas in the collection yet.
             </p>
-            <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Add the first one
-            </Button>
+            {isMember && (
+              <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add the first one
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-10 max-sm:space-y-8">
@@ -246,9 +259,9 @@ export function CollectionPage() {
                       key={item.id}
                       item={item}
                       currentName={displayName ?? ''}
-                      onLike={handleLike}
-                      onEdit={setEditItem}
-                      onDelete={handleDelete}
+                      onLike={isMember ? handleLike : undefined}
+                      onEdit={isMember && (isOwner || item.created_by === (displayName ?? '')) ? setEditItem : undefined}
+                      onDelete={isMember && (isOwner || item.created_by === (displayName ?? '')) ? handleDelete : undefined}
                     />
                   ))}
                 </div>

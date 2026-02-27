@@ -23,7 +23,7 @@ import { formatTripDate } from '@/lib/utils'
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
   const { user, getIdToken } = useAuth()
-  const { trip, days, loading, error } = useTrip(slug)
+  const { trip, days, loading, error, isMember } = useTrip(slug, user?.uid)
   const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
   const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
@@ -413,7 +413,8 @@ export function ItineraryPage() {
           />
         )}
 
-        {/* Photo + Update text — in their own section */}
+        {/* Photo + Update text — only for trip members */}
+        {isMember && (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 max-sm:pt-6 max-sm:px-3 max-sm:pb-3">
           <div className="rounded-xl border border-border bg-card/50 px-4 py-3 flex flex-col items-center gap-3 max-sm:px-3 max-sm:py-2.5">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
@@ -459,6 +460,7 @@ export function ItineraryPage() {
             )}
           </div>
         </div>
+        )}
 
         {/* Update text modal — multi-select which sections and optionally which days */}
         {updateTextModalOpen && (

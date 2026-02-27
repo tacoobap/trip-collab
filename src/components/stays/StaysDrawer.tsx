@@ -28,7 +28,7 @@ function nightCount(checkIn: string, checkOut: string) {
 interface StayCardProps {
   stay: Stay
   currentName: string | null
-  onDelete: () => void
+  onDelete?: () => void
 }
 
 function StayCard({ stay, currentName, onDelete }: StayCardProps) {
@@ -41,7 +41,7 @@ function StayCard({ stay, currentName, onDelete }: StayCardProps) {
             {stay.name}
           </h3>
         </div>
-        {stay.proposed_by === currentName && (
+        {onDelete && stay.proposed_by === currentName && (
           <button
             onClick={onDelete}
             className="text-muted-foreground hover:text-destructive transition-colors shrink-0 mt-0.5"
@@ -219,6 +219,7 @@ interface StaysDrawerProps {
   onAdd: (data: StayInput) => Promise<void>
   onUpdate?: (stayId: string, data: Partial<StayInput>) => Promise<void>
   onDelete: (stayId: string) => Promise<void>
+  canEdit?: boolean
 }
 
 export function StaysDrawer({
@@ -229,6 +230,7 @@ export function StaysDrawer({
   currentName,
   onAdd,
   onDelete,
+  canEdit = true,
 }: StaysDrawerProps) {
   const [showForm, setShowForm] = useState(false)
 
@@ -274,7 +276,7 @@ export function StaysDrawer({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {!showForm && currentName && (
+                {canEdit && !showForm && currentName && (
                   <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
                     <Plus className="w-3.5 h-3.5 mr-1" />
                     Add stay
@@ -291,7 +293,7 @@ export function StaysDrawer({
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-              {showForm && currentName && (
+              {canEdit && showForm && currentName && (
                 <AddStayForm
                   trip={trip}
                   currentName={currentName}
@@ -312,7 +314,7 @@ export function StaysDrawer({
                   key={stay.id}
                   stay={stay}
                   currentName={currentName}
-                  onDelete={() => void onDelete(stay.id)}
+                  onDelete={canEdit ? () => void onDelete(stay.id) : undefined}
                 />
               ))}
             </div>

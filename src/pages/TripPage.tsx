@@ -18,7 +18,7 @@ export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
   const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
   const { user, getIdToken } = useAuth()
-  const { trip, days, loading, error, isMember } = useTrip(slug, user?.uid)
+  const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
   const [joining, setJoining] = useState(false)
@@ -120,6 +120,37 @@ export function TripPage() {
         currentName={displayName ?? ''}
         onChangeName={clearName}
       />
+      {/* Read-only banner for non-members */}
+      {user && isMember === false && (
+        <div className="border-b border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              You’re viewing this trip as a guest. You can’t edit the plan, add ideas, or change stays until you join.
+            </p>
+            <Button
+              size="sm"
+              onClick={handleJoinTrip}
+              disabled={joining}
+              className="shrink-0 bg-amber-700 hover:bg-amber-800 text-white dark:bg-amber-600 dark:hover:bg-amber-700"
+            >
+              {joining ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Joining…
+                </>
+              ) : (
+                'Join this trip'
+              )}
+            </Button>
+          </div>
+          {joinError && (
+            <p className="max-w-7xl mx-auto px-4 sm:px-6 pb-2.5 text-xs text-destructive">
+              {joinError}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="border-b border-border bg-warm-white/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
           <div className="min-w-0">
@@ -133,23 +164,6 @@ export function TripPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {user && isMember === false && (
-              <Button
-                size="sm"
-                onClick={handleJoinTrip}
-                disabled={joining}
-                className="max-sm:min-h-[40px]"
-              >
-                {joining ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    Joining…
-                  </>
-                ) : (
-                  'Join this trip'
-                )}
-              </Button>
-            )}
             <Button
               size="sm"
               variant="outline"
@@ -168,19 +182,16 @@ export function TripPage() {
             </button>
           </div>
         </div>
-        {joinError && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3 text-xs text-destructive">
-            {joinError}
-          </div>
-        )}
-        {user && isMember === false && !joinError && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3 text-xs text-muted-foreground">
-            You’re viewing this trip from an invite link. Click <span className="font-medium">Join this trip</span> above to add it to your trips and start planning together.
-          </div>
-        )}
       </div>
       <main className="pt-8 pb-10 px-6 sm:px-8 lg:px-10 max-w-[1600px] mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8 max-sm:px-4">
-        <PlanningBoard trip={trip} days={days} currentName={displayName ?? ''} getToken={getIdToken} />
+        <PlanningBoard
+          trip={trip}
+          days={days}
+          currentName={displayName ?? ''}
+          getToken={getIdToken}
+          isMember={isMember ?? false}
+          isOwner={isOwner}
+        />
       </main>
 
       <StaysDrawer
@@ -192,6 +203,7 @@ export function TripPage() {
         onAdd={addStay}
         onUpdate={updateStay}
         onDelete={deleteStay}
+        canEdit={isMember ?? false}
       />
     </div>
   )

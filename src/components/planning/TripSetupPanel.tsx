@@ -17,6 +17,7 @@ interface DaySetup {
 
 interface TripSetupPanelProps {
   trip: Trip
+  canEdit?: boolean
 }
 
 const DEFAULT_SLOTS = [
@@ -25,7 +26,7 @@ const DEFAULT_SLOTS = [
   { time_label: 'Evening', category: 'food', sort_order: 2 },
 ] as const
 
-export function TripSetupPanel({ trip }: TripSetupPanelProps) {
+export function TripSetupPanel({ trip, canEdit = true }: TripSetupPanelProps) {
   // Build one setup row per date in the trip's range
   const initialDays = useMemo<DaySetup[]>(() => {
     if (!trip.start_date || !trip.end_date) return []
@@ -136,12 +137,21 @@ export function TripSetupPanel({ trip }: TripSetupPanelProps) {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-lg mx-auto px-4 sm:px-6 py-12"
     >
+      {!canEdit && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3">
+          <p className="text-sm text-amber-900 dark:text-amber-100">
+            Only trip members can set up days. Join this trip to add the itinerary.
+          </p>
+        </div>
+      )}
       <div className="mb-8">
         <h2 className="text-2xl font-serif font-semibold text-foreground mb-1">
           Set up your days
         </h2>
         <p className="text-sm text-muted-foreground">
-          Assign a city to each day. You can always rearrange later.
+          {canEdit
+            ? 'Assign a city to each day. You can always rearrange later.'
+            : 'Days have not been set up yet.'}
         </p>
       </div>
 
@@ -158,8 +168,9 @@ export function TripSetupPanel({ trip }: TripSetupPanelProps) {
                 <button
                   key={dest}
                   type="button"
-                  onClick={() => setDayCity(i, dest)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                  onClick={() => canEdit && setDayCity(i, dest)}
+                  disabled={!canEdit}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all disabled:opacity-60 disabled:pointer-events-none ${
                     day.city === dest
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background text-foreground border-border hover:border-primary/40'
@@ -170,8 +181,9 @@ export function TripSetupPanel({ trip }: TripSetupPanelProps) {
               ))}
               <button
                 type="button"
-                onClick={() => setDayCity(i, '__custom__')}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                onClick={() => canEdit && setDayCity(i, '__custom__')}
+                disabled={!canEdit}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all disabled:opacity-60 disabled:pointer-events-none ${
                   day.city === '__custom__'
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
@@ -188,6 +200,7 @@ export function TripSetupPanel({ trip }: TripSetupPanelProps) {
                 value={day.customCity}
                 onChange={(e) => setDayCustomCity(i, e.target.value)}
                 autoFocus
+                disabled={!canEdit}
               />
             )}
           </div>
@@ -196,21 +209,23 @@ export function TripSetupPanel({ trip }: TripSetupPanelProps) {
 
       {error && <p className="text-sm text-destructive mt-4">{error}</p>}
 
-      <Button
-        className="w-full mt-6"
-        size="lg"
-        onClick={handleCreate}
-        disabled={loading}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Creating days…
-          </>
-        ) : (
-          `Create ${days.length} day${days.length !== 1 ? 's' : ''} →`
-        )}
-      </Button>
+      {canEdit && (
+        <Button
+          className="w-full mt-6"
+          size="lg"
+          onClick={handleCreate}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Creating days…
+            </>
+          ) : (
+            `Create ${days.length} day${days.length !== 1 ? 's' : ''} →`
+          )}
+        </Button>
+      )}
     </motion.div>
   )
 }
