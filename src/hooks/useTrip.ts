@@ -46,9 +46,6 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
         const selectedId = docSnap.id
         const selectedData = docSnap.data()
 
-        const ownerUid = selectedData?.owner_uid
-        const memberUids = selectedData?.member_uids
-
         const tripData = { id: selectedId, ...selectedData } as Trip
         setTrip(tripData)
 
