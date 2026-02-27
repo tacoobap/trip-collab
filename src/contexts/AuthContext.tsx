@@ -10,6 +10,8 @@ import {
   type User,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -34,7 +36,11 @@ interface AuthContextValue {
   setAuthError: (message: string) => void
   getSignInMethodsForEmail: (email: string) => Promise<string[]>
   linkEmailPasswordToCurrentUser: (email: string, password: string) => Promise<void>
+  /** Redirects to Google sign-in; after return we link the password (for Add password flow). */
+  signInWithGoogleRedirectToAddPassword: (email: string, password: string) => void
 }
+
+const ADD_PASSWORD_STORAGE_KEY = 'trip-collab-add-password'
 
 function getAuthErrorMessage(err: unknown): string {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -76,6 +82,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!result?.user) return
+        const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(ADD_PASSWORD_STORAGE_KEY) : null
+        if (!raw) return
+        try {
+          const { email, password } = JSON.parse(raw) as { email: string; password: string }
+          await linkWithCredential(result.user, EmailAuthProvider.credential(email.trim(), password))
+        } catch (err) {
+          const message =
+            err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'auth/weak-password'
+              ? 'Please choose a password with at least 6 characters.'
+              : err instanceof Error ? err.message : 'Add password failed. Please try again.'
+          setAuthError(message)
+        }
+        sessionStorage.removeItem(ADD_PASSWORD_STORAGE_KEY)
+      })
+      .catch(() => {})
+
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u)
       if (u) {
@@ -159,6 +184,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const signInWithGoogleRedirectToAddPassword = useCallback((email: string, password: string) => {
+    setAuthError(null)
+    try {
+      sessionStorage.setItem(ADD_PASSWORD_STORAGE_KEY, JSON.stringify({ email: email.trim(), password }))
+      // #region agent log
+      fetch('http://127.0.0.1:7610/ingest/f2b541e2-014a-40b9-bc7b-f2c09dbf8f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'97004e'},body:JSON.stringify({sessionId:'97004e',location:'AuthContext.tsx:signInWithGoogleRedirectToAddPassword',message:'Storage set, calling redirect',data:{email:email.trim()},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      signInWithRedirect(auth, new GoogleAuthProvider())
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Could not start sign-in.')
+    }
+  }, [])
+
   const value: AuthContextValue = {
     user,
     loading,
@@ -172,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthError: setAuthErrorMessage,
     getSignInMethodsForEmail,
     linkEmailPasswordToCurrentUser,
+    signInWithGoogleRedirectToAddPassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

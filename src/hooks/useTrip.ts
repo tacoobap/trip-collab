@@ -33,11 +33,20 @@ export function useTrip(slug: string | undefined) {
         setTrip(tripData)
 
         // Subscribe to trip doc so updates (e.g. vibe_heading, vibe_tags) flow to UI
-        unsubTrip = onSnapshot(doc(db, 'trips', tripDoc.id), (snap) => {
-          if (cancelled) return
-          const next = { id: snap.id, ...snap.data() } as Trip
-          setTrip(next)
-        })
+        unsubTrip = onSnapshot(
+          doc(db, 'trips', tripDoc.id),
+          (snap) => {
+            if (cancelled) return
+            const next = { id: snap.id, ...snap.data() } as Trip
+            setTrip(next)
+          },
+          (err) => {
+            if (cancelled) return
+            console.error('useTrip trip snapshot error:', err)
+            setError(err?.code === 'permission-denied' ? "You don't have access to this trip." : 'Failed to load trip.')
+            setLoading(false)
+          }
+        )
 
         // Mutable maps shared by all snapshot callbacks in this effect invocation
         const liveSlots = new Map<string, Slot>()

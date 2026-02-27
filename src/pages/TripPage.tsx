@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { formatTripDate } from '@/lib/utils'
+import { firebaseProjectId } from '@/lib/firebase'
 import { Loader2, BedDouble } from 'lucide-react'
 
 export function TripPage() {
@@ -35,9 +36,14 @@ export function TripPage() {
             {error || 'Trip not found'}
           </p>
           {user && (
-            <p className="text-xs text-muted-foreground mb-4 font-mono break-all max-w-md mx-auto">
-              Signed-in UID: {user.uid}
-            </p>
+            <>
+              <p className="text-xs text-muted-foreground mb-1 font-mono break-all max-w-md mx-auto">
+                Signed-in UID: {user.uid}
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                App project: {firebaseProjectId} — in Firebase Console confirm this matches your project and that Firestore rules are deployed.
+              </p>
+            </>
           )}
           {!user && (
             <p className="text-sm text-muted-foreground mb-4">

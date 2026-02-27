@@ -18,6 +18,7 @@ export const firebaseReady = Boolean(
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+export const firebaseProjectId = firebaseConfig.projectId
 
 // App Check: optional; enable in Firebase Console and set VITE_APP_CHECK_RECAPTCHA_SITE_KEY
 const appCheckSiteKey = import.meta.env.VITE_APP_CHECK_RECAPTCHA_SITE_KEY as
