@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react'
-import { updateDoc, doc, addDoc, collection } from 'firebase/firestore'
+import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { addSlot } from '@/services/planningService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
 import { CityTag } from '@/components/shared/CityTag'
-import { Camera, Loader2, Plus, Check, X, Upload, Sparkles } from 'lucide-react'
+import { Camera, Loader2, Plus, Check, X, Upload, Sparkles, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseTimeToMinutes, formatTimeLabel } from '@/lib/timeUtils'
 
@@ -18,9 +19,10 @@ interface DayColumnProps {
   onSlotClick: (slot: SlotWithProposals, dayLabel: string) => void
   getToken?: () => Promise<string | null>
   canEdit?: boolean
+  onEditDay?: (day: DayWithSlots) => void
 }
 
-export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick, getToken, canEdit = true }: DayColumnProps) {
+export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick, getToken, canEdit = true, onEditDay }: DayColumnProps) {
   const getDisplayTime = (slot: SlotWithProposals) => {
     const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
     return locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
@@ -112,14 +114,10 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
     setAddSlotError(null)
     setSavingSlot(true)
     try {
-      await addDoc(collection(db, 'slots'), {
+      await addSlot({
         day_id: day.id,
         trip_id: tripId,
         time_label: formatted,
-        category: 'activity',
-        icon: null,
-        status: 'open',
-        locked_proposal_id: null,
         sort_order: day.slots.length,
       })
       setNewLabel('')
@@ -168,9 +166,22 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
 
       <div className="pb-4 mb-4 border-b border-border">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-serif font-semibold text-base text-foreground leading-tight">
-            Day {day.day_number}
-          </h3>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="font-serif font-semibold text-base text-foreground leading-tight shrink-0">
+              Day {day.day_number}
+            </h3>
+            {onEditDay && (
+              <button
+                type="button"
+                onClick={() => onEditDay(day)}
+                className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-manipulation p-0.5 rounded"
+                title="Edit day"
+                aria-label="Edit day"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-1.5">
             {day.city && (
               <CityTag city={day.city} className="bg-muted/80 text-muted-foreground border-border" />

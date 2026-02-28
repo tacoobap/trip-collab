@@ -1,7 +1,19 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, query, where, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore'
 import { db, auth } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
+import { getTripBySlug } from '@/services/tripService'
+
+/** Firestore 'in' queries support at most 10 values. */
+const IN_QUERY_MAX = 10
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size))
+  }
+  return out
+}
 
 export function useTrip(slug: string | undefined, currentUid?: string | null) {
   const [trip, setTrip] = useState<Trip | null>(null)
@@ -31,30 +43,30 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     setError('')
     setLoading(true)
 
-    const tripsCol = collection(db, 'trips')
-    getDocs(query(tripsCol, where('slug', '==', slug)))
-      .then((snap) => {
+    getTripBySlug(slug)
+      .then((result) => {
         if (cancelled) return
 
-        if (snap.empty) {
+        if (result === null) {
           setError('Trip not found.')
           setLoading(false)
           return
         }
 
-        const docSnap = snap.docs[0]
-        const selectedId = docSnap.id
-        const selectedData = docSnap.data()
-
-        const tripData = { id: selectedId, ...selectedData } as Trip
+        const { id: selectedId, trip: tripData } = result
         setTrip(tripData)
 
-        // Subscribe to trip doc so updates (e.g. vibe_heading, vibe_tags) flow to UI
+        // Subscribe to trip doc so updates (e.g. destinations, dates) flow to UI
         unsubTrip = onSnapshot(
           doc(db, 'trips', selectedId),
           (snap) => {
             if (cancelled) return
-            const next = { id: snap.id, ...snap.data() } as Trip
+            const data = snap.data()
+            const next: Trip = {
+              id: snap.id,
+              ...data,
+              destinations: Array.isArray(data?.destinations) ? data.destinations : [],
+            } as Trip
             setTrip(next)
           },
           (err) => {
@@ -145,52 +157,64 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
               return
             }
 
-            unsubSlots = onSnapshot(
-              query(collection(db, 'slots'), where('day_id', 'in', dayIds)),
-              (slotsSnap) => {
-                if (cancelled) return
-                liveSlots.clear()
-                slotsSnap.docs.forEach((d) => {
-                  const slot = { id: d.id, ...d.data() } as Slot
-                  liveSlots.set(d.id, slot)
-                })
-                const newSlotIds = [...liveSlots.keys()].sort()
-                const slotIdsChanged =
-                  JSON.stringify(newSlotIds) !== JSON.stringify(currentSlotIds)
-                currentSlotIds = newSlotIds
-                if (!slotIdsChanged) {
-                  // Slot statuses changed (e.g. a slot was locked) — rebuild immediately
-                  rebuild()
-                  return
-                }
+            const dayChunks = chunk(dayIds, IN_QUERY_MAX)
+            const slotDocsByChunk: (Slot[] | null)[] = dayChunks.map(() => null)
+            const unsubChunks: (() => void)[] = []
 
-                // Slot structure changed — re-subscribe to proposals
-                unsubProposals?.()
-                unsubProposals = null
-
-                if (newSlotIds.length === 0) {
-                  rebuild()
-                  return
-                }
-
-                unsubProposals = onSnapshot(
-                  query(
-                    collection(db, 'proposals'),
-                    where('trip_id', '==', selectedId)
-                  ),
-                  (propsSnap) => {
-                    if (cancelled) return
-                    liveProposals.clear()
-                    propsSnap.docs.forEach((d) =>
-                      liveProposals.set(d.id, { id: d.id, ...d.data() } as Proposal)
-                    )
-
-                    rebuild()
-                    void ensureLegacyLockedProposals()
-                  }
-                )
+            const onSlotsMerged = () => {
+              if (cancelled) return
+              liveSlots.clear()
+              for (const docs of slotDocsByChunk) {
+                if (docs) for (const s of docs) liveSlots.set(s.id, s)
               }
-            )
+              const newSlotIds = [...liveSlots.keys()].sort()
+              const slotIdsChanged =
+                JSON.stringify(newSlotIds) !== JSON.stringify(currentSlotIds)
+              currentSlotIds = newSlotIds
+              if (!slotIdsChanged) {
+                rebuild()
+                return
+              }
+              unsubProposals?.()
+              unsubProposals = null
+              if (newSlotIds.length === 0) {
+                rebuild()
+                return
+              }
+              unsubProposals = onSnapshot(
+                query(
+                  collection(db, 'proposals'),
+                  where('trip_id', '==', selectedId)
+                ),
+                (propsSnap) => {
+                  if (cancelled) return
+                  liveProposals.clear()
+                  propsSnap.docs.forEach((d) =>
+                    liveProposals.set(d.id, { id: d.id, ...d.data() } as Proposal)
+                  )
+                  rebuild()
+                  void ensureLegacyLockedProposals()
+                }
+              )
+            }
+
+            for (let i = 0; i < dayChunks.length; i++) {
+              const chunkIds = dayChunks[i]
+              const unsub = onSnapshot(
+                query(collection(db, 'slots'), where('day_id', 'in', chunkIds)),
+                (snap) => {
+                  if (cancelled) return
+                  slotDocsByChunk[i] = snap.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                  } as Slot))
+                  onSlotsMerged()
+                }
+              )
+              unsubChunks.push(unsub)
+            }
+
+            unsubSlots = () => unsubChunks.forEach((u) => u())
           }
         )
       })

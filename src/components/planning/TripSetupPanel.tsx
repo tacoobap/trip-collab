@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
-import { collection, writeBatch, doc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import { motion } from 'framer-motion'
-import { Loader2, CalendarDays } from 'lucide-react'
+import { createDaysWithDefaultSlots } from '@/services/planningService'
+import { Loader2, CalendarDays, Plus, Pencil } from 'lucide-react'
+import { AddDayDialog } from './AddDayDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Trip } from '@/types/database'
@@ -18,15 +18,10 @@ interface DaySetup {
 interface TripSetupPanelProps {
   trip: Trip
   canEdit?: boolean
+  onOpenEditTrip?: () => void
 }
 
-const DEFAULT_SLOTS = [
-  { time_label: 'Morning', category: 'activity', sort_order: 0 },
-  { time_label: 'Afternoon', category: 'activity', sort_order: 1 },
-  { time_label: 'Evening', category: 'food', sort_order: 2 },
-] as const
-
-export function TripSetupPanel({ trip, canEdit = true }: TripSetupPanelProps) {
+export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSetupPanelProps) {
   // Build one setup row per date in the trip's range
   const initialDays = useMemo<DaySetup[]>(() => {
     if (!trip.start_date || !trip.end_date) return []
@@ -79,55 +74,65 @@ export function TripSetupPanel({ trip, canEdit = true }: TripSetupPanelProps) {
     setError('')
 
     try {
-      const batch = writeBatch(db)
-
-      for (const day of resolved) {
-        const dayRef = doc(collection(db, 'days'))
-        batch.set(dayRef, {
-          trip_id: trip.id,
-          city: day.effectiveCity,
-          label: `Day ${day.dayNumber} · ${day.effectiveCity}`,
-          day_number: day.dayNumber,
-          date: day.date,
-        })
-
-        for (const slot of DEFAULT_SLOTS) {
-          const slotRef = doc(collection(db, 'slots'))
-          batch.set(slotRef, {
-            day_id: dayRef.id,
-            trip_id: trip.id,
-            time_label: slot.time_label,
-            category: slot.category,
-            status: 'open',
-            locked_proposal_id: null,
-            sort_order: slot.sort_order,
-          })
-        }
-      }
-
-      await batch.commit()
+      await createDaysWithDefaultSlots(
+        trip.id,
+        resolved.map((d) => ({
+          date: d.date,
+          dayNumber: d.dayNumber,
+          city: d.effectiveCity,
+        }))
+      )
       // useTrip's onSnapshot will pick up the new days automatically
     } catch (err) {
       console.error(err)
       setError('Something went wrong. Please try again.')
+    } finally {
       setLoading(false)
     }
   }
 
-  // No date range set — fall back to a simple prompt
+  const [addDayOpen, setAddDayOpen] = useState(false)
+
+  // No date range set — offer to add a day or edit trip
   if (!hasDates) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-muted mb-4">
-          <CalendarDays className="w-7 h-7 text-muted-foreground" />
+      <>
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-muted mb-4">
+            <CalendarDays className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-serif font-semibold text-foreground mb-2">
+            No days yet
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-xs mb-6">
+            Add a date range in trip settings, or add your first day below.
+          </p>
+          {canEdit && (
+            <div className="flex flex-col sm:flex-row gap-3">
+              {onOpenEditTrip && (
+                <Button
+                  variant="outline"
+                  onClick={onOpenEditTrip}
+                  className="gap-2"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit trip (dates & name)
+                </Button>
+              )}
+              <Button onClick={() => setAddDayOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add first day
+              </Button>
+            </div>
+          )}
         </div>
-        <h2 className="text-lg font-serif font-semibold text-foreground mb-2">
-          No days yet
-        </h2>
-        <p className="text-sm text-muted-foreground max-w-xs">
-          This trip doesn't have dates set. Edit the trip to add a date range, then come back here to set up the days.
-        </p>
-      </div>
+        <AddDayDialog
+          open={addDayOpen}
+          onOpenChange={setAddDayOpen}
+          trip={trip}
+          existingDays={[]}
+        />
+      </>
     )
   }
 

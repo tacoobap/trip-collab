@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useAuth } from '@/contexts/AuthContext'
-import { NamePrompt } from './NamePrompt'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useTrip } from '@/hooks/useTrip'
 import { useCollectionItems } from '@/hooks/useCollectionItems'
@@ -61,8 +60,8 @@ function groupByDestination(
 
 export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { user, getIdToken } = useAuth()
-  const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
+  const { user, loading: authLoading, getIdToken } = useAuth()
+  const { displayName } = useDisplayName()
   const { trip, days, loading: tripLoading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { items, loading: itemsLoading } = useCollectionItems(trip?.id)
   const [addOpen, setAddOpen] = useState(false)
@@ -138,7 +137,7 @@ export function CollectionPage() {
     await deleteDoc(doc(db, 'collection_items', itemId))
   }
 
-  if (tripLoading) {
+  if (authLoading || tripLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -171,8 +170,30 @@ export function CollectionPage() {
     )
   }
 
-  if (!displayName && !isSignedIn) {
-    return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+        <div>
+          <p className="text-lg font-serif font-semibold text-foreground mb-2">
+            Sign in to view this trip
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            You need to be signed in to access the collection.
+          </p>
+          <div className="flex flex-col gap-2">
+            <a
+              href={slug ? `/sign-in?from=/trip/${slug}/collection` : '/sign-in'}
+              className="text-sm text-primary hover:underline"
+            >
+              Sign in with Google
+            </a>
+            <a href="/" className="text-sm text-primary hover:underline">
+              ← Back to home
+            </a>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const destinationOrder = trip.destinations?.length ? trip.destinations : []
@@ -181,7 +202,7 @@ export function CollectionPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader trip={trip} currentName={displayName ?? ''} onChangeName={clearName} />
+      <PageHeader trip={trip} currentName={displayName ?? ''} />
 
       {/* Hero */}
       <div className="border-b border-border bg-gradient-to-br from-muted/30 to-background">

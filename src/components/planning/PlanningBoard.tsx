@@ -3,6 +3,7 @@ import type { Trip, DayWithSlots, SlotWithProposals } from '@/types/database'
 import { DayColumn } from './DayColumn'
 import { ProposalDrawer } from './ProposalDrawer'
 import { TripSetupPanel } from './TripSetupPanel'
+import { EditDayModal } from './EditDayModal'
 import { cn } from '@/lib/utils'
 
 interface PlanningBoardProps {
@@ -12,13 +13,15 @@ interface PlanningBoardProps {
   getToken?: () => Promise<string | null>
   isMember: boolean
   isOwner: boolean
+  onOpenEditTrip?: () => void
 }
 
 const VISIBLE_PILLS_HINT_THRESHOLD = 5
 
-export function PlanningBoard({ trip, days, currentName, getToken, isMember, isOwner }: PlanningBoardProps) {
+export function PlanningBoard({ trip, days, currentName, getToken, isMember, isOwner, onOpenEditTrip }: PlanningBoardProps) {
   const [activeSlot, setActiveSlot] = useState<SlotWithProposals | null>(null)
   const [activeDayLabel, setActiveDayLabel] = useState('')
+  const [activeEditDay, setActiveEditDay] = useState<DayWithSlots | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const columnRefs = useRef<(HTMLDivElement | null)[]>([])
   const [activeDayIndex, setActiveDayIndex] = useState(0)
@@ -91,7 +94,13 @@ export function PlanningBoard({ trip, days, currentName, getToken, isMember, isO
   }
 
   if (days.length === 0) {
-    return <TripSetupPanel trip={trip} canEdit={isMember} />
+    return (
+      <TripSetupPanel
+        trip={trip}
+        canEdit={isMember}
+        onOpenEditTrip={onOpenEditTrip}
+      />
+    )
   }
 
   return (
@@ -165,6 +174,7 @@ export function PlanningBoard({ trip, days, currentName, getToken, isMember, isO
                 onSlotClick={handleSlotClick}
                 getToken={getToken}
                 canEdit={isMember}
+                onEditDay={isMember ? (d) => setActiveEditDay(d) : undefined}
               />
             </div>
           ))}
@@ -182,6 +192,13 @@ export function PlanningBoard({ trip, days, currentName, getToken, isMember, isO
         onUpdate={() => {}}
         canEdit={isMember}
         canDeleteSlot={isOwner}
+      />
+
+      <EditDayModal
+        open={!!activeEditDay}
+        onOpenChange={(open) => !open && setActiveEditDay(null)}
+        day={activeEditDay}
+        trip={trip}
       />
     </>
   )

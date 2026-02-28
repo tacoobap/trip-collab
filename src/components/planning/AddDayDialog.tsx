@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { collection, addDoc, writeBatch, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -34,12 +34,28 @@ interface AddDayDialogProps {
 
 export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayDialogProps) {
   const [selectedDate, setSelectedDate] = useState('')
-  const [city, setCity] = useState(trip.destinations[0] ?? '')
+  const [city, setCity] = useState('')
   const [customCity, setCustomCity] = useState('')
   const [presets, setPresets] = useState<SlotPreset[]>(DEFAULT_PRESETS)
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Existing cities = trip destinations + cities already used on days (unique)
+  const existingCityOptions = useMemo(() => {
+    const fromTrip = trip.destinations ?? []
+    const fromDays = existingDays.map((d) => d.city).filter(Boolean)
+    return [...new Set([...fromTrip, ...fromDays])].sort((a, b) => a.localeCompare(b))
+  }, [trip.destinations, existingDays])
+
+  // When dialog opens, set initial city from trip/days or "Other" for custom
+  useEffect(() => {
+    if (open) {
+      const first = existingCityOptions[0]
+      setCity(first ?? '__custom__')
+      setCustomCity('')
+    }
+  }, [open, existingCityOptions])
 
   // Build the full date range from the trip's start/end dates
   const dateRange = useMemo<DateOption[]>(() => {
@@ -94,7 +110,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
 
   const handleClose = () => {
     setSelectedDate('')
-    setCity(trip.destinations[0] ?? '')
+    setCity(existingCityOptions[0] ?? '')
     setCustomCity('')
     setPresets(DEFAULT_PRESETS)
     setOpenPickerIndex(null)
@@ -187,58 +203,47 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
               </div>
             )}
 
-            {/* City selector */}
+            {/* City: pick from trip / existing days or add a new one */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 City <span className="text-destructive">*</span>
               </label>
 
-              {trip.destinations.length > 0 ? (
-                <>
-                  <div className="flex flex-wrap gap-2">
-                    {trip.destinations.map((dest) => (
-                      <button
-                        key={dest}
-                        type="button"
-                        onClick={() => setCity(dest)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                          city === dest
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background text-foreground border-border hover:border-primary/40'
-                        }`}
-                      >
-                        {dest}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setCity('__custom__')}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                        city === '__custom__'
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
-                      }`}
-                    >
-                      Other
-                    </button>
-                  </div>
+              <div className="flex flex-wrap gap-2">
+                {existingCityOptions.map((dest) => (
+                  <button
+                    key={dest}
+                    type="button"
+                    onClick={() => setCity(dest)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                      city === dest
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background text-foreground border-border hover:border-primary/40'
+                    }`}
+                  >
+                    {dest}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCity('__custom__')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                    city === '__custom__'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
+                  }`}
+                >
+                  {existingCityOptions.length > 0 ? 'Other' : 'Add city'}
+                </button>
+              </div>
 
-                  {city === '__custom__' && (
-                    <Input
-                      className="mt-2"
-                      placeholder="City name"
-                      value={customCity}
-                      onChange={(e) => setCustomCity(e.target.value)}
-                      autoFocus
-                    />
-                  )}
-                </>
-              ) : (
+              {city === '__custom__' && (
                 <Input
-                  placeholder="e.g. Paris"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  autoFocus={!hasDates}
+                  className="mt-2"
+                  placeholder={existingCityOptions.length > 0 ? 'City name' : 'e.g. Rome, Paris'}
+                  value={customCity}
+                  onChange={(e) => setCustomCity(e.target.value)}
+                  autoFocus
                 />
               )}
             </div>

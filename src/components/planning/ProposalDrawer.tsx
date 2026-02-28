@@ -2,17 +2,18 @@ import { useState } from 'react'
 import { X, LockOpen, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-  query,
-  where,
-  doc,
-  serverTimestamp,
-} from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+  addProposal,
+  updateProposal,
+  updateProposalExactTime,
+  updateSlotTimeLabel,
+  updateSlotIcon,
+  setProposalVotes,
+  lockSlot,
+  unlockSlot,
+  setSlotProposed,
+  deleteProposal,
+  deleteSlot,
+} from '@/services/planningService'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import type { Trip } from '@/types/database'
 import { SlotIconPicker, CATEGORY_ICONS } from './SlotIconPicker'
@@ -60,9 +61,9 @@ function InlineSlotLabel({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
     setSaving(true)
     try {
       if (lockedProposal) {
-        await updateDoc(doc(db, 'proposals', lockedProposal.id), { exact_time: formatted })
+        await updateProposalExactTime(lockedProposal.id, formatted)
       } else {
-        await updateDoc(doc(db, 'slots', slot.id), { time_label: formatted })
+        await updateSlotTimeLabel(slot.id, formatted)
       }
     } finally {
       setSaving(false)
@@ -150,7 +151,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
 
   const handleIconSelect = async (emoji: string) => {
     if (!slot) return
-    await updateDoc(doc(db, 'slots', slot.id), { icon: emoji })
+    await updateSlotIcon(slot.id, emoji)
   }
 
   const handleQuickLabel = async (label: string) => {
@@ -159,10 +160,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
       ? slot.proposals.find((p) => p.id === slot.locked_proposal_id)
       : null
     if (lockedProposal) {
-      await updateDoc(doc(db, 'proposals', lockedProposal.id), { exact_time: label })
+      await updateProposalExactTime(lockedProposal.id, label)
     } else {
       if (label === slot.time_label) return
-      await updateDoc(doc(db, 'slots', slot.id), { time_label: label })
+      await updateSlotTimeLabel(slot.id, label)
     }
   }
 
@@ -171,19 +172,17 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const isLocked = slot.status === 'locked'
 
   const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
-    await addDoc(collection(db, 'proposals'), {
+    await addProposal({
       slot_id: slot.id,
       trip_id: trip.id,
       proposer_name: currentName,
       title: data.title,
       note: data.note ?? null,
       url: data.url ?? null,
-      votes: [],
-      created_at: serverTimestamp(),
     })
 
     if (slot.status === 'open') {
-      await updateDoc(doc(db, 'slots', slot.id), { status: 'proposed' })
+      await setSlotProposed(slot.id)
     }
 
     setShowAddForm(false)
@@ -207,17 +206,14 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
     const newVotes = hasVoted
       ? proposal.votes.filter((v) => v !== currentName)
       : [...proposal.votes, currentName]
-    await updateDoc(doc(db, 'proposals', proposalId), { votes: newVotes })
+    await setProposalVotes(proposalId, newVotes)
     onUpdate()
   }
 
   const handleUnlock = async () => {
     setUnlockLoading(true)
     try {
-      await updateDoc(doc(db, 'slots', slot.id), {
-        status: 'proposed',
-        locked_proposal_id: null,
-      })
+      await unlockSlot(slot.id)
     } finally {
       setUnlockLoading(false)
     }
@@ -225,13 +221,12 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
 
   const handleDeleteProposal = async (proposalId: string) => {
     if (!slot) return
-    await deleteDoc(doc(db, 'proposals', proposalId))
     const remaining = slot.proposals.filter((p) => p.id !== proposalId)
-    if (remaining.length === 0) {
-      await updateDoc(doc(db, 'slots', slot.id), { status: 'open', locked_proposal_id: null })
-    } else if (slot.locked_proposal_id === proposalId) {
-      await updateDoc(doc(db, 'slots', slot.id), { status: 'proposed', locked_proposal_id: null })
-    }
+    await deleteProposal(proposalId, {
+      slotId: slot.id,
+      remainingProposalCount: remaining.length,
+      lockedProposalId: slot.locked_proposal_id,
+    })
     onUpdate()
   }
 
@@ -239,9 +234,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
     if (!slot) return
     setDeletingSlot(true)
     try {
-      const proposalsSnap = await getDocs(query(collection(db, 'proposals'), where('slot_id', '==', slot.id)))
-      await Promise.all(proposalsSnap.docs.map((d) => deleteDoc(d.ref)))
-      await deleteDoc(doc(db, 'slots', slot.id))
+      await deleteSlot(slot.id)
       onClose()
       onSlotDeleted?.()
     } finally {
@@ -253,7 +246,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
     proposalId: string,
     data: { title: string; note: string | null; url: string | null }
   ) => {
-    await updateDoc(doc(db, 'proposals', proposalId), {
+    await updateProposal(proposalId, {
       title: data.title,
       note: data.note,
       url: data.url,
@@ -264,10 +257,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const handleLock = async (proposalId: string) => {
     setLockLoading(true)
     try {
-      await updateDoc(doc(db, 'slots', slot.id), {
-        status: 'locked',
-        locked_proposal_id: proposalId,
-      })
+      await lockSlot(slot.id, proposalId)
       onUpdate()
       onClose()
     } finally {

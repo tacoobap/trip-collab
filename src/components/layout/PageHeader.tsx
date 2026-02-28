@@ -1,13 +1,12 @@
-import { Sparkles, ChevronDown } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import type { Trip } from '@/types/database'
-import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import { cn } from '@/lib/utils'
+import { UserMenu } from '@/components/layout/UserMenu'
 
 interface PageHeaderProps {
   trip: Trip
   currentName?: string | null
-  onChangeName?: () => void
   /** When true (e.g. itinerary over full-screen hero), use dark transparent overlay; otherwise light bar */
   overHero?: boolean
 }
@@ -15,7 +14,6 @@ interface PageHeaderProps {
 export function PageHeader({
   trip,
   currentName,
-  onChangeName,
   overHero = false,
 }: PageHeaderProps) {
   const location = useLocation()
@@ -25,7 +23,6 @@ export function PageHeader({
   const isDark = overHero
   const linkActive = isDark ? 'text-white bg-white/15' : 'border-primary text-foreground'
   const linkInactive = isDark ? 'text-white/70 hover:text-white' : 'border-transparent text-muted-foreground hover:text-foreground'
-  const nameBtn = isDark ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
 
   return (
     <header
@@ -83,29 +80,8 @@ export function PageHeader({
           </Link>
         </nav>
 
-        {/* Right: single avatar (you); chevron goes to "Who are you?" page */}
-        <div className="flex items-center shrink-0 max-sm:min-h-[44px] max-sm:items-center">
-          {currentName && (
-            onChangeName ? (
-              <button
-                onClick={onChangeName}
-                className={cn(
-                  'flex items-center gap-1.5 transition-colors group touch-manipulation max-sm:p-2 max-sm:-m-2 rounded-md',
-                  nameBtn
-                )}
-                title="Change person"
-                aria-label="Change who you are"
-              >
-                <ProposerAvatar name={currentName} size="sm" />
-                <ChevronDown className={cn('w-3 h-3 opacity-50 group-hover:opacity-100', isDark ? 'text-white' : '')} />
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <ProposerAvatar name={currentName} size="sm" />
-              </div>
-            )
-          )}
-        </div>
+        {/* Right: user avatar + dropdown menu */}
+        {currentName && <UserMenu isDark={isDark} />}
       </div>
     </header>
   )

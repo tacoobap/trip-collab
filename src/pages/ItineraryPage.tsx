@@ -10,7 +10,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { NamePrompt } from '@/pages/NamePrompt'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
@@ -22,9 +21,9 @@ import { formatTripDate } from '@/lib/utils'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { user, getIdToken } = useAuth()
+  const { user, loading: authLoading, getIdToken } = useAuth()
   const { trip, days, loading, error, isMember } = useTrip(slug, user?.uid)
-  const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
+  const { displayName } = useDisplayName()
   const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
@@ -245,7 +244,7 @@ export function ItineraryPage() {
     setUpdateTextModalOpen(true)
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -273,8 +272,30 @@ export function ItineraryPage() {
     )
   }
 
-  if (!displayName && !isSignedIn) {
-    return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+        <div>
+          <p className="text-lg font-serif font-semibold text-foreground mb-2">
+            Sign in to view this trip
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            You need to be signed in to view the itinerary.
+          </p>
+          <div className="flex flex-col gap-2">
+            <a
+              href={slug ? `/sign-in?from=/trip/${slug}/itinerary` : '/sign-in'}
+              className="text-sm text-primary hover:underline"
+            >
+              Sign in with Google
+            </a>
+            <a href="/" className="text-sm text-primary hover:underline">
+              ← Back to home
+            </a>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric' })
@@ -299,7 +320,6 @@ export function ItineraryPage() {
         <PageHeader
           trip={trip}
           currentName={displayName ?? ''}
-          onChangeName={clearName}
           overHero
         />
       )}
@@ -392,7 +412,6 @@ export function ItineraryPage() {
         <PageHeader
           trip={trip}
           currentName={displayName ?? ''}
-          onChangeName={clearName}
         />
       )}
 

@@ -36,13 +36,15 @@
 
 ### Progress (updated Feb 27, 2026)
 
-- ✅ `src/services/staysService.ts` created and wired into `src/hooks/useStays.ts`.
-- ✅ `src/services/collectionService.ts` created and wired into `src/hooks/useCollectionItems.ts`.
-- ✅ Verified stays and collection flows in dev; fixed `StayInput` import regression and removed temporary debug instrumentation.
+- ✅ **Services:** `tripService` (getTripBySlug, joinTrip, listUserTrips), `staysService`, `collectionService` (subscribe), `planningService` (addSlot, addProposal, updateProposal, updateProposalExactTime, setProposalVotes, updateSlotTimeLabel, updateSlotIcon, lockSlot, unlockSlot, setSlotProposed, deleteProposal, deleteSlot, createDaysWithDefaultSlots).
+- ✅ **Hooks:** `useTrip` uses tripService + chunked slots query (11+ days safe); `useStays` and `useCollectionItems` use their services.
+- ✅ **Components:** DayColumn, ProposalDrawer, TripSetupPanel, StaysDrawer use services; TripPage and LandingPage use tripService.
+- ✅ **useTrip:** Chunked `where('day_id', 'in', dayIds)` (Firestore 10-item limit).
 
-### Next up (short-term)
+### Still to do (short-term)
 
-- Introduce a minimal `tripService` with a `getTripBySlug(slug)` helper and refactor `useTrip` to call it for the initial trip load, keeping the existing subscription wiring as-is for now.
+- **Collection writes:** Move CollectionPage / CollectionItemForm add/update/delete/like for `collection_items` into `collectionService` and use it from the UI.
+- **useTrip (optional):** Extract subscription wiring into `tripSubscription.ts`; keep `useTrip` thin.
 
 ### Overview
 

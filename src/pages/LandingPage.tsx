@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2, LogOut } from 'lucide-react'
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
-import { db, firebaseReady } from '@/lib/firebase'
+import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react'
+import { firebaseReady } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { NewTripDialog } from '@/components/trips/NewTripDialog'
+import { UserMenu } from '@/components/layout/UserMenu'
 import { Button } from '@/components/ui/button'
 import type { Trip } from '@/types/database'
 import { formatTripDate } from '@/lib/utils'
+import { listUserTrips } from '@/services/tripService'
 
 function TripCard({ trip }: { trip: Trip }) {
   const start = formatTripDate(trip.start_date)
@@ -48,19 +49,8 @@ function TripCard({ trip }: { trip: Trip }) {
   )
 }
 
-function mergeTrips(owned: Trip[], shared: Trip[]): Trip[] {
-  const byId = new Map<string, Trip>()
-  for (const t of [...owned, ...shared]) {
-    byId.set(t.id, t)
-  }
-  return [...byId.values()].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
-}
-
 export function LandingPage() {
-  const { user, loading: authLoading, signOut } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [newTripOpen, setNewTripOpen] = useState(false)
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,28 +61,8 @@ export function LandingPage() {
       if (!user) setTrips([])
       return
     }
-    const uid = user.uid
-    Promise.all([
-      getDocs(
-        query(
-          collection(db, 'trips'),
-          where('owner_uid', '==', uid),
-          orderBy('created_at', 'desc')
-        )
-      ),
-      getDocs(
-        query(
-          collection(db, 'trips'),
-          where('member_uids', 'array-contains', uid),
-          orderBy('created_at', 'desc')
-        )
-      ),
-    ])
-      .then(([ownedSnap, sharedSnap]) => {
-        const owned = ownedSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip))
-        const shared = sharedSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip))
-        setTrips(mergeTrips(owned, shared))
-      })
+    listUserTrips(user.uid)
+      .then(setTrips)
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [user])
@@ -125,9 +95,7 @@ export function LandingPage() {
             <Plus className="w-4 h-4 mr-1.5" />
             New trip
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => signOut()} className="max-sm:min-h-[44px]" aria-label="Sign out">
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <UserMenu />
         </div>
       </header>
 

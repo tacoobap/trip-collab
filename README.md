@@ -78,14 +78,16 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 - `src/pages/` — Route-level pages (Landing, Trip, Itinerary, Collection, Seed).
 - `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout.
-- `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useProposerName`.
+- `src/services/` — Data layer: `tripService`, `planningService`, `staysService`, `collectionService`.
+- `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, etc.
 - `src/lib/` — Firebase, utils, time/URL helpers, image upload/search, narrative and suggestion (Gemini).
 - `src/types/database.ts` — Shared Firestore/document types.
 - `netlify/functions/` — Serverless: `search-image` (Unsplash proxy), `generate-narrative` (optional server-side Gemini).
 
 ## Next up (productionizing)
 
-- Introduce a minimal `tripService` with a `getTripBySlug(slug)` helper and refactor `useTrip` to call it for the initial trip load (keeping the existing subscription wiring as-is for now).
+- Move collection add/update/delete/like into `collectionService` and use it from CollectionPage.
+- Then: async UX (toasts, user-facing errors), component decomposition (ItineraryPage, CollectionPage), AI hooks (`useNarrativeGeneration`, `useCollectionSuggestions`), schema docs & migrations, tests. See **Feb 28 Productionizing.md** for the full plan.
 
 ## Deploy
 

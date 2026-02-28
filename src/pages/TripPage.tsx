@@ -3,24 +3,25 @@ import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
 import { StaysDrawer } from '@/components/stays/StaysDrawer'
-import { NamePrompt } from './NamePrompt'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { Button } from '@/components/ui/button'
-import { joinTrip } from '@/lib/trips'
+import { joinTrip } from '@/services/tripService'
 import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
-import { Loader2, BedDouble } from 'lucide-react'
+import { Loader2, BedDouble, Pencil } from 'lucide-react'
+import { EditTripModal } from '@/components/trips/EditTripModal'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { displayName, setName, clearName, namesUsed, isSignedIn } = useDisplayName()
-  const { user, getIdToken } = useAuth()
+  const { displayName } = useDisplayName()
+  const { user, loading: authLoading, getIdToken } = useAuth()
   const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
+  const [editTripOpen, setEditTripOpen] = useState(false)
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -57,7 +58,7 @@ export function TripPage() {
     }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -105,8 +106,30 @@ export function TripPage() {
     )
   }
 
-  if (!displayName && !isSignedIn) {
-    return <NamePrompt onSetName={setName} namesUsed={namesUsed} />
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+        <div>
+          <p className="text-lg font-serif font-semibold text-foreground mb-2">
+            Sign in to view this trip
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            You need to be signed in to access trip plans.
+          </p>
+          <div className="flex flex-col gap-2">
+            <a
+              href={slug ? `/sign-in?from=/trip/${slug}` : '/sign-in'}
+              className="text-sm text-primary hover:underline"
+            >
+              Sign in with Google
+            </a>
+            <a href="/" className="text-sm text-primary hover:underline">
+              ← Back to home
+            </a>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric', year: 'numeric' })
@@ -115,11 +138,7 @@ export function TripPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader
-        trip={trip}
-        currentName={displayName ?? ''}
-        onChangeName={clearName}
-      />
+      <PageHeader trip={trip} currentName={displayName ?? ''} />
       {/* Read-only banner for non-members */}
       {user && isMember === false && (
         <div className="border-b border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30">
@@ -154,9 +173,22 @@ export function TripPage() {
       <div className="border-b border-border bg-warm-white/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
           <div className="min-w-0">
-            <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
-              {trip.name}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
+                {trip.name}
+              </h2>
+              {(isMember ?? false) && (
+                <button
+                  type="button"
+                  onClick={() => setEditTripOpen(true)}
+                  className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  title="Edit trip"
+                  aria-label="Edit trip"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             {dateRange && (
               <p className="text-sm text-muted-foreground mt-0.5">
                 {dateRange}
@@ -164,14 +196,6 @@ export function TripPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCopyInviteLink}
-              className="max-sm:min-h-[40px]"
-            >
-              {copied ? 'Link copied' : 'Invite link'}
-            </Button>
             <button
               onClick={() => setStaysOpen(true)}
               className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
@@ -180,6 +204,14 @@ export function TripPage() {
             >
               <BedDouble className="w-4 h-4" />
             </button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCopyInviteLink}
+              className="max-sm:min-h-[40px]"
+            >
+              {copied ? 'Link copied' : 'Invite link'}
+            </Button>
           </div>
         </div>
       </div>
@@ -191,8 +223,15 @@ export function TripPage() {
           getToken={getIdToken}
           isMember={isMember ?? false}
           isOwner={isOwner}
+          onOpenEditTrip={() => setEditTripOpen(true)}
         />
       </main>
+
+      <EditTripModal
+        open={editTripOpen}
+        onOpenChange={setEditTripOpen}
+        trip={trip}
+      />
 
       <StaysDrawer
         open={staysOpen}

@@ -11,6 +11,7 @@ export function SignInPage() {
   const location = useLocation()
   const {
     user,
+    loading: authLoading,
     signInWithGoogle,
     signInWithEmailPassword,
     signUpWithEmailPassword,
@@ -30,6 +31,15 @@ export function SignInPage() {
   useEffect(() => {
     if (user) navigate(redirectTo, { replace: true })
   }, [user, navigate, redirectTo])
+
+  // Don't show sign-in UI until auth has finished initializing (avoids flash on refresh)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" aria-hidden />
+      </div>
+    )
+  }
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

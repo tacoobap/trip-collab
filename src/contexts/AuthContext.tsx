@@ -70,16 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u)
-      if (u) {
-        try {
-          await syncUserProfile(u)
-        } catch (err) {
-          console.error('Failed to sync user profile', err)
-        }
-      }
       setLoading(false)
+      if (u) {
+        syncUserProfile(u).catch((err) =>
+          console.error('Failed to sync user profile', err)
+        )
+      }
     })
     return () => unsubscribe()
   }, [])
