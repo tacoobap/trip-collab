@@ -34,7 +34,7 @@ export function SlotCard({ slot, onClick }: SlotCardProps) {
         'flex flex-col justify-between min-h-[88px] max-sm:min-h-[72px]',
         isOpen && 'border border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40',
         isProposed && 'border border-border bg-muted/30 hover:border-border/80 hover:bg-muted/50',
-        isLocked && 'border border-blue-500/40 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10'
+        isLocked && 'border border-locked/40 bg-locked/5 hover:border-locked/60 hover:bg-locked/10'
       )}
     >
       {/* Icon + time label */}

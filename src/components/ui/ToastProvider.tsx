@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -87,19 +87,20 @@ function ToastList({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: str
 }
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+  const reducedMotion = useReducedMotion()
   const variantStyles: Record<ToastVariant, string> = {
     default: 'bg-secondary text-secondary-foreground border-border',
-    success: 'bg-emerald-950/95 text-emerald-50 border-emerald-700',
+    success: 'bg-success/95 text-success-foreground border-success',
     error: 'bg-destructive/95 text-destructive-foreground border-destructive',
   }
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 24, scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      layout={!reducedMotion}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 24, scale: 0.98 }}
+      transition={reducedMotion ? { duration: 0.01 } : { type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(
         'flex items-start gap-2 rounded-lg border px-4 py-3 shadow-lg',
         variantStyles[toast.variant]

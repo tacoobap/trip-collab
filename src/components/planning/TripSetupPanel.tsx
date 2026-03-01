@@ -152,8 +152,8 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
       className="max-w-lg mx-auto px-4 sm:px-6 py-12"
     >
       {!canEdit && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3">
-          <p className="text-sm text-amber-900 dark:text-amber-100">
+        <div className="mb-6 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <p className="text-sm text-warning-foreground">
             Only trip members can set up days. Join this trip to add the itinerary.
           </p>
         </div>

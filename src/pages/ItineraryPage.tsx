@@ -1,10 +1,12 @@
 import { useRef, useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { DaySection } from '@/components/itinerary/DaySection'
-import { CityDivider } from '@/components/layout/CityDivider'
+import { useParams } from 'react-router-dom'
 import { VibeTagsSection } from '@/components/itinerary/VibeTagsSection'
 import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
-import { Loader2, Camera, Sparkles, BedDouble } from 'lucide-react'
+import { ItineraryHero } from '@/components/itinerary/ItineraryHero'
+import { ItineraryCustomizePanel } from '@/components/itinerary/ItineraryCustomizePanel'
+import { ItineraryDaysList } from '@/components/itinerary/ItineraryDaysList'
+import { UpdateTextModal } from '@/components/itinerary/UpdateTextModal'
+import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -15,7 +17,6 @@ import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Stay } from '@/types/database'
 import { useNarrativeGeneration } from '@/hooks/useNarrativeGeneration'
 import { searchImage } from '@/lib/imageSearch'
 import { formatTripDate } from '@/lib/utils'
@@ -323,20 +324,10 @@ export function ItineraryPage() {
   const endFmt = formatTripDate(trip.end_date, { month: 'long', day: 'numeric' })
   const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
 
-  // heroPreview = local blob URL shown instantly on file select (bypasses CDN cache)
-  // heroUrl    = confirmed remote URL after upload completes
   const currentHero = heroPreview ?? heroUrl ?? trip.image_url
-  function stayForDay(date: string | null): Stay | undefined {
-    if (!date) return undefined
-    return stays.find((s) => s.check_in <= date && date < s.check_out)
-  }
-
-  let lastCity = ''
-  let lastStayId = ''
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Fixed overlay when hero is in view */}
       {!scrolledPastHero && (
         <PageHeader
           trip={trip}
@@ -345,88 +336,12 @@ export function ItineraryPage() {
         />
       )}
 
-      {/* ── Full-viewport hero (Charleston-style) ── */}
-      <div
-        ref={heroRef}
-        className="relative min-h-screen h-[100vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40"
-      >
-        {currentHero && (
-          <motion.img
-            src={currentHero}
-            alt={trip.name}
-            className="absolute inset-0 w-full h-full object-cover"
-            initial={{ scale: 1 }}
-            animate={{ scale: 1.08 }}
-            transition={{
-              duration: 20,
-              ease: 'linear',
-              repeat: Infinity,
-              repeatType: 'reverse',
-            }}
-          />
-        )}
-
-        {/* Gradient overlay + soft fade into next section at bottom */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
-        <div
-          className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
-          style={{
-            background: 'linear-gradient(to top, hsl(var(--background)), transparent)',
-          }}
-        />
-
-        {/* Trip info — centered, elegant */}
-        <div className="absolute inset-0 flex items-center justify-center px-4 sm:px-12">
-          <div className="text-center max-w-2xl">
-            <motion.h1
-              className="font-serif text-4xl sm:text-5xl md:text-6xl font-normal text-white leading-tight tracking-tight mb-4"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-            >
-              {trip.name}
-            </motion.h1>
-            {trip.tagline && (
-              <motion.p
-                className="font-serif text-xs sm:text-sm md:text-base text-white/65 italic font-normal tracking-wide mb-3"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.45 }}
-              >
-                {trip.tagline}
-              </motion.p>
-            )}
-            {(trip.destinations.length > 0 || dateRange) && (
-              <motion.div
-                className="w-12 h-px bg-primary/80 mx-auto my-3"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4, duration: 0.4 }}
-              />
-            )}
-            {trip.destinations.length > 0 && (
-              <motion.p
-                className="text-white/80 text-base sm:text-lg font-sans font-light tracking-wide mb-1"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45, duration: 0.45 }}
-              >
-                {trip.destinations.join(' · ')}
-              </motion.p>
-            )}
-            {dateRange && (
-              <motion.p
-                className="text-white/60 text-sm font-sans font-light"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.55, duration: 0.45 }}
-              >
-                {dateRange}
-              </motion.p>
-            )}
-          </div>
-        </div>
-      </div>
+      <ItineraryHero
+        trip={trip}
+        currentHero={currentHero}
+        heroRef={heroRef}
+        dateRange={dateRange}
+      />
 
       {/* Sticky header in flow when scrolled (same minimal design) */}
       {scrolledPastHero && (
@@ -453,220 +368,46 @@ export function ItineraryPage() {
           />
         )}
 
-        {/* Photo + Update text — only for trip members */}
         {isMember && (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 max-sm:pt-6 max-sm:px-3 max-sm:pb-3">
-          <div className="rounded-xl border border-border bg-card/50 px-4 py-3 flex flex-col items-center gap-3 max-sm:px-3 max-sm:py-2.5">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              Customize
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 max-sm:gap-2 max-sm:w-full max-sm:flex-col">
-              <input
-                ref={heroInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleHeroUpload}
-              />
-              <button
-                onClick={() => heroInputRef.current?.click()}
-                disabled={heroUploading}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
-                title={currentHero ? 'Change cover photo' : 'Add cover photo'}
-              >
-                {heroUploading ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {heroPct}%</>
-                ) : (
-                  <><Camera className="w-3.5 h-3.5" /> Hero Photo</>
-                )}
-              </button>
-              <button
-                onClick={trip.tagline ? openUpdateTextModal : handleGenerate}
-                disabled={generating}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50 touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
-                title={trip.tagline ? 'Update narrative text' : 'Generate narrative text'}
-              >
-                {generating ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generateStatus || '…'}</>
-                ) : (
-                  <><Sparkles className="w-3.5 h-3.5" /> {trip.tagline ? 'Update text' : 'Generate text'}</>
-                )}
-              </button>
-            </div>
-            {generateError && (
-              <p className="text-[10px] text-destructive/90 text-center">
-                {generateError}
-              </p>
-            )}
-          </div>
-        </div>
+          <ItineraryCustomizePanel
+            heroUploading={heroUploading}
+            heroPct={heroPct}
+            onHeroClick={() => heroInputRef.current?.click()}
+            onHeroFileChange={handleHeroUpload}
+            generating={generating}
+            generateStatus={generateStatus}
+            generateError={generateError}
+            hasExistingNarrative={!!trip.tagline}
+            onGenerate={handleGenerate}
+            onOpenUpdateModal={openUpdateTextModal}
+            heroInputRef={heroInputRef}
+          />
         )}
 
-        {/* Update text modal — multi-select which sections and optionally which days */}
-        {updateTextModalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-            onClick={() => setUpdateTextModalOpen(false)}
-          >
-            <div
-              className="bg-card border border-border rounded-xl shadow-xl max-w-sm w-full p-5 max-h-[85vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-sm font-semibold text-foreground mb-3">
-                Update text
-              </h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                Choose which parts to regenerate:
-              </p>
-              <div className="space-y-2 mb-4">
-                {[
-                  { key: 'vibe' as const, label: 'Vibe' },
-                  { key: 'dayDescriptions' as const, label: 'Day descriptions' },
-                  { key: 'activityDescriptions' as const, label: 'Activity descriptions' },
-                ].map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-2 cursor-pointer text-sm text-foreground"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={updateTextSelections[key]}
-                      onChange={(e) =>
-                        setUpdateTextSelections((s) => ({ ...s, [key]: e.target.checked }))
-                      }
-                      className="rounded border-border"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
+        <UpdateTextModal
+          open={updateTextModalOpen}
+          onClose={() => setUpdateTextModalOpen(false)}
+          selections={updateTextSelections}
+          onSelectionsChange={setUpdateTextSelections}
+          dayScopeMode={updateTextDayScopeMode}
+          onDayScopeModeChange={setUpdateTextDayScopeMode}
+          selectedDayIds={updateTextSelectedDayIds}
+          onSelectedDayIdsChange={setUpdateTextSelectedDayIds}
+          days={days}
+          onUpdate={handleUpdateText}
+          disabled={
+            (!updateTextSelections.vibe &&
+              !updateTextSelections.dayDescriptions &&
+              !updateTextSelections.activityDescriptions) ||
+            ((updateTextSelections.dayDescriptions ||
+              updateTextSelections.activityDescriptions) &&
+              updateTextDayScopeMode === 'selected' &&
+              updateTextSelectedDayIds.length === 0)
+          }
+        />
 
-              {(updateTextSelections.dayDescriptions || updateTextSelections.activityDescriptions) && days.length > 0 && (
-                <div className="mb-6 pt-3 border-t border-border">
-                  <p className="text-xs font-medium text-foreground mb-2">Apply to:</p>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-foreground">
-                      <input
-                        type="radio"
-                        name="dayScope"
-                        checked={updateTextDayScopeMode === 'all'}
-                        onChange={() => setUpdateTextDayScopeMode('all')}
-                        className="border-border"
-                      />
-                      Whole trip
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-foreground">
-                      <input
-                        type="radio"
-                        name="dayScope"
-                        checked={updateTextDayScopeMode === 'selected'}
-                        onChange={() => setUpdateTextDayScopeMode('selected')}
-                        className="border-border"
-                      />
-                      Selected days
-                    </label>
-                    {updateTextDayScopeMode === 'selected' && (
-                      <div className="ml-5 mt-1 space-y-1.5">
-                        {days.map((day) => (
-                          <label
-                            key={day.id}
-                            className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={updateTextSelectedDayIds.includes(day.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setUpdateTextSelectedDayIds((ids) => [...ids, day.id])
-                                } else {
-                                  setUpdateTextSelectedDayIds((ids) => ids.filter((id) => id !== day.id))
-                                }
-                              }}
-                              className="rounded border-border"
-                            />
-                            {day.narrative_title || day.label}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUpdateTextModalOpen(false)}
-                  className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleUpdateText(updateTextSelections, {
-                      mode: updateTextDayScopeMode,
-                      selectedDayIds: updateTextSelectedDayIds,
-                    })
-                  }
-                  disabled={
-                    (!updateTextSelections.vibe &&
-                      !updateTextSelections.dayDescriptions &&
-                      !updateTextSelections.activityDescriptions) ||
-                    ((updateTextSelections.dayDescriptions || updateTextSelections.activityDescriptions) &&
-                      updateTextDayScopeMode === 'selected' &&
-                      updateTextSelectedDayIds.length === 0)
-                  }
-                  className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 border border-primary rounded-md disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  Update
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Content ── */}
-        {days.length === 0 ? (
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-12 text-center">
-            <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
-            <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
-              ← Head back to planning
-            </Link>
-          </div>
-        ) : (
-          days.map((day, dayIndex) => {
-            const showDivider = day.city !== lastCity
-            lastCity = day.city
-            const dayStay = stayForDay(day.date)
-            const showStay = !!dayStay && dayStay.id !== lastStayId
-            if (dayStay) lastStayId = dayStay.id
-
-            return (
-              <div
-                key={day.id}
-                className={dayIndex % 2 === 0 ? 'bg-sand/30' : 'bg-background'}
-              >
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-14">
-                  {showDivider && <CityDivider city={day.city} />}
-
-                  {showStay && dayStay && (
-                    <div className="mt-4 flex items-center gap-3 px-4 py-3 border border-border rounded-xl bg-muted/30 mb-2">
-                      <BedDouble className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">Staying at</p>
-                        <p className="text-sm font-semibold text-foreground">{dayStay.name}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-6">
-                    <DaySection day={day} flip={dayIndex % 2 === 1} />
-                  </div>
-                </div>
-              </div>
-            )
-          })
+        {slug && (
+          <ItineraryDaysList slug={slug} days={days} stays={stays} />
         )}
 
         {/* ── At a Glance ── */}

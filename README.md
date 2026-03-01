@@ -100,7 +100,7 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 ## Next up (productionizing)
 
 - **Done:** All collection writes (add/update/delete/like) live in `collectionService`; trip/days edit flows (EditTripModal, EditDayModal, add first day when no dates, destinations normalized); chunked slots in useTrip; toast system (`ToastProvider` + `useToast`) with user-facing feedback for hero upload, narrative generate/update, collection suggestions and add/delete; AI hooks `useNarrativeGeneration` and `useCollectionSuggestions` (ItineraryPage and CollectionPage).
-- **Next:** Optional useTrip subscription extract (`tripSubscription.ts`); component decomposition (ItineraryPage, CollectionPage); schema docs & migrations; tests. See **Feb 28 Productionizing.md** for the full plan.
+- **Next:** Schema docs & migrations; tests. See **Feb 28 Productionizing.md** for the full plan.
 
 ## Deploy
 

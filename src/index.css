@@ -51,6 +51,13 @@
     --sand: 37 33% 92%;
     --warm-white: 37 33% 98%;
     --coral: 15 60% 60%;
+
+    --success: 160 60% 32%;
+    --success-foreground: 37 33% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 30% 15%;
+    --locked: 215 50% 40%;
+    --locked-foreground: 37 33% 98%;
   }
 
   .dark {
@@ -81,6 +88,12 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --success: 160 50% 38%;
+    --success-foreground: 37 33% 98%;
+    --warning: 38 85% 55%;
+    --warning-foreground: 220 30% 10%;
+    --locked: 215 45% 50%;
+    --locked-foreground: 37 33% 98%;
   }
 }
 
@@ -91,6 +104,14 @@
 
   body {
     @apply bg-background text-foreground font-sans;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {

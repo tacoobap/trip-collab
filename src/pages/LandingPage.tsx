@@ -75,9 +75,9 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {!firebaseReady && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800">
+        <div className="bg-warning/10 border-b border-warning/30 px-4 py-3 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <div className="text-sm text-warning-foreground">
             <strong>Firebase not connected.</strong> Create a{' '}
             <code className="bg-amber-100 px-1 rounded font-mono text-xs">.env</code> file
             with your Firebase config keys, then restart the dev server.

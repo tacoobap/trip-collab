@@ -78,7 +78,7 @@ export function SignInPage() {
           <Sparkles className="w-7 h-7" />
         </div>
         <h1 className="text-2xl font-serif font-bold text-foreground mb-2">
-          Trip Collab
+          Trup
         </h1>
         <p className="text-muted-foreground text-sm mb-6">
           Sign in to see your trips and create new ones.

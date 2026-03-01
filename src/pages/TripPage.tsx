@@ -73,7 +73,7 @@ export function TripPage() {
           <p className="text-lg font-serif font-semibold text-foreground mb-2">
             {error || 'Trip not found'}
           </p>
-          {user && (
+          {user && import.meta.env.DEV && (
             <>
               <p className="text-xs text-muted-foreground mb-1 font-mono break-all max-w-md mx-auto">
                 Signed-in UID: {user.uid}
@@ -141,16 +141,16 @@ export function TripPage() {
       <PageHeader trip={trip} currentName={displayName ?? ''} />
       {/* Read-only banner for non-members */}
       {user && isMember === false && (
-        <div className="border-b border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30">
+        <div className="border-b border-warning/30 bg-warning/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-amber-900 dark:text-amber-100">
+            <p className="text-sm text-warning-foreground">
               You’re viewing this trip as a guest. You can’t edit the plan, add ideas, or change stays until you join.
             </p>
             <Button
               size="sm"
               onClick={handleJoinTrip}
               disabled={joining}
-              className="shrink-0 bg-amber-700 hover:bg-amber-800 text-white dark:bg-amber-600 dark:hover:bg-amber-700"
+              className="shrink-0 bg-warning text-warning-foreground hover:bg-warning/90"
             >
               {joining ? (
                 <>

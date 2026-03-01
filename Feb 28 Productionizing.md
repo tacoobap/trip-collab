@@ -46,8 +46,8 @@
 
 ### Still to do (short-term)
 
-- **useTrip (optional):** Extract subscription wiring into `tripSubscription.ts`; keep `useTrip` thin.
-- **Component decomposition:** ItineraryPage (ItineraryHero, ItineraryCustomizePanel, etc.); CollectionPage (CollectionHeader, CollectionList, CollectionSuggestionsDialog).
+- ~~**useTrip (optional):** Extract subscription wiring into `tripSubscription.ts`; keep `useTrip` thin.~~ ✅ Done.
+- ~~**Component decomposition:** ItineraryPage (ItineraryHero, ItineraryCustomizePanel, etc.); CollectionPage (CollectionHeader, CollectionList, CollectionSuggestionsDialog).~~ ✅ Done.
 - **Schema & migrations:** `docs/schema.md`, migration scripts, then rules/types cleanup.
 - **Tests:** Hooks, services, and basic integration tests (see §6).
 
@@ -112,13 +112,9 @@ You’ve already wired `isMember` / `isOwner` through `useTrip` and gated UI act
 ### 3. Async UX & component decomposition
 
 - **Standardize async feedback** — ✅ **Done.** Toast system (`ToastProvider` + `useToast`); hero upload, narrative generate/update, collection suggestions/add/delete show toasts. More operations (join trip, lock/unlock, stays) can be wired to toasts as needed.
-- **Break large pages into smaller components** — *Still to do*
-  - `src/pages/ItineraryPage.tsx`:
-    - Extract subcomponents such as `ItineraryHero`, `ItineraryCustomizePanel`, `ItineraryVibeSection`, `ItineraryDaysList`, `UpdateTextModal` into `src/components/itinerary/`.
-    - Keep the page-level file focused on data fetching, scroll behavior, and wiring.
-  - `src/pages/CollectionPage.tsx`:
-    - Extract `CollectionHeader`, `CollectionList`, `CollectionSuggestionsDialog` into `src/components/collection/`.
-    - Isolate suggestion-related UI and state into their own component / hook.
+- **Break large pages into smaller components** — ✅ **Done.**
+  - `src/pages/ItineraryPage.tsx`: Extracted `ItineraryHero`, `ItineraryCustomizePanel`, `ItineraryDaysList`, `UpdateTextModal` into `src/components/itinerary/`. Page focuses on data fetching, scroll, and wiring.
+  - `src/pages/CollectionPage.tsx`: Extracted `CollectionHeader`, `CollectionList`, `CollectionSuggestionsDialog` into `src/components/collection/`.
 
 ---
 

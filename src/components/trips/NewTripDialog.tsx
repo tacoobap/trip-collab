@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin, Plus, Loader2 } from 'lucide-react'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
@@ -32,6 +32,7 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const endDateInputRef = useRef<HTMLInputElement>(null)
 
   const reset = () => {
     setTripName('')
@@ -165,7 +166,20 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
               <Input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setStartDate(next)
+                  if (next) {
+                    if (!endDate || endDate < next) setEndDate(next)
+                    setTimeout(() => {
+                      const el = endDateInputRef.current
+                      if (el) {
+                        el.focus()
+                        el.showPicker?.()
+                      }
+                    }, 0)
+                  }
+                }}
               />
             </div>
             <div>
@@ -173,8 +187,10 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
                 End date
               </label>
               <Input
+                ref={endDateInputRef}
                 type="date"
                 value={endDate}
+                min={startDate || undefined}
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>

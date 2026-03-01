@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Loader2, Plus, Sparkles } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -23,43 +22,10 @@ import {
 } from '@/services/collectionService'
 import { searchImage } from '@/lib/imageSearch'
 import type { CollectionItem } from '@/types/database'
-import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
 import { CollectionItemForm } from '@/components/collection/CollectionItemForm'
-import { Textarea } from '@/components/ui/textarea'
-
-const OTHER_LABEL = 'Other'
-
-function groupByDestination(
-  items: CollectionItem[],
-  destinationOrder: string[]
-): { label: string; items: CollectionItem[] }[] {
-  const sorted = [...items].sort((a, b) => {
-    const likesA = a.likes.length
-    const likesB = b.likes.length
-    if (likesB !== likesA) return likesB - likesA
-    return (a.created_at || '').localeCompare(b.created_at || '')
-  })
-  const map = new Map<string, CollectionItem[]>()
-  for (const dest of destinationOrder) {
-    map.set(dest, [])
-  }
-  map.set(OTHER_LABEL, [])
-  for (const item of sorted) {
-    const dest = item.destination?.trim() || null
-    const key = dest && destinationOrder.includes(dest) ? dest : OTHER_LABEL
-    const list = map.get(key) ?? []
-    list.push(item)
-    map.set(key, list)
-  }
-  return destinationOrder
-    .filter((d) => (map.get(d)?.length ?? 0) > 0)
-    .map((label) => ({ label, items: map.get(label) ?? [] }))
-    .concat(
-      (map.get(OTHER_LABEL)?.length ?? 0) > 0
-        ? [{ label: OTHER_LABEL, items: map.get(OTHER_LABEL) ?? [] }]
-        : []
-    )
-}
+import { CollectionHeader } from '@/components/collection/CollectionHeader'
+import { CollectionList } from '@/components/collection/CollectionList'
+import { CollectionSuggestionsDialog } from '@/components/collection/CollectionSuggestionsDialog'
 
 export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -200,98 +166,35 @@ export function CollectionPage() {
   }
 
   const destinationOrder = trip.destinations?.length ? trip.destinations : []
-  const sections = groupByDestination(items, destinationOrder)
-  const hasAny = items.length > 0
+  const isMemberBool = isMember === true
 
   return (
     <div className="min-h-screen bg-background">
       <PageHeader trip={trip} currentName={displayName ?? ''} />
 
-      {/* Hero */}
-      <div className="border-b border-border bg-gradient-to-br from-muted/30 to-background">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 max-sm:py-5">
-          <h1 className="font-serif text-lg sm:text-xl font-semibold text-foreground">
-            Collection
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5 mb-4 sm:mb-6">
-            Save ideas for later and add them to the plan when you’re ready.
-          </p>
-          {!isMember && user && (
-            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3">
-              <p className="text-sm text-amber-900 dark:text-amber-100">
-                Only trip members can add or edit ideas. Join this trip to contribute to the collection.
-              </p>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-3 max-sm:flex-col max-sm:gap-2">
-            {isMember && (
-              <>
-                <Button
-                  onClick={() => {
-                    setSuggestOpen(true)
-                    setSavedIds(new Set())
-                    setVibeSentence('')
-                  }}
-                  variant="default"
-                  className="gap-2 max-sm:w-full max-sm:justify-center"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Suggest something for me
-                </Button>
-                <Button
-                  onClick={() => setAddOpen(true)}
-                  variant="outline"
-                  className="gap-2 max-sm:w-full max-sm:justify-center"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add an idea
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <CollectionHeader
+        isMember={isMemberBool}
+        onSuggestClick={() => {
+          setSuggestOpen(true)
+          setSavedIds(new Set())
+          setVibeSentence('')
+        }}
+        onAddClick={() => setAddOpen(true)}
+      />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 max-sm:py-4">
-        {itemsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : !hasAny ? (
-          <div className="text-center py-12 rounded-xl border border-dashed border-border bg-muted/20">
-            <p className="text-muted-foreground text-sm mb-4">
-              No ideas in the collection yet.
-            </p>
-            {isMember && (
-              <Button onClick={() => setAddOpen(true)} variant="outline" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add the first one
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-10 max-sm:space-y-8">
-            {sections.map(({ label, items: list }) => (
-              <section key={label}>
-                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4 max-sm:mb-3">
-                  {label}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {list.map((item) => (
-                    <CollectionItemCard
-                      key={item.id}
-                      item={item}
-                      currentName={displayName ?? ''}
-                      onLike={isMember ? handleLike : undefined}
-                      onEdit={isMember && (isOwner || item.created_by === (displayName ?? '')) ? setEditItem : undefined}
-                      onDelete={isMember && (isOwner || item.created_by === (displayName ?? '')) ? handleDelete : undefined}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
+        <CollectionList
+          itemsLoading={itemsLoading}
+          items={items}
+          destinationOrder={destinationOrder}
+          displayName={displayName ?? ''}
+          isMember={isMemberBool}
+          isOwner={isOwner ?? false}
+          onLike={handleLike}
+          onEdit={setEditItem}
+          onDelete={handleDelete}
+          onAddClick={() => setAddOpen(true)}
+        />
       </main>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -332,115 +235,18 @@ export function CollectionPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-6">
-          <DialogClose onClick={() => setSuggestOpen(false)} />
-          <DialogHeader className="shrink-0">
-            <DialogTitle>Suggest something for me</DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              We’ll look at your itinerary and open slots and suggest up to 3 places. Add a vibe to narrow it down (optional).
-            </p>
-          </DialogHeader>
-          <div className="flex flex-col min-h-0 flex-1 overflow-y-auto space-y-4">
-            <div className="shrink-0">
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Vibe (optional)
-              </label>
-              <Textarea
-                value={vibeSentence}
-                onChange={(e) => setVibeSentence(e.target.value)}
-                placeholder="e.g. chill coffee spot, something romantic, kid-friendly"
-                rows={2}
-                className="resize-none"
-              />
-            </div>
-            {suggestions.length === 0 && suggestLoading !== 'loading' && (
-              <Button
-                onClick={handleGetSuggestions}
-                className="w-full gap-2 shrink-0"
-              >
-                <Sparkles className="w-4 h-4" />
-                Get suggestions
-              </Button>
-            )}
-            {suggestLoading === 'loading' && (
-              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground shrink-0">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Finding ideas…</span>
-              </div>
-            )}
-            {suggestions.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Pick what to save
-                </p>
-                {suggestions.map((s, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg border border-border bg-muted/20 p-3 space-y-2"
-                  >
-                    <div className="flex gap-3">
-                      {suggestionImageUrls[i] ? (
-                        <img
-                          src={suggestionImageUrls[i]}
-                          alt=""
-                          className="w-14 h-14 rounded-lg object-cover shrink-0 border border-border"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-lg bg-muted/50 shrink-0 border border-border flex items-center justify-center">
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-medium text-foreground">{s.name}</p>
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                              {s.category}
-                            </span>
-                          </div>
-                          {savedIds.has(i) ? (
-                            <span className="text-xs text-primary font-medium">Saved</span>
-                          ) : (
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSaveSuggestion(i)}
-                              >
-                                Save
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        {s.one_line_description && (
-                          <p className="text-sm text-muted-foreground">
-                            {s.one_line_description}
-                          </p>
-                        )}
-                        {s.suggested_for && (
-                          <p className="text-xs text-muted-foreground/80">
-                            Suggested for: {s.suggested_for}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleGetSuggestions}
-                  disabled={suggestLoading === 'loading'}
-                  className="w-full"
-                >
-                  Get more suggestions
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CollectionSuggestionsDialog
+        open={suggestOpen}
+        onOpenChange={setSuggestOpen}
+        suggestions={suggestions}
+        suggestLoading={suggestLoading}
+        vibeSentence={vibeSentence}
+        onVibeChange={setVibeSentence}
+        onGetSuggestions={handleGetSuggestions}
+        suggestionImageUrls={suggestionImageUrls}
+        savedIds={savedIds}
+        onSaveSuggestion={handleSaveSuggestion}
+      />
     </div>
   )
 }
