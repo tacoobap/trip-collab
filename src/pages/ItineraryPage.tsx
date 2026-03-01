@@ -7,6 +7,7 @@ import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
 import { Loader2, Camera, Sparkles, BedDouble } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -15,14 +16,16 @@ import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { Stay } from '@/types/database'
-import { generateNarrative } from '@/lib/generateNarrative'
+import { useNarrativeGeneration } from '@/hooks/useNarrativeGeneration'
 import { searchImage } from '@/lib/imageSearch'
 import { formatTripDate } from '@/lib/utils'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
   const { user, loading: authLoading, getIdToken } = useAuth()
+  const { addToast } = useToast()
   const { trip, days, loading, error, isMember } = useTrip(slug, user?.uid)
+  const { generate: generateNarrativeResult, error: narrativeError, clearError: clearNarrativeError } = useNarrativeGeneration(trip, days)
   const { displayName } = useDisplayName()
   const { stays } = useStays(trip?.id)
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
@@ -71,8 +74,10 @@ export function ItineraryPage() {
       const url = await uploadImage(`trips/${trip.id}/hero.jpg`, file, setHeroPct)
       await updateDoc(doc(db, 'trips', trip.id), { image_url: url })
       setHeroUrl(url)
+      addToast('Hero image updated.')
     } catch (err) {
       console.error('Hero upload failed', err)
+      addToast('Failed to upload hero image. Try again.', { variant: 'error' })
       URL.revokeObjectURL(preview)
       setHeroPreview(null)
     } finally {
@@ -85,10 +90,15 @@ export function ItineraryPage() {
     if (!trip || generating) return
     setGenerating(true)
     setGenerateError('')
+    clearNarrativeError()
     try {
-      // Step 1: generate narrative copy from the LLM
       setGenerateStatus('Writing narrative…')
-      const result = await generateNarrative(trip, days)
+      const result = await generateNarrativeResult()
+      if (!result) {
+        setGenerateError(narrativeError || 'Generation failed')
+        addToast('Failed to generate narrative.', { variant: 'error' })
+        return
+      }
 
       // Step 2: write trip-level fields
       setGenerateStatus('Saving narrative…')
@@ -159,11 +169,13 @@ export function ItineraryPage() {
       }
 
       setGenerateStatus('Done!')
+      addToast('Narrative generated.')
       setTimeout(() => setGenerateStatus(''), 3000)
     } catch (err) {
       console.error('[handleGenerate]', err)
       const msg = err instanceof Error ? err.message : String(err)
       setGenerateError(msg)
+      addToast('Failed to save narrative.', { variant: 'error' })
     } finally {
       setGenerating(false)
     }
@@ -181,10 +193,17 @@ export function ItineraryPage() {
 
     setGenerating(true)
     setGenerateError('')
+    clearNarrativeError()
     setUpdateTextModalOpen(false)
     try {
       setGenerateStatus('Updating…')
-      const result = await generateNarrative(trip, days)
+      const result = await generateNarrativeResult()
+      if (!result) {
+        setGenerateError(narrativeError || 'Generation failed')
+        addToast('Failed to update text.', { variant: 'error' })
+        setGenerating(false)
+        return
+      }
       setGenerateStatus('Saving…')
 
       const tripUpdates: { vibe_heading?: string | null; vibe_tags?: typeof result.vibe_tags } = {}
@@ -223,11 +242,13 @@ export function ItineraryPage() {
       }
 
       setGenerateStatus('Done!')
+      addToast('Text updated.')
       setTimeout(() => setGenerateStatus(''), 3000)
     } catch (err) {
       console.error('[handleUpdateText]', err)
       const msg = err instanceof Error ? err.message : String(err)
       setGenerateError(msg)
+      addToast('Failed to update text.', { variant: 'error' })
     } finally {
       setGenerating(false)
     }

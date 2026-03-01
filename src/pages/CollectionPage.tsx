@@ -11,16 +11,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/components/ui/ToastProvider'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useTrip } from '@/hooks/useTrip'
 import { useCollectionItems } from '@/hooks/useCollectionItems'
+import { useCollectionSuggestions } from '@/hooks/useCollectionSuggestions'
 import {
   addCollectionItem,
   deleteCollectionItem,
   setCollectionItemLikes,
 } from '@/services/collectionService'
-import { suggestCollectionItems } from '@/lib/suggestCollectionItems'
-import type { CollectionSuggestion } from '@/lib/suggestCollectionItems'
 import { searchImage } from '@/lib/imageSearch'
 import type { CollectionItem } from '@/types/database'
 import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
@@ -64,32 +64,34 @@ function groupByDestination(
 export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
   const { user, loading: authLoading, getIdToken } = useAuth()
+  const { addToast } = useToast()
   const { displayName } = useDisplayName()
   const { trip, days, loading: tripLoading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { items, loading: itemsLoading } = useCollectionItems(trip?.id)
+  const {
+    suggestions,
+    getSuggestions,
+    status: suggestLoading,
+    error: suggestError,
+    clearError: clearSuggestError,
+  } = useCollectionSuggestions(trip, days)
   const [addOpen, setAddOpen] = useState(false)
   const [editItem, setEditItem] = useState<CollectionItem | null>(null)
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [vibeSentence, setVibeSentence] = useState('')
-  const [suggestLoading, setSuggestLoading] = useState(false)
-  const [suggestions, setSuggestions] = useState<CollectionSuggestion[]>([])
   const [suggestionImageUrls, setSuggestionImageUrls] = useState<Record<number, string>>({})
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set())
 
-  const handleGetSuggestions = async () => {
-    if (!trip) return
-    setSuggestLoading(true)
-    setSuggestions([])
-    setSuggestionImageUrls({})
-    try {
-      const { suggestions: list } = await suggestCollectionItems(trip, days, vibeSentence.trim() || null)
-      setSuggestions(list)
-    } catch (err) {
-      console.error('Suggestions failed', err)
-      setSuggestions([])
-    } finally {
-      setSuggestLoading(false)
+  useEffect(() => {
+    if (suggestError) {
+      addToast('Failed to load suggestions.', { variant: 'error' })
+      clearSuggestError()
     }
+  }, [suggestError, addToast, clearSuggestError])
+
+  const handleGetSuggestions = () => {
+    setSuggestionImageUrls({})
+    getSuggestions(vibeSentence.trim() || null)
   }
 
   // Fetch an image for each suggestion when we have new suggestions
@@ -227,7 +229,6 @@ export function CollectionPage() {
                 <Button
                   onClick={() => {
                     setSuggestOpen(true)
-                    setSuggestions([])
                     setSavedIds(new Set())
                     setVibeSentence('')
                   }}
@@ -353,7 +354,7 @@ export function CollectionPage() {
                 className="resize-none"
               />
             </div>
-            {suggestions.length === 0 && !suggestLoading && (
+            {suggestions.length === 0 && suggestLoading !== 'loading' && (
               <Button
                 onClick={handleGetSuggestions}
                 className="w-full gap-2 shrink-0"
@@ -362,7 +363,7 @@ export function CollectionPage() {
                 Get suggestions
               </Button>
             )}
-            {suggestLoading && (
+            {suggestLoading === 'loading' && (
               <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground shrink-0">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Finding ideas…</span>
@@ -430,7 +431,7 @@ export function CollectionPage() {
                   variant="ghost"
                   size="sm"
                   onClick={handleGetSuggestions}
-                  disabled={suggestLoading}
+                  disabled={suggestLoading === 'loading'}
                   className="w-full"
                 >
                   Get more suggestions

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { createDaysWithDefaultSlots } from '@/services/planningService'
 import { Loader2, CalendarDays, Plus, Pencil } from 'lucide-react'
@@ -50,6 +50,15 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
   const [days, setDays] = useState<DaySetup[]>(initialDays)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // When trip is edited to add dates/cities, initialDays becomes populated but
+  // local `days` was only set on first mount. Sync so we show the day setup view
+  // without requiring a refresh.
+  useEffect(() => {
+    if (initialDays.length > 0 && days.length === 0) {
+      setDays(initialDays)
+    }
+  }, [initialDays, days.length])
 
   const hasDates = days.length > 0
 

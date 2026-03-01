@@ -34,17 +34,22 @@
 
 ## Trip Collab Production Hardening Plan
 
-### Progress (updated Feb 27, 2026)
+### Progress (updated Mar 1, 2026)
 
 - ✅ **Services:** `tripService` (getTripBySlug, joinTrip, listUserTrips, updateTripMeta; trip `destinations` normalized on read), `staysService`, `collectionService` (subscribe + addCollectionItem, updateCollectionItem, deleteCollectionItem, setCollectionItemLikes), `planningService` (addSlot, addProposal, updateProposal, updateProposalExactTime, setProposalVotes, updateSlotTimeLabel, updateSlotIcon, lockSlot, unlockSlot, setSlotProposed, deleteProposal, deleteSlot, createDaysWithDefaultSlots, updateDay).
-- ✅ **Hooks:** `useTrip` (tripService + chunked slots + trip doc subscription; destinations normalized in snapshot); `useStays` and `useCollectionItems` use their services.
+- ✅ **Hooks:** `useTrip` (tripService + chunked slots + trip doc subscription; destinations normalized in snapshot); `useStays` and `useCollectionItems` use their services; `useNarrativeGeneration` (narrative AI); `useCollectionSuggestions` (collection AI suggestions).
 - ✅ **Components:** DayColumn, ProposalDrawer, TripSetupPanel, StaysDrawer use services; TripPage and LandingPage use tripService; CollectionPage and CollectionItemForm use collectionService for all collection writes (add/update/delete/like).
 - ✅ **Trip/days UX:** EditTripModal (trip name, dates, destinations); EditDayModal (day city, date); TripSetupPanel “Add first day” when trip has no dates; Add Day city = pick from trip + existing days or add new (Enter to add); Edit Trip destinations = type + Enter to add (no blur).
 - ✅ **useTrip:** Chunked `where('day_id', 'in', dayIds)` (Firestore 10-item limit).
+- ✅ **Async UX (toasts):** `ToastProvider` + `useToast` in `src/components/ui/ToastProvider.tsx`; toasts for hero upload, narrative generate/update, collection suggestions (errors), add/delete collection item. Wired in `main.tsx`.
+- ✅ **AI hooks:** `useNarrativeGeneration` (ItineraryPage generate + update text); `useCollectionSuggestions` (CollectionPage "Suggest something for me"). Both guard against overlapping calls and stale responses.
 
 ### Still to do (short-term)
 
 - **useTrip (optional):** Extract subscription wiring into `tripSubscription.ts`; keep `useTrip` thin.
+- **Component decomposition:** ItineraryPage (ItineraryHero, ItineraryCustomizePanel, etc.); CollectionPage (CollectionHeader, CollectionList, CollectionSuggestionsDialog).
+- **Schema & migrations:** `docs/schema.md`, migration scripts, then rules/types cleanup.
+- **Tests:** Hooks, services, and basic integration tests (see §6).
 
 ### Overview
 
@@ -106,7 +111,8 @@ You’ve already wired `isMember` / `isOwner` through `useTrip` and gated UI act
 
 ### 3. Async UX & component decomposition
 
-- **Break large pages into smaller components**
+- **Standardize async feedback** — ✅ **Done.** Toast system (`ToastProvider` + `useToast`); hero upload, narrative generate/update, collection suggestions/add/delete show toasts. More operations (join trip, lock/unlock, stays) can be wired to toasts as needed.
+- **Break large pages into smaller components** — *Still to do*
   - `src/pages/ItineraryPage.tsx`:
     - Extract subcomponents such as `ItineraryHero`, `ItineraryCustomizePanel`, `ItineraryVibeSection`, `ItineraryDaysList`, `UpdateTextModal` into `src/components/itinerary/`.
     - Keep the page-level file focused on data fetching, scroll behavior, and wiring.
@@ -114,26 +120,16 @@ You’ve already wired `isMember` / `isOwner` through `useTrip` and gated UI act
     - Extract `CollectionHeader`, `CollectionList`, `CollectionSuggestionsDialog` into `src/components/collection/`.
     - Isolate suggestion-related UI and state into their own component / hook.
 
-- **Standardize async feedback**
-  - Add a lightweight toast system, e.g. `src/components/ui/ToastProvider.tsx` + `useToast` hook.
-  - Replace `console.error`-only paths with user-facing feedback for important operations:
-    - Joining a trip, adding/locking/unlocking proposals, adding/deleting stays, adding/deleting/liking collection items, running AI.
-
 ---
 
 ### 4. AI flow robustness (narrative + collection suggestions)
 
-- **Encapsulate AI calls in hooks**
-  - Create `src/hooks/useNarrativeGeneration.ts`:
+- **Encapsulate AI calls in hooks** — ✅ **Done.**
+  - `src/hooks/useNarrativeGeneration.ts`:
     - Accepts `trip` and `days`, exposes `{ generate, status, error }`.
     - Handles debouncing / concurrency (no overlapping calls), resets errors, and guards against stale responses.
-  - Create `src/hooks/useCollectionSuggestions.ts`:
-    - Accepts `trip`, `days`, and optional vibe string.
-    - Exposes `{ suggestions, getSuggestions, status, error }`.
-
-- **Integrate hooks into pages**
-  - `ItineraryPage` uses `useNarrativeGeneration` for generate/update instead of calling `generateNarrative` directly.
-  - `CollectionPage` uses `useCollectionSuggestions` and removes inlined suggestion state where possible.
+  - `src/hooks/useCollectionSuggestions.ts`: accepts `trip`, `days`, optional vibe; exposes `{ suggestions, getSuggestions, status, error, clearError }`.
+- **Integrate hooks into pages** — ✅ **Done.** ItineraryPage uses `useNarrativeGeneration`; CollectionPage uses `useCollectionSuggestions`.
 
 ---
 

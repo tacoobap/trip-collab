@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ToastProvider } from '@/components/ui/ToastProvider'
 import App from './App'
 
 // Google Analytics 4 (optional): set VITE_GA_MEASUREMENT_ID in .env
@@ -23,7 +24,9 @@ if (gaId) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </AuthProvider>
   </StrictMode>,
 )

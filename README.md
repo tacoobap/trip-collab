@@ -92,15 +92,15 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 - `src/pages/` — Route-level pages (Landing, Trip, Itinerary, Collection, Seed).
 - `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout.
 - `src/services/` — Data layer: `tripService`, `planningService`, `staysService`, `collectionService`.
-- `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, etc.
+- `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, etc.
 - `src/lib/` — Firebase, utils, time/URL helpers, image upload/search, narrative and suggestion (Gemini).
 - `src/types/database.ts` — Shared Firestore/document types.
 - `netlify/functions/` — Serverless: `search-image` (Unsplash proxy), `generate-narrative` (optional server-side Gemini).
 
 ## Next up (productionizing)
 
-- **Done:** All collection writes (add/update/delete/like) live in `collectionService`; trip/days edit flows (EditTripModal, EditDayModal, add first day when no dates, destinations normalized); chunked slots in useTrip.
-- **Next:** Optional useTrip subscription extract; then async UX (toasts, user-facing errors), component decomposition (ItineraryPage, CollectionPage), AI hooks (`useNarrativeGeneration`, `useCollectionSuggestions`), schema docs & migrations, tests. See **Feb 28 Productionizing.md** for the full plan.
+- **Done:** All collection writes (add/update/delete/like) live in `collectionService`; trip/days edit flows (EditTripModal, EditDayModal, add first day when no dates, destinations normalized); chunked slots in useTrip; toast system (`ToastProvider` + `useToast`) with user-facing feedback for hero upload, narrative generate/update, collection suggestions and add/delete; AI hooks `useNarrativeGeneration` and `useCollectionSuggestions` (ItineraryPage and CollectionPage).
+- **Next:** Optional useTrip subscription extract (`tripSubscription.ts`); component decomposition (ItineraryPage, CollectionPage); schema docs & migrations; tests. See **Feb 28 Productionizing.md** for the full plan.
 
 ## Deploy
 
