@@ -36,7 +36,7 @@ export function PageHeader({
       <div className="relative max-w-7xl mx-auto px-3 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3">
         {/* Left: Trup */}
         <Link
-          to="/"
+          to="/home"
           className={cn(
             'flex items-center gap-1.5 shrink-0 transition-colors z-10',
             isDark ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'

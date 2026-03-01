@@ -278,3 +278,7 @@ This section focuses on **how it feels to use** the product — flows, hierarchy
 | Logo | Consider Trup → `/home` when signed in. |
 | Trip name bar | Clear order: name first, then dates, then Stays/Invite. |
 | Cards | One standard card style; reserve larger radius for hero-style blocks. |
+
+**What “chrome” and “cards” mean here:**  
+- **Chrome** = the persistent UI frame (header, logo, trip nav). The suggestion was to keep a clear order in the trip name bar (name → dates → actions) and to use the logo to go to “My trips” when signed in.  
+- **Cards** = the suggestion is only about **corner radius**: use one radius (e.g. `rounded-xl`) for normal content cards (slot cards, collection cards, stay cards) so they feel like one family; use a larger radius (`rounded-2xl`) only for hero-style blocks (empty-state “Plan your first trip” card, trip cards on the landing page). That keeps the system consistent without changing layout.

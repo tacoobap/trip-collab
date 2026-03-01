@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { TripLayout } from '@/components/layout/TripLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useDisplayName } from '@/hooks/useDisplayName'
@@ -169,9 +169,7 @@ export function CollectionPage() {
   const isMemberBool = isMember === true
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader trip={trip} currentName={displayName ?? ''} />
-
+    <TripLayout trip={trip} currentName={displayName ?? ''}>
       <CollectionHeader
         isMember={isMemberBool}
         onSuggestClick={() => {
@@ -247,6 +245,6 @@ export function CollectionPage() {
         savedIds={savedIds}
         onSaveSuggestion={handleSaveSuggestion}
       />
-    </div>
+    </TripLayout>
   )
 }

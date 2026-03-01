@@ -106,23 +106,21 @@ export function LandingPage() {
           </div>
         ) : trips.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center text-center py-24"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
           >
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-5">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="text-3xl font-serif font-bold text-foreground mb-3">
-              Plan your first trip
-            </h1>
-            <p className="text-muted-foreground leading-relaxed max-w-sm mb-8">
-              Create a trip to start planning with your group.
-            </p>
-            <Button size="lg" onClick={() => setNewTripOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Plan a trip
-            </Button>
+            <button
+              onClick={() => setNewTripOpen(true)}
+              className="w-full h-full min-h-[110px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer touch-manipulation max-sm:min-h-[120px]"
+              aria-label="Plan your first trip"
+            >
+              <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary mb-1">
+                <Sparkles className="w-6 h-6" />
+              </span>
+              <span className="text-lg font-serif font-semibold text-foreground">Plan your first trip</span>
+              <span className="text-sm">Create a trip to start planning with your group.</span>
+            </button>
           </motion.div>
         ) : (
           <>

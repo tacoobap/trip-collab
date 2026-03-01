@@ -5,6 +5,7 @@ import { PlanningBoard } from '@/components/planning/PlanningBoard'
 import { StaysDrawer } from '@/components/stays/StaysDrawer'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
   const { displayName } = useDisplayName()
   const { user, loading: authLoading, getIdToken } = useAuth()
+  const { addToast } = useToast()
   const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
@@ -32,6 +34,7 @@ export function TripPage() {
     setJoinError('')
     try {
       await joinTrip(trip.id, user.uid)
+      addToast("You've joined the trip.", { variant: 'success' })
     } catch (err) {
       console.error('Failed to join trip', err)
       setJoinError('Failed to join trip. Please try again.')
@@ -48,6 +51,7 @@ export function TripPage() {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url)
         setCopied(true)
+        addToast('Link copied to clipboard.', { variant: 'success' })
         window.setTimeout(() => setCopied(false), 2000)
       } else {
         window.prompt('Copy this link', url)
@@ -139,12 +143,11 @@ export function TripPage() {
   return (
     <div className="min-h-screen bg-background">
       <PageHeader trip={trip} currentName={displayName ?? ''} />
-      {/* Read-only banner for non-members */}
       {user && isMember === false && (
         <div className="border-b border-warning/30 bg-warning/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-warning-foreground">
-              You’re viewing this trip as a guest. You can’t edit the plan, add ideas, or change stays until you join.
+              You're viewing this trip as a guest. You can't edit the plan, add ideas, or change stays until you join.
             </p>
             <Button
               size="sm"
@@ -247,3 +250,4 @@ export function TripPage() {
     </div>
   )
 }
+

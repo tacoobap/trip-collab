@@ -49,9 +49,10 @@ export function CollectionSuggestionsDialog({
         </DialogHeader>
         <div className="flex flex-col min-h-0 flex-1 overflow-y-auto space-y-4">
           <div className="shrink-0">
-            <label className="block text-sm font-medium text-foreground mb-1">
+            <label className="block text-sm font-medium text-foreground mb-0.5">
               Vibe (optional)
             </label>
+            <p className="text-xs text-muted-foreground mb-1">Narrow by vibe</p>
             <Textarea
               value={vibeSentence}
               onChange={(e) => onVibeChange(e.target.value)}

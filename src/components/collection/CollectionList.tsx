@@ -88,13 +88,14 @@ export function CollectionList({
   }
 
   const sections = groupByDestination(items, destinationOrder)
+  const singleDestination = sections.length === 1
 
   return (
     <div className="space-y-10 max-sm:space-y-8">
       {sections.map(({ label, items: list }) => (
         <section key={label}>
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4 max-sm:mb-3">
-            {label}
+            {singleDestination ? 'Ideas' : label}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {list.map((item) => (

@@ -92,6 +92,9 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-serif text-xl">Plan a new trip</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            You'll assign cities to each day next.
+          </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">

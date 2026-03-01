@@ -114,11 +114,12 @@ export function ItineraryPage() {
         const fullDay = days.find((day) => day.id === d.day_id)
         return !fullDay?.narrative_title
       })
-      await Promise.all(
-        daysNeedingTitle.map((d) =>
-          updateDoc(doc(db, 'days', d.day_id), { narrative_title: d.narrative_title })
-        )
-      )
+      const totalDays = daysNeedingTitle.length
+      for (let i = 0; i < totalDays; i++) {
+        setGenerateStatus(totalDays > 1 ? `Writing day ${i + 1} of ${totalDays}…` : 'Saving days…')
+        const d = daysNeedingTitle[i]
+        await updateDoc(doc(db, 'days', d.day_id), { narrative_title: d.narrative_title })
+      }
 
       // Step 4: write proposal editorial captions + suggested times — only for proposals that don't have one yet
       const proposalsNeedingCaption = result.proposals.filter((p) => {
@@ -343,12 +344,18 @@ export function ItineraryPage() {
         dateRange={dateRange}
       />
 
-      {/* Sticky header in flow when scrolled (same minimal design) */}
+      {/* Sticky header in flow when scrolled — fade in for smoother transition */}
       {scrolledPastHero && (
-        <PageHeader
-          trip={trip}
-          currentName={displayName ?? ''}
-        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+        >
+          <PageHeader
+            trip={trip}
+            currentName={displayName ?? ''}
+          />
+        </motion.div>
       )}
 
       {/* ── Fade-in content block (Charleston-style transition) ── */}
