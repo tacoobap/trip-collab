@@ -17,6 +17,19 @@ npm run dev
 - **Gemini** — Optional. Used for “Generate text” on the itinerary and “Suggest something for me” on the collection. Set `VITE_GEMINI_API_KEY`.
 - **Unsplash** — Optional. Used for hero/day images and suggestion thumbnails. Set `VITE_UNSPLASH_ACCESS_KEY`. In production, use the Netlify function so the key stays server-side (`UNSPLASH_ACCESS_KEY` in Netlify env).
 - **GitHub (image upload)** — Optional. For uploading custom hero/day images. Set `VITE_GITHUB_TOKEN`, `VITE_GITHUB_OWNER`, `VITE_GITHUB_REPO`.
+- **Google Analytics** — Optional. Set `VITE_GA_MEASUREMENT_ID` to your GA4 Measurement ID (e.g. `G-XXXXXXXXXX`). See below for how to get it and view data.
+
+## Google Analytics (viewing data)
+
+1. **Create a GA4 property** (if you don’t have one): go to [analytics.google.com](https://analytics.google.com) → **Admin** (gear) → **Create property** → choose **Web** and finish setup.
+2. **Get your Measurement ID**: Admin → **Data streams** → select your web stream → copy the **Measurement ID** (e.g. `G-XXXXXXXXXX`). Put it in `.env` as `VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX` and redeploy (or restart `npm run dev`).
+3. **View data**: In [Google Analytics](https://analytics.google.com), use **Reports** (left sidebar):
+   - **Acquisition** → **User acquisition** / **Traffic acquisition** — where users come from.
+   - **Engagement** → **Pages and screens** — which routes (e.g. `/`, `/trip/…`) get traffic.
+   - **Engagement** → **Events** — default events (e.g. `page_view`, `session_start`) and any custom events you send.
+   - **Realtime** — current users and pages right now.
+
+Data can take up to 24–48 hours to appear in standard reports; **Realtime** updates within seconds.
 
 ## Scripts
 
@@ -86,8 +99,8 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 ## Next up (productionizing)
 
-- Move collection add/update/delete/like into `collectionService` and use it from CollectionPage.
-- Then: async UX (toasts, user-facing errors), component decomposition (ItineraryPage, CollectionPage), AI hooks (`useNarrativeGeneration`, `useCollectionSuggestions`), schema docs & migrations, tests. See **Feb 28 Productionizing.md** for the full plan.
+- **Done:** All collection writes (add/update/delete/like) live in `collectionService`; trip/days edit flows (EditTripModal, EditDayModal, add first day when no dates, destinations normalized); chunked slots in useTrip.
+- **Next:** Optional useTrip subscription extract; then async UX (toasts, user-facing errors), component decomposition (ItineraryPage, CollectionPage), AI hooks (`useNarrativeGeneration`, `useCollectionSuggestions`), schema docs & migrations, tests. See **Feb 28 Productionizing.md** for the full plan.
 
 ## Deploy
 

@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Loader2, ImagePlus, X } from 'lucide-react'
-import { addDoc, collection, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import {
+  addCollectionItem,
+  updateCollectionItem,
+} from '@/services/collectionService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
@@ -107,7 +109,7 @@ export function CollectionItemForm({
     setUploadPct(0)
     try {
       if (isEdit && item) {
-        const updateData: Partial<CollectionItem> = {
+        await updateCollectionItem(item.id, {
           name: name.trim(),
           category,
           destination: destination?.trim() || null,
@@ -117,45 +119,40 @@ export function CollectionItemForm({
           latitude: parsed?.latitude ?? null,
           longitude: parsed?.longitude ?? null,
           place_name: parsed?.placeName ?? null,
-          image_url: photoFile ? null : (item.image_url ?? fetchedImageUrl),
-        }
-        await updateDoc(doc(db, 'collection_items', item.id), updateData)
+          image_url: photoFile ? null : (item.image_url ?? fetchedImageUrl) ?? null,
+        })
         if (photoFile) {
           setUploadPct(10)
-          const url = await uploadImage(
+          const imageUrl = await uploadImage(
             `trips/${tripId}/collection/${item.id}.jpg`,
             photoFile,
             (p) => setUploadPct(p)
           )
-          await updateDoc(doc(db, 'collection_items', item.id), { image_url: url })
+          await updateCollectionItem(item.id, { image_url: imageUrl })
         }
       } else {
-        const docData = {
+        const docId = await addCollectionItem({
           trip_id: tripId,
           name: name.trim(),
           category,
           destination: destination?.trim() || null,
-          image_url: (photoFile ? null : fetchedImageUrl) as string | null,
+          image_url: (photoFile ? null : fetchedImageUrl) ?? null,
           google_maps_url: mapsUrl.trim() || null,
           url: url.trim() || null,
           note: note.trim() || null,
           latitude: parsed?.latitude ?? null,
           longitude: parsed?.longitude ?? null,
           place_name: parsed?.placeName ?? null,
-          likes: [] as string[],
-          created_at: serverTimestamp(),
           created_by: currentName,
-        }
-        const ref = await addDoc(collection(db, 'collection_items'), docData)
-        const docId = ref.id
+        })
         if (photoFile) {
           setUploadPct(10)
-          const url = await uploadImage(
+          const imageUrl = await uploadImage(
             `trips/${tripId}/collection/${docId}.jpg`,
             photoFile,
             (p) => setUploadPct(p)
           )
-          await updateDoc(doc(db, 'collection_items', docId), { image_url: url })
+          await updateCollectionItem(docId, { image_url: imageUrl })
         }
       }
       onSuccess()

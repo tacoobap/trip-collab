@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import type { Stay, Trip } from '@/types/database'
-import type { StayInput } from '@/hooks/useStays'
+import type { StayInput } from '@/services/staysService'
 import { cn } from '@/lib/utils'
 
 function formatDateRange(checkIn: string, checkOut: string) {

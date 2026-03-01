@@ -14,8 +14,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useTrip } from '@/hooks/useTrip'
 import { useCollectionItems } from '@/hooks/useCollectionItems'
-import { updateDoc, doc, addDoc, collection, serverTimestamp, deleteDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import {
+  addCollectionItem,
+  deleteCollectionItem,
+  setCollectionItemLikes,
+} from '@/services/collectionService'
 import { suggestCollectionItems } from '@/lib/suggestCollectionItems'
 import type { CollectionSuggestion } from '@/lib/suggestCollectionItems'
 import { searchImage } from '@/lib/imageSearch'
@@ -102,7 +105,7 @@ export function CollectionPage() {
   const handleSaveSuggestion = async (index: number) => {
     const s = suggestions[index]
     if (!trip || !s) return
-    await addDoc(collection(db, 'collection_items'), {
+    await addCollectionItem({
       trip_id: trip.id,
       name: s.name,
       category: s.category,
@@ -114,8 +117,6 @@ export function CollectionPage() {
       latitude: null,
       longitude: null,
       place_name: null,
-      likes: [],
-      created_at: serverTimestamp(),
       created_by: displayName ?? '',
     })
     setSavedIds((prev) => new Set(prev).add(index))
@@ -129,12 +130,12 @@ export function CollectionPage() {
     const newLikes = hasLiked
       ? item.likes.filter((n) => n !== displayName)
       : [...item.likes, displayName]
-    await updateDoc(doc(db, 'collection_items', itemId), { likes: newLikes })
+    await setCollectionItemLikes(itemId, newLikes)
   }
 
   const handleDelete = async (itemId: string) => {
     if (!window.confirm('Remove this idea from the collection?')) return
-    await deleteDoc(doc(db, 'collection_items', itemId))
+    await deleteCollectionItem(itemId)
   }
 
   if (authLoading || tripLoading) {

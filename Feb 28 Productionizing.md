@@ -36,14 +36,14 @@
 
 ### Progress (updated Feb 27, 2026)
 
-- ✅ **Services:** `tripService` (getTripBySlug, joinTrip, listUserTrips), `staysService`, `collectionService` (subscribe), `planningService` (addSlot, addProposal, updateProposal, updateProposalExactTime, setProposalVotes, updateSlotTimeLabel, updateSlotIcon, lockSlot, unlockSlot, setSlotProposed, deleteProposal, deleteSlot, createDaysWithDefaultSlots).
-- ✅ **Hooks:** `useTrip` uses tripService + chunked slots query (11+ days safe); `useStays` and `useCollectionItems` use their services.
-- ✅ **Components:** DayColumn, ProposalDrawer, TripSetupPanel, StaysDrawer use services; TripPage and LandingPage use tripService.
+- ✅ **Services:** `tripService` (getTripBySlug, joinTrip, listUserTrips, updateTripMeta; trip `destinations` normalized on read), `staysService`, `collectionService` (subscribe + addCollectionItem, updateCollectionItem, deleteCollectionItem, setCollectionItemLikes), `planningService` (addSlot, addProposal, updateProposal, updateProposalExactTime, setProposalVotes, updateSlotTimeLabel, updateSlotIcon, lockSlot, unlockSlot, setSlotProposed, deleteProposal, deleteSlot, createDaysWithDefaultSlots, updateDay).
+- ✅ **Hooks:** `useTrip` (tripService + chunked slots + trip doc subscription; destinations normalized in snapshot); `useStays` and `useCollectionItems` use their services.
+- ✅ **Components:** DayColumn, ProposalDrawer, TripSetupPanel, StaysDrawer use services; TripPage and LandingPage use tripService; CollectionPage and CollectionItemForm use collectionService for all collection writes (add/update/delete/like).
+- ✅ **Trip/days UX:** EditTripModal (trip name, dates, destinations); EditDayModal (day city, date); TripSetupPanel “Add first day” when trip has no dates; Add Day city = pick from trip + existing days or add new (Enter to add); Edit Trip destinations = type + Enter to add (no blur).
 - ✅ **useTrip:** Chunked `where('day_id', 'in', dayIds)` (Firestore 10-item limit).
 
 ### Still to do (short-term)
 
-- **Collection writes:** Move CollectionPage / CollectionItemForm add/update/delete/like for `collection_items` into `collectionService` and use it from the UI.
 - **useTrip (optional):** Extract subscription wiring into `tripSubscription.ts`; keep `useTrip` thin.
 
 ### Overview
