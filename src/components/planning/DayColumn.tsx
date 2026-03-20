@@ -56,7 +56,8 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
       const url = await uploadImage(
         `trips/${tripId}/days/${day.id}.jpg`,
         file,
-        setUploadPct
+        setUploadPct,
+        getToken
       )
       await updateDoc(doc(db, 'days', day.id), { image_url: url })
     } catch (err) {

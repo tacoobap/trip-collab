@@ -16,7 +16,7 @@ npm run dev
 - **Firebase** — Required. Create a project at [Firebase Console](https://console.firebase.google.com), enable Firestore, and set the `VITE_FIREBASE_*` variables in `.env`.
 - **Gemini** — Optional. Used for “Generate text” on the itinerary and “Suggest something for me” on the collection. Set `VITE_GEMINI_API_KEY`.
 - **Unsplash** — Optional. Used for hero/day images and suggestion thumbnails. Set `VITE_UNSPLASH_ACCESS_KEY`. In production, use the Netlify function so the key stays server-side (`UNSPLASH_ACCESS_KEY` in Netlify env).
-- **GitHub (image upload)** — Optional. For uploading custom hero/day images. Set `VITE_GITHUB_TOKEN`, `VITE_GITHUB_OWNER`, `VITE_GITHUB_REPO`.
+- **GitHub (image upload)** — Optional. **Production / Netlify:** set **`GITHUB_TOKEN`**, **`GITHUB_OWNER`**, **`GITHUB_REPO`** (no `VITE_` prefix) so `upload-github-image` can call the GitHub API; the PAT must not be in client env vars or Netlify will flag `ghp_` in `dist`. **Local `npm run dev` only:** you can set `VITE_GITHUB_*` in `.env` for direct uploads without `netlify dev`.
 - **Google Analytics** — Optional. Set `VITE_GA_MEASUREMENT_ID` to your GA4 Measurement ID (e.g. `G-XXXXXXXXXX`). See below for how to get it and view data.
 
 ## Google Analytics (viewing data)
@@ -95,7 +95,7 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 - `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, etc.
 - `src/lib/` — Firebase, utils, time/URL helpers, image upload/search, narrative and suggestion (Gemini).
 - `src/types/database.ts` — Shared Firestore/document types.
-- `netlify/functions/` — Serverless: `search-image` (Unsplash proxy), `generate-narrative` (optional server-side Gemini).
+- `netlify/functions/` — Serverless: `search-image` (Unsplash proxy), `generate-narrative` (optional server-side Gemini), `upload-github-image` (GitHub image upload with PAT server-side).
 
 ## Next up (productionizing)
 
@@ -111,7 +111,7 @@ The app is set up for **Netlify**: build command `npm run build`, publish direct
 In **Site configuration → Environment variables**, set at least:
 
 - **Build / client:** the same `VITE_*` values you use locally (from `.env.example`), so Vite can embed public Firebase config and any client-side keys you rely on.
-- **Functions (server-only):** `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`, and **`FIREBASE_SERVICE_ACCOUNT_JSON`** — the full Firebase service account JSON as a **single string** (paste the JSON object; Netlify stores it as a secret). This is used by `netlify/functions` to verify Firebase ID tokens (`generate-narrative`, `search-image`). The code reads **`process.env.FIREBASE_SERVICE_ACCOUNT_JSON` only** — do not rely on a committed key file.
+- **Functions (server-only):** `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`, **`FIREBASE_SERVICE_ACCOUNT_JSON`** (Firebase Admin for ID token verification), and **`GITHUB_TOKEN`**, **`GITHUB_OWNER`**, **`GITHUB_REPO`** if you use custom image uploads. Do **not** set `VITE_GITHUB_TOKEN` on Netlify — it is compiled into the browser bundle and triggers secrets scanning (`ghp_` / `github_pat_`).
 
 ### If a service account JSON was committed
 

@@ -126,7 +126,8 @@ export function CollectionItemForm({
           const imageUrl = await uploadImage(
             `trips/${tripId}/collection/${item.id}.jpg`,
             photoFile,
-            (p) => setUploadPct(p)
+            (p) => setUploadPct(p),
+            getToken
           )
           await updateCollectionItem(item.id, { image_url: imageUrl })
         }
@@ -150,7 +151,8 @@ export function CollectionItemForm({
           const imageUrl = await uploadImage(
             `trips/${tripId}/collection/${docId}.jpg`,
             photoFile,
-            (p) => setUploadPct(p)
+            (p) => setUploadPct(p),
+            getToken
           )
           await updateCollectionItem(docId, { image_url: imageUrl })
         }

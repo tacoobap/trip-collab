@@ -72,7 +72,7 @@ export function ItineraryPage() {
     setHeroUploading(true)
     setHeroPct(0)
     try {
-      const url = await uploadImage(`trips/${trip.id}/hero.jpg`, file, setHeroPct)
+      const url = await uploadImage(`trips/${trip.id}/hero.jpg`, file, setHeroPct, getIdToken)
       await updateDoc(doc(db, 'trips', trip.id), { image_url: url })
       setHeroUrl(url)
       addToast('Hero image updated.')
