@@ -104,4 +104,19 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 ## Deploy
 
-The app is set up for **Netlify**: build command `npm run build`, publish directory `dist`. Configure environment variables in the Netlify dashboard (same keys as `.env.example`, without the `VITE_` prefix for server-side function secrets like `GEMINI_API_KEY` and `UNSPLASH_ACCESS_KEY`).
+The app is set up for **Netlify**: build command `npm run build`, publish directory `dist` (see `netlify.toml`).
+
+### Netlify environment variables
+
+In **Site configuration → Environment variables**, set at least:
+
+- **Build / client:** the same `VITE_*` values you use locally (from `.env.example`), so Vite can embed public Firebase config and any client-side keys you rely on.
+- **Functions (server-only):** `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`, and **`FIREBASE_SERVICE_ACCOUNT_JSON`** — the full Firebase service account JSON as a **single string** (paste the JSON object; Netlify stores it as a secret). This is used by `netlify/functions` to verify Firebase ID tokens (`generate-narrative`, `search-image`). The code reads **`process.env.FIREBASE_SERVICE_ACCOUNT_JSON` only** — do not rely on a committed key file.
+
+### If a service account JSON was committed
+
+Netlify’s secrets scanner will block builds until the private key is gone from the repo (including **history**).
+
+1. Remove the file from the tree, ensure it matches an entry in `.gitignore`, and commit that change.
+2. **Purge Git history** for that path (for example [`git filter-repo`](https://github.com/newren/git-filter-repo) with `--path path/to/file.json --invert-paths`), then force-push, or follow [GitHub’s guide](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository) to remove sensitive data.
+3. In **Google Cloud Console** → IAM → **Service accounts** → your Firebase admin user → **Keys**, **delete** the leaked key and **add** a new key. Update **`FIREBASE_SERVICE_ACCOUNT_JSON`** in Netlify with the new JSON (one line).

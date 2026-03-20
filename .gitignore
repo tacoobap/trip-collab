@@ -2,6 +2,14 @@
 .env
 .env.local
 
+# Firebase / GCP — never commit keys (Netlify and other scanners will fail the build)
+*-firebase-adminsdk-*.json
+firebase-service-account.json
+serviceAccountKey.json
+service-account*.json
+*-service-account*.json
+google-services.json
+
 # Logs
 logs
 *.log
