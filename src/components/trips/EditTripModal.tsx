@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import type { Trip } from '@/types/database'
 import { updateTripMeta } from '@/services/tripService'
+import { syncTripDays } from '@/services/planningService'
 
 interface EditTripModalProps {
   open: boolean
@@ -65,6 +66,14 @@ export function EditTripModal({
         start_date: startDate || null,
         end_date: endDate || null,
       })
+      // The range alone isn't enough — without this, extending a trip leaves
+      // the new days missing from the board entirely
+      await syncTripDays(
+        trip.id,
+        startDate || null,
+        endDate || null,
+        destinations[0] ?? ''
+      )
       onOpenChange(false)
       onSaved?.()
     } catch (err) {

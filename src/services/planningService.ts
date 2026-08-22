@@ -11,7 +11,8 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Slot } from '@/types/database'
+import type { Day, Slot } from '@/types/database'
+import { enumerateDates, dayLabel } from '@/lib/dateRange'
 
 export type SlotCategory = Slot['category']
 
@@ -60,6 +61,114 @@ export async function createDaysWithDefaultSlots(
     }
   }
   await batch.commit()
+}
+
+/**
+ * Reconcile a trip's day docs with its date range.
+ *
+ * Editing the range only ever wrote `start_date`/`end_date` on the trip, so
+ * extending a trip left the extra days missing entirely. This fills in any
+ * date in range that has no day doc (with the same default slots as initial
+ * setup) and renumbers everything by date so `Day N` stays in order.
+ *
+ * Days outside the new range are deliberately left alone — they may carry
+ * slots, proposals and photos, and deleting that silently on a date tweak
+ * would be far worse than leaving a stray day on the board.
+ */
+export async function syncTripDays(
+  tripId: string,
+  startDate: string | null,
+  endDate: string | null,
+  fallbackCity: string
+): Promise<void> {
+  if (!startDate || !endDate) return
+  const dates = enumerateDates(startDate, endDate)
+  if (dates.length === 0) return
+
+  const snap = await getDocs(
+    query(collection(db, 'days'), where('trip_id', '==', tripId))
+  )
+  const existing = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Day, 'id'>),
+  }))
+  const byDate = new Map(
+    existing.filter((d) => d.date).map((d) => [d.date as string, d])
+  )
+
+  // Carry the city forward from the nearest earlier day, so extending a Lisbon
+  // trip yields more Lisbon days rather than blank ones
+  const cityFor = (date: string): string => {
+    const earlier = existing
+      .filter((d): d is typeof d & { date: string } => !!d.date && d.date < date)
+      .sort((a, b) => b.date.localeCompare(a.date))[0]
+    return earlier?.city || existing[0]?.city || fallbackCity
+  }
+
+  // Final ordering: everything in range, plus any out-of-range stragglers after
+  const inRange = dates.map((date) => ({ date, current: byDate.get(date) ?? null }))
+  const strays = existing
+    .filter((d) => !d.date || !dates.includes(d.date))
+    .map((d) => ({ date: d.date ?? '', current: d }))
+  const ordered = [...inRange, ...strays]
+
+  // Chunked: a batch caps at 500 writes and each new day costs 1 + 3 slots
+  let batch = writeBatch(db)
+  let ops = 0
+  const flush = async (force = false) => {
+    if (ops >= 450 || (force && ops > 0)) {
+      await batch.commit()
+      batch = writeBatch(db)
+      ops = 0
+    }
+  }
+
+  for (let i = 0; i < ordered.length; i++) {
+    const { date, current } = ordered[i]
+    const dayNumber = i + 1
+
+    if (!current) {
+      const city = cityFor(date)
+      const dayRef = doc(collection(db, 'days'))
+      batch.set(dayRef, {
+        trip_id: tripId,
+        city,
+        label: dayLabel(dayNumber, city),
+        day_number: dayNumber,
+        date,
+        image_url: null,
+        image_attribution: null,
+        narrative_title: null,
+      })
+      ops++
+      for (const slot of DEFAULT_DAY_SLOTS) {
+        const slotRef = doc(collection(db, 'slots'))
+        batch.set(slotRef, {
+          day_id: dayRef.id,
+          trip_id: tripId,
+          time_label: slot.time_label,
+          category: slot.category,
+          icon: null,
+          status: 'open',
+          locked_proposal_id: null,
+          sort_order: slot.sort_order,
+        })
+        ops++
+      }
+    } else if (current.day_number !== dayNumber) {
+      // Labels are always derived (`Day N · City`), never free text, so
+      // rewriting them here can't clobber anything the user typed
+      batch.update(doc(db, 'days', current.id), {
+        day_number: dayNumber,
+        label: dayLabel(dayNumber, current.city),
+      })
+      ops++
+    }
+
+    await flush()
+  }
+
+  await flush(true)
 }
 
 export type AddSlotInput = {

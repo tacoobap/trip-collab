@@ -6,6 +6,7 @@ import { AddDayDialog } from './AddDayDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Trip } from '@/types/database'
+import { enumerateDates } from '@/lib/dateRange'
 
 interface DaySetup {
   date: string
@@ -25,26 +26,17 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
   // Build one setup row per date in the trip's range
   const initialDays = useMemo<DaySetup[]>(() => {
     if (!trip.start_date || !trip.end_date) return []
-    const rows: DaySetup[] = []
-    const current = new Date(trip.start_date + 'T00:00:00')
-    const end = new Date(trip.end_date + 'T00:00:00')
-    let dayNum = 1
-    while (current <= end) {
-      rows.push({
-        date: current.toISOString().split('T')[0],
-        dayNumber: dayNum,
-        formatted: current.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        }),
-        city: trip.destinations[0] ?? '',
-        customCity: '',
-      })
-      current.setDate(current.getDate() + 1)
-      dayNum++
-    }
-    return rows
+    return enumerateDates(trip.start_date, trip.end_date).map((date, i) => ({
+      date,
+      dayNumber: i + 1,
+      formatted: new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      }),
+      city: trip.destinations[0] ?? '',
+      customCity: '',
+    }))
   }, [trip])
 
   const [days, setDays] = useState<DaySetup[]>(initialDays)
