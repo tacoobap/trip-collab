@@ -17,6 +17,7 @@ export type Trip = {
   vibe_tags: VibeTag[] | null
   owner_uid?: string   // required on create; present after migration
   member_uids?: string[]
+  share_token?: string | null   // set when a public share link is active
 }
 
 export type Day = {

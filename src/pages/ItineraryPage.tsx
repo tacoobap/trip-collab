@@ -398,6 +398,9 @@ export function ItineraryPage() {
             heroInputRef={heroInputRef}
             exporting={exporting}
             onExport={exportPdf}
+            tripId={trip.id}
+            shareToken={trip.share_token ?? null}
+            getIdToken={getIdToken}
           />
         )}
 

@@ -44,5 +44,9 @@ export function formatTripDate(
   options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
 ): string | null {
   if (!dateStr) return null
-  return new Date(dateStr).toLocaleDateString('en-US', options)
+  // A bare YYYY-MM-DD is parsed as UTC midnight, which then renders as the
+  // *previous* day for anyone west of UTC. Pin it to local midnight instead,
+  // matching how day dates are parsed elsewhere.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? `${dateStr}T00:00:00` : dateStr
+  return new Date(iso).toLocaleDateString('en-US', options)
 }

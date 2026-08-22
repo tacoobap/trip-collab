@@ -8,6 +8,8 @@ interface ItineraryDaysListProps {
   slug: string
   days: DayWithSlots[]
   stays: Stay[]
+  /** Public share view — hide links back into the authenticated app. */
+  readOnly?: boolean
 }
 
 function stayForDay(stays: Stay[], date: string | null): Stay | undefined {
@@ -15,14 +17,16 @@ function stayForDay(stays: Stay[], date: string | null): Stay | undefined {
   return stays.find((s) => s.check_in <= date && date < s.check_out)
 }
 
-export function ItineraryDaysList({ slug, days, stays }: ItineraryDaysListProps) {
+export function ItineraryDaysList({ slug, days, stays, readOnly = false }: ItineraryDaysListProps) {
   if (days.length === 0) {
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-12 text-center">
         <p className="text-muted-foreground text-sm mb-3">Nothing locked in yet.</p>
-        <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
-          ← Head back to planning
-        </Link>
+        {!readOnly && (
+          <Link to={`/trip/${slug}`} className="text-sm text-primary hover:underline">
+            ← Head back to planning
+          </Link>
+        )}
       </div>
     )
   }

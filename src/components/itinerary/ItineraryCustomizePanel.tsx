@@ -1,4 +1,5 @@
 import { Loader2, Camera, Sparkles, FileDown } from 'lucide-react'
+import { ShareLinkButton } from './ShareLinkButton'
 
 interface ItineraryCustomizePanelProps {
   /** Whether hero image is currently uploading. */
@@ -27,6 +28,12 @@ interface ItineraryCustomizePanelProps {
   exporting: boolean
   /** Run the export (opens the browser's print-to-PDF). */
   onExport: () => void
+  /** Trip id, for the share-link endpoint. */
+  tripId: string
+  /** Existing public share token, or null when sharing is off. */
+  shareToken: string | null
+  /** Firebase ID token provider, for authenticating the share call. */
+  getIdToken: () => Promise<string | null>
 }
 
 export function ItineraryCustomizePanel({
@@ -43,6 +50,9 @@ export function ItineraryCustomizePanel({
   heroInputRef,
   exporting,
   onExport,
+  tripId,
+  shareToken,
+  getIdToken,
 }: ItineraryCustomizePanelProps) {
   const handleGenerateOrUpdate = () => {
     if (hasExistingNarrative) {
@@ -118,6 +128,11 @@ export function ItineraryCustomizePanel({
               </>
             )}
           </button>
+          <ShareLinkButton
+            tripId={tripId}
+            shareToken={shareToken}
+            getIdToken={getIdToken}
+          />
         </div>
         {generateError && (
           <p className="text-[10px] text-destructive/90 text-center">{generateError}</p>

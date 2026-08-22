@@ -21,6 +21,27 @@ function ensureAdmin() {
 }
 
 /**
+ * Firestore via the Admin SDK. This authenticates as a service account, which
+ * bypasses security rules entirely — that's what lets the public share link
+ * read a trip without opening `firestore.rules` to unauthenticated clients.
+ */
+export function getDb(): admin.firestore.Firestore {
+  ensureAdmin()
+  return admin.firestore()
+}
+
+/** Firestore Timestamps aren't JSON — flatten them for the wire. */
+export function serialize<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_k, v) =>
+      v && typeof v === 'object' && typeof (v as { toDate?: unknown }).toDate === 'function'
+        ? (v as { toDate: () => Date }).toDate().toISOString()
+        : v
+    )
+  ) as T
+}
+
+/**
  * Returns the Firebase UID if the request has a valid Bearer token; otherwise null.
  * Do not use verifyIdToken(idToken, true) (revocation check) — it can cause timeouts on Netlify.
  */
