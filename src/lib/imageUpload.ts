@@ -103,7 +103,10 @@ async function uploadDirectToGithub(
   }
 
   onProgress?.(100)
-  return `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath}`
+  // Commit-SHA ref, not `main` — see upload-github-image.ts for why.
+  const putData = (await putRes.json().catch(() => ({}))) as { commit?: { sha?: string } }
+  const ref = putData.commit?.sha || 'main'
+  return `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${ref}/${filePath}`
 }
 
 /**

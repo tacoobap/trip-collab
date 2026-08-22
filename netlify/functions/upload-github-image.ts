@@ -98,7 +98,12 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  const url = `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`
+  // Pin to the commit SHA. The file path is stable (`hero.jpg`, `<dayId>.jpg`), so a
+  // `main`-ref URL is byte-identical across re-uploads and browsers keep serving the
+  // stale image for raw.githubusercontent's `max-age=300`.
+  const putData = (await putRes.json().catch(() => ({}))) as { commit?: { sha?: string } }
+  const ref = putData.commit?.sha || 'main'
+  const url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${filePath}`
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
