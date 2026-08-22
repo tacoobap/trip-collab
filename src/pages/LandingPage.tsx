@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react'
+import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2, Trash2 } from 'lucide-react'
 import { firebaseReady } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { NewTripDialog } from '@/components/trips/NewTripDialog'
@@ -10,8 +10,17 @@ import { Button } from '@/components/ui/button'
 import type { Trip } from '@/types/database'
 import { formatTripDate } from '@/lib/utils'
 import { listUserTrips } from '@/services/tripService'
+import { DeleteTripDialog } from '@/components/trips/DeleteTripDialog'
 
-function TripCard({ trip }: { trip: Trip }) {
+function TripCard({
+  trip,
+  canDelete,
+  onRequestDelete,
+}: {
+  trip: Trip
+  canDelete: boolean
+  onRequestDelete: () => void
+}) {
   const start = formatTripDate(trip.start_date)
   const end = formatTripDate(trip.end_date)
   const dateRange = start && end ? `${start} – ${end}` : start ?? end ?? null
@@ -27,7 +36,25 @@ function TripCard({ trip }: { trip: Trip }) {
           <h3 className="font-serif font-semibold text-foreground text-lg leading-snug group-hover:text-primary transition-colors">
             {trip.name}
           </h3>
-          <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex items-center gap-1 shrink-0 mt-0.5">
+            {canDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  // The whole card is a Link — don't navigate on delete
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onRequestDelete()
+                }}
+                className="p-1 -m-1 rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all touch-manipulation max-sm:opacity-100"
+                title="Delete trip"
+                aria-label={`Delete ${trip.name}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
         </div>
 
         <div className="mt-3 space-y-1.5">
@@ -50,9 +77,10 @@ function TripCard({ trip }: { trip: Trip }) {
 }
 
 export function LandingPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, getIdToken } = useAuth()
   const [newTripOpen, setNewTripOpen] = useState(false)
   const [trips, setTrips] = useState<Trip[]>([])
+  const [tripToDelete, setTripToDelete] = useState<Trip | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -139,7 +167,11 @@ export function LandingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <TripCard trip={trip} />
+                  <TripCard
+                    trip={trip}
+                    canDelete={trip.owner_uid === user?.uid}
+                    onRequestDelete={() => setTripToDelete(trip)}
+                  />
                 </motion.div>
               ))}
               <motion.div
@@ -160,6 +192,19 @@ export function LandingPage() {
           </>
         )}
       </main>
+
+      {tripToDelete && (
+        <DeleteTripDialog
+          open={!!tripToDelete}
+          onOpenChange={(o) => !o && setTripToDelete(null)}
+          trip={tripToDelete}
+          getIdToken={getIdToken}
+          onDeleted={(id) => {
+            setTrips((prev) => prev.filter((t) => t.id !== id))
+            setTripToDelete(null)
+          }}
+        />
+      )}
 
       <footer className="border-t border-border py-4 px-4 sm:px-8 text-center text-xs text-muted-foreground">
         <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>

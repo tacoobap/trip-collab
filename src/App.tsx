@@ -8,6 +8,7 @@ import { ItineraryPage } from '@/pages/ItineraryPage'
 import { CollectionPage } from '@/pages/CollectionPage'
 import { SeedPage } from '@/pages/SeedPage'
 import { SharedItineraryPage } from '@/pages/SharedItineraryPage'
+import { TripSettingsPage } from '@/pages/TripSettingsPage'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/trip/:slug" element={<TripPage />} />
         <Route path="/trip/:slug/itinerary" element={<ItineraryPage />} />
         <Route path="/trip/:slug/collection" element={<CollectionPage />} />
+        <Route path="/trip/:slug/settings" element={<TripSettingsPage />} />
         {/* Public — no auth; data comes from the shared-trip function */}
         <Route path="/i/:token" element={<SharedItineraryPage />} />
         {import.meta.env.DEV && <Route path="/seed" element={<SeedPage />} />}

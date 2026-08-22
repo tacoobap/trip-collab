@@ -82,7 +82,7 @@ export function PageHeader({
         </nav>
 
         {/* Right: user avatar + dropdown menu */}
-        {currentName && <UserMenu isDark={isDark} />}
+        {currentName && <UserMenu isDark={isDark} tripSlug={trip.slug} />}
       </div>
     </header>
   )

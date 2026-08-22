@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
-import { ChevronDown, LogOut } from 'lucide-react'
+import { ChevronDown, LogOut, Settings } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -8,9 +9,11 @@ import { useDisplayName } from '@/hooks/useDisplayName'
 interface UserMenuProps {
   /** When true, use dark styling (e.g. over hero) */
   isDark?: boolean
+  /** Trip slug — when set, the menu offers that trip's settings. */
+  tripSlug?: string
 }
 
-export function UserMenu({ isDark = false }: UserMenuProps) {
+export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
   const { user, signOut } = useAuth()
   const { displayName } = useDisplayName()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -67,6 +70,20 @@ export function UserMenu({ isDark = false }: UserMenuProps) {
               : 'border-border bg-warm-white shadow-md'
           )}
         >
+          {tripSlug && (
+            <Link
+              to={`/trip/${tripSlug}/settings`}
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                isDark ? 'hover:bg-white/15' : 'hover:bg-muted text-foreground'
+              )}
+            >
+              <Settings className="w-4 h-4 shrink-0 opacity-70" />
+              Settings
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"
