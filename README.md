@@ -1,6 +1,6 @@
 # Trup — Trip planning, together
 
-Collaborative trip itinerary planning. Create a trip, add days and time slots, propose ideas, vote, and lock in the plan. View a polished itinerary and manage a shared collection of ideas.
+Collaborative trip itinerary planning. Create a trip, add days and time slots, propose ideas, vote, and lock in the plan. View a polished itinerary and manage a shared collection of ideas. Export the itinerary as a PDF, or share a read-only link that needs no account.
 
 **Stack:** React 19, TypeScript, Vite, Tailwind CSS, Framer Motion, Firebase (Firestore). Optional: Netlify (hosting + serverless functions), Gemini (narrative copy), Unsplash (images).
 
@@ -30,6 +30,14 @@ npm run dev
    - **Realtime** — current users and pages right now.
 
 Data can take up to 24–48 hours to appear in standard reports; **Realtime** updates within seconds.
+
+## Sharing an itinerary
+
+Trip settings (profile menu → **Trip settings**) can mint a public link at `/i/<token>`. Anyone with it sees the current itinerary — no account, no sign-in — and it reflects edits on their next load.
+
+`firestore.rules` is **not** opened up for this. The link is served by the `shared-trip` function, which reads through the Firebase Admin SDK; because that authenticates as a service account, it bypasses security rules entirely, so unauthenticated clients still have no direct Firestore access. The token is minted server-side, looked up server-side, and stripped from the response.
+
+Turn a link off in Trip settings. That takes effect immediately, and creating a new one later issues a different address. The shared page sets `noindex` so a forwarded link stays out of search results.
 
 ## Scripts
 
@@ -89,13 +97,21 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 ## Project layout
 
-- `src/pages/` — Route-level pages (Landing, Trip, Itinerary, Collection, Seed).
+- `src/pages/` — Route-level pages (Landing, Trip, Itinerary, Collection, TripSettings, SharedItinerary, Seed).
 - `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout.
 - `src/services/` — Data layer: `tripService`, `planningService`, `staysService`, `collectionService`.
-- `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, etc.
-- `src/lib/` — Firebase, utils, time/URL helpers, image upload/search, narrative and suggestion (Gemini).
+- `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, `useItineraryExport`, `useShareLink`, etc.
+- `src/lib/` — Firebase, utils, time/URL helpers, `dateRange` (timezone-safe date maths), `slotEmojis` (icon set + search + auto-assign), image upload/search, narrative and suggestion (Gemini).
 - `src/types/database.ts` — Shared Firestore/document types.
-- `netlify/functions/` — Serverless: `search-image` (Unsplash proxy), `generate-narrative` (optional server-side Gemini), `upload-github-image` (GitHub image upload with PAT server-side).
+- `netlify/functions/` — Serverless:
+  - `search-image` — Unsplash proxy.
+  - `generate-narrative` — optional server-side Gemini.
+  - `upload-github-image` — GitHub image upload with the PAT server-side.
+  - `share-link` — mint or revoke a trip's public share token (members only).
+  - `shared-trip` — public, unauthenticated read of a shared itinerary by token.
+  - `delete-trip` — owner-only cascading delete of a trip and its documents.
+
+  Note: `netlify/functions` isn't covered by `tsconfig.app.json` (which includes only `src`), so `npm run build` does **not** type-check it — esbuild strips types at deploy time without checking them. Type-check functions separately if you change them.
 
 ## Next up (productionizing)
 
@@ -111,7 +127,7 @@ The app is set up for **Netlify**: build command `npm run build`, publish direct
 In **Site configuration → Environment variables**, set at least:
 
 - **Build / client:** the same `VITE_*` values you use locally (from `.env.example`), so Vite can embed public Firebase config and any client-side keys you rely on.
-- **Functions (server-only):** `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`, **`FIREBASE_SERVICE_ACCOUNT_JSON`** (Firebase Admin for ID token verification), and **`GITHUB_TOKEN`**, **`GITHUB_OWNER`**, **`GITHUB_REPO`** if you use custom image uploads. Do **not** set `VITE_GITHUB_TOKEN` on Netlify — it is compiled into the browser bundle and triggers secrets scanning (`ghp_` / `github_pat_`).
+- **Functions (server-only):** `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`, **`FIREBASE_SERVICE_ACCOUNT_JSON`** (Firebase Admin), and **`GITHUB_TOKEN`**, **`GITHUB_OWNER`**, **`GITHUB_REPO`** if you use custom image uploads. The service account is used for ID token verification **and** for Firestore reads/writes by `share-link`, `shared-trip` and `delete-trip`, so it needs **Cloud Datastore User** as well as auth access — Firebase's auto-generated `firebase-adminsdk` account has both by default, but a hand-scoped one may not. Do **not** set `VITE_GITHUB_TOKEN` on Netlify — it is compiled into the browser bundle and triggers secrets scanning (`ghp_` / `github_pat_`).
 
 ### If a service account JSON was committed
 
