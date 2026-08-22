@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { createDaysWithDefaultSlots } from '@/services/planningService'
+import { createDays } from '@/services/planningService'
 import { Loader2, CalendarDays, Plus, Pencil } from 'lucide-react'
 import { AddDayDialog } from './AddDayDialog'
 import { Button } from '@/components/ui/button'
@@ -75,7 +75,7 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
     setError('')
 
     try {
-      await createDaysWithDefaultSlots(
+      await createDays(
         trip.id,
         resolved.map((d) => ({
           date: d.date,

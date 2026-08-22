@@ -13,14 +13,9 @@ import {
 import { db } from '@/lib/firebase'
 import type { Day, Slot } from '@/types/database'
 import { enumerateDates, dayLabel } from '@/lib/dateRange'
+import { suggestEmoji } from '@/lib/slotEmojis'
 
 export type SlotCategory = Slot['category']
-
-const DEFAULT_DAY_SLOTS = [
-  { time_label: 'Morning', category: 'activity' as SlotCategory, sort_order: 0 },
-  { time_label: 'Afternoon', category: 'activity' as SlotCategory, sort_order: 1 },
-  { time_label: 'Evening', category: 'food' as SlotCategory, sort_order: 2 },
-]
 
 export type CreateDayInput = {
   date: string
@@ -29,10 +24,11 @@ export type CreateDayInput = {
 }
 
 /**
- * Create day docs and default slots (Morning, Afternoon, Evening) for each day in one batch.
+ * Create day docs for each day in one batch. Days start empty — the quick-entry
+ * row fills them faster than placeholder slots can be edited.
  * useTrip's subscription will pick up the new days automatically.
  */
-export async function createDaysWithDefaultSlots(
+export async function createDays(
   tripId: string,
   days: CreateDayInput[]
 ): Promise<void> {
@@ -46,19 +42,6 @@ export async function createDaysWithDefaultSlots(
       day_number: day.dayNumber,
       date: day.date,
     })
-    for (const slot of DEFAULT_DAY_SLOTS) {
-      const slotRef = doc(collection(db, 'slots'))
-      batch.set(slotRef, {
-        day_id: dayRef.id,
-        trip_id: tripId,
-        time_label: slot.time_label,
-        category: slot.category,
-        icon: null,
-        status: 'open',
-        locked_proposal_id: null,
-        sort_order: slot.sort_order,
-      })
-    }
   }
   await batch.commit()
 }
@@ -112,7 +95,7 @@ export async function syncTripDays(
     .map((d) => ({ date: d.date ?? '', current: d }))
   const ordered = [...inRange, ...strays]
 
-  // Chunked: a batch caps at 500 writes and each new day costs 1 + 3 slots
+  // Chunked: a batch caps at 500 writes
   let batch = writeBatch(db)
   let ops = 0
   const flush = async (force = false) => {
@@ -141,20 +124,6 @@ export async function syncTripDays(
         narrative_title: null,
       })
       ops++
-      for (const slot of DEFAULT_DAY_SLOTS) {
-        const slotRef = doc(collection(db, 'slots'))
-        batch.set(slotRef, {
-          day_id: dayRef.id,
-          trip_id: tripId,
-          time_label: slot.time_label,
-          category: slot.category,
-          icon: null,
-          status: 'open',
-          locked_proposal_id: null,
-          sort_order: slot.sort_order,
-        })
-        ops++
-      }
     } else if (current.day_number !== dayNumber) {
       // Labels are always derived (`Day N · City`), never free text, so
       // rewriting them here can't clobber anything the user typed
@@ -263,7 +232,7 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
     trip_id,
     time_label,
     category,
-    icon: null,
+    icon: suggestEmoji(title),
     status: 'locked',
     locked_proposal_id: proposalRef.id,
     sort_order,
@@ -345,12 +314,14 @@ export async function updateSlotIcon(slotId: string, icon: string): Promise<void
 
 export async function lockSlot(
   slotId: string,
-  locked_proposal_id: string
+  locked_proposal_id: string,
+  /** Title of the locked idea — used to fill in an icon when the slot has none. */
+  titleForIcon?: string | null
 ): Promise<void> {
-  await updateDoc(doc(db, 'slots', slotId), {
-    status: 'locked',
-    locked_proposal_id,
-  })
+  const data: Record<string, unknown> = { status: 'locked', locked_proposal_id }
+  const icon = titleForIcon ? suggestEmoji(titleForIcon) : null
+  if (icon) data.icon = icon
+  await updateDoc(doc(db, 'slots', slotId), data)
 }
 
 export async function unlockSlot(slotId: string): Promise<void> {

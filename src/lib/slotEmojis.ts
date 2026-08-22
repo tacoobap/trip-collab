@@ -185,7 +185,7 @@ export const SLOT_EMOJI_GROUPS: SlotEmojiGroup[] = [
 
   group('Shopping', [
     ['🛍', 'Shopping', 'shops', 'retail', 'boutique', 'mall'],
-    ['🛒', 'Groceries', 'supermarket', 'shopping', 'market'],
+    ['🛒', 'Groceries', 'supermarket', 'shopping', 'market', 'grocery'],
     ['🧺', 'Farmers market', 'market', 'produce', 'local'],
     ['💐', 'Flower market', 'flowers', 'bouquet', 'market'],
     ['🕯', 'Home goods', 'candle', 'shop', 'decor'],
@@ -231,7 +231,7 @@ export const SLOT_EMOJI_GROUPS: SlotEmojiGroup[] = [
     ['🎈', 'Hot air balloon', 'balloon', 'ride', 'sunrise'],
     ['⛺', 'Camping', 'tent', 'outdoors', 'campsite'],
     ['🔥', 'Campfire', 'bonfire', 'fire', 'evening'],
-    ['🧭', 'Exploring', 'compass', 'wander', 'adventure'],
+    ['🧭', 'Exploring', 'compass', 'wander', 'adventure', 'explore', 'roam'],
     ['🗺', 'Tour', 'map', 'guide', 'sightseeing', 'walking tour'],
     ['🔭', 'Observatory', 'telescope', 'stars', 'viewpoint'],
     ['🔦', 'Caving', 'torch', 'cave', 'underground'],
@@ -255,7 +255,7 @@ export const SLOT_EMOJI_GROUPS: SlotEmojiGroup[] = [
     ['⛳', 'Golf', 'course', 'tee', 'round'],
     ['🎳', 'Bowling', 'game', 'alley'],
     ['🎯', 'Darts', 'pub', 'game'],
-    ['🎱', 'Pool', 'billiards', 'snooker', 'bar', 'game'],
+    ['🎱', 'Billiards', 'pool', 'snooker', 'bar', 'game'],
     ['🎮', 'Arcade', 'games', 'video games'],
     ['🕹', 'Retro arcade', 'games', 'joystick'],
     ['🎲', 'Board games', 'dice', 'games', 'night in'],
@@ -405,7 +405,7 @@ export const SLOT_EMOJI_GROUPS: SlotEmojiGroup[] = [
     ['🚋', 'Historic tram', 'streetcar', 'tram 28'],
     ['🚌', 'Bus', 'coach', 'shuttle'],
     ['🚐', 'Minivan', 'shuttle', 'transfer', 'van'],
-    ['🚗', 'Drive', 'car', 'road trip', 'rental'],
+    ['🚗', 'Drive', 'car', 'road trip', 'rental', 'rent', 'hire'],
     ['🚙', 'Road trip', 'car', 'suv', 'drive'],
     ['🚕', 'Taxi', 'cab', 'uber', 'ride'],
     ['🛺', 'Tuk-tuk', 'rickshaw', 'ride'],
@@ -589,4 +589,80 @@ export function matchesEmoji(entry: SlotEmoji, groupName: string, q: string): bo
   if (entry.label.toLowerCase().includes(q)) return true
   if (groupName.toLowerCase().includes(q)) return true
   return (entry.keywords ?? []).some((k) => k.includes(q))
+}
+
+// ── Auto-assign ─────────────────────────────────────────────────────────────
+
+/** Words too generic to identify an activity — they'd match almost anything. */
+const STOP_TERMS = new Set(['day', 'time', 'to', 'the', 'in', 'at', 'a', 'an', 'of'])
+
+/** Crude singulariser — enough to bridge "cocktails"/"cocktail". */
+function singular(word: string): string {
+  return word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word
+}
+
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents: "Chapitô" → "chapito"
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Pick an emoji for a slot from the text of its idea — "Check in to hotel" → 🏨,
+ * "Sunset @ Chapitô à Mesa" → 🌄.
+ *
+ * Scores every entry's label and keywords against the title and takes the best.
+ * Matching is word-boundary only, so "art" can't match inside "depart", and
+ * longer terms outrank shorter ones so "hot spring" beats a bare "hot". Returns
+ * null rather than guessing when nothing scores well — a wrong icon is worse
+ * than the category default.
+ */
+export function suggestEmoji(text: string): string | null {
+  const norm = normalize(text)
+  if (!norm) return null
+
+  const words = new Set<string>()
+  for (const w of norm.split(' ')) {
+    words.add(w)
+    words.add(singular(w))
+  }
+
+  let best: { emoji: string; score: number } | null = null
+
+  for (const group of SLOT_EMOJI_GROUPS) {
+    for (const entry of group.emojis) {
+      let score = 0
+
+      const consider = (raw: string, isLabel: boolean) => {
+        const term = normalize(raw)
+        if (!term || STOP_TERMS.has(term)) return
+        let hit = 0
+        if (term.includes(' ')) {
+          // Multi-word terms must appear as a phrase, and are more telling
+          if (norm.includes(term)) hit = term.length + 4
+        } else if (words.has(term) || words.has(singular(term))) {
+          hit = term.length
+        }
+        // A label is what the icon *is*; a keyword is only a way to find it.
+        // Without this, "Beach day" scores 🥥 (keyword) over 🏖 (label).
+        if (hit > 0) score = Math.max(score, isLabel ? hit + 3 : hit)
+      }
+
+      consider(entry.label, true)
+      for (const k of entry.keywords ?? []) consider(k, false)
+
+      // Earlier groups are the more travel-specific ones; only displace on a
+      // strictly better score so curation order breaks ties
+      if (score > 0 && (!best || score > best.score)) {
+        best = { emoji: entry.emoji, score }
+      }
+    }
+  }
+
+  // Two- and three-letter hits are almost always incidental
+  return best && best.score >= 4 ? best.emoji : null
 }

@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { formatTimeLabel } from '@/lib/timeUtils'
 import { cn } from '@/lib/utils'
 
-const TIME_CHIPS = ['9:00 AM', '12:00 PM', '3:00 PM', '7:00 PM']
+const TIME_CHIPS = ['9:00 AM', '11:00 AM', '12:00 PM', '3:00 PM', '5:00 PM', '7:00 PM']
 
 // ── Inline slot label (editable time in drawer header) ──────────────────────
 
@@ -258,7 +258,9 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const handleLock = async (proposalId: string) => {
     setLockLoading(true)
     try {
-      await lockSlot(slot.id, proposalId)
+      // Only derive an icon if the user hasn't picked one themselves
+      const title = slot.proposals.find((p) => p.id === proposalId)?.title
+      await lockSlot(slot.id, proposalId, slot.icon ? null : title)
       onUpdate()
       onClose()
     } finally {

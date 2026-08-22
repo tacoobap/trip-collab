@@ -137,11 +137,15 @@
 
 /* ── Print / "Export PDF" (itinerary) ─────────────────────────────────────
    The PDF is the live page repaginated, not a separate layout, so design
-   changes flow through automatically. Triggered from useItineraryExport. */
+   changes flow through automatically. Triggered from useItineraryExport.
+
+   Content flows continuously here. Forcing each day onto its own sheet reads
+   nicely in theory but left every page 35–50% empty, so only individual
+   entries and cards are protected from splitting. */
 @media print {
   @page {
     size: letter portrait;
-    margin: 0.5in;
+    margin: 0.45in;
   }
 
   /* Cover sheet runs full-bleed */
@@ -189,41 +193,33 @@
     page-break-after: always;
   }
 
-  /* The scrim is weakest at centre, where the title sits — on a bright photo
-     that leaves white-on-white, so carry the contrast in the type itself */
-  [data-print='hero'] h1,
-  [data-print='hero'] p {
-    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.45) !important;
-  }
-
-  /* The on-screen tagline/date lean on white/60–65 over the scrim; without a
-     guaranteed scrim on paper they need to carry themselves */
-  [data-print='hero'] h1 {
-    color: #fff !important;
-  }
-
-  [data-print='hero'] p {
-    color: rgba(255, 255, 255, 0.93) !important;
-  }
-
   [data-print='content'] {
     margin-top: 0 !important;
     padding-top: 0 !important;
   }
 
-  /* ── Days ──
-     No forced break-before: a day that overflows would leave the remainder
-     stranded on an otherwise blank sheet. break-inside keeps each day whole
-     and lets the browser pull it to the next sheet only when it must. */
-  [data-print='day'] {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    background: none !important;
-    padding-top: 0.18in !important;
-    padding-bottom: 0.18in !important;
+  /* ── Vibe ── */
+  [data-print='vibe'] {
+    padding-top: 0.3in !important;
+    padding-bottom: 0.2in !important;
   }
 
-  [data-print='day'] + [data-print='day'] {
+  [data-print='vibe'] h2 {
+    margin-bottom: 0.2in !important;
+  }
+
+  /* ── Days ── */
+  [data-print='day'] {
+    background: none !important;
+    padding: 0 !important;
+  }
+
+  [data-print='day'] > div {
+    padding-top: 0.16in !important;
+    padding-bottom: 0.16in !important;
+  }
+
+  [data-print='day'] + [data-print='day'] > div {
     border-top: 1px solid hsl(var(--border));
   }
 
@@ -233,39 +229,40 @@
   [data-print='day-grid'] {
     flex-direction: row !important;
     align-items: flex-start !important;
-    gap: 0.3in !important;
+    gap: 0.28in !important;
   }
 
   [data-print='day-photo'] {
-    width: 38% !important;
+    width: 34% !important;
     margin-bottom: 0 !important;
     position: static !important;
   }
 
   [data-print='day-photo-frame'] {
-    height: 2.9in !important;
+    height: 2.4in !important;
     min-height: 0 !important;
   }
 
-  /* ── Tighten vertical rhythm so a full day fits one sheet ── */
+  /* Keep a day's heading with at least the start of its timeline */
   [data-print='day-header'] {
-    margin-bottom: 0.15in !important;
+    margin-bottom: 0.12in !important;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   [data-print='day-header'] h2 {
-    font-size: 1.5rem !important;
+    font-size: 1.4rem !important;
     line-height: 1.25 !important;
-    margin-bottom: 0.1in !important;
+    margin-bottom: 0.08in !important;
   }
 
   [data-print='item-body'] {
-    padding-bottom: 0.1in !important;
+    padding-bottom: 0.07in !important;
   }
 
   [data-print='glance'] {
-    break-before: page;
-    page-break-before: always;
-    padding-top: 0 !important;
+    padding-top: 0.25in !important;
+    padding-bottom: 0 !important;
   }
 
   /* Never split a single entry or card across sheets */

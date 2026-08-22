@@ -46,7 +46,7 @@ export function VibeTagsSection({ tags, heading }: VibeTagsSectionProps) {
   const sectionTitle = heading ?? 'Intention Over Itinerary'
 
   return (
-    <section className="pt-16 md:pt-24 pb-8 px-6">
+    <section data-print="vibe" className="pt-16 md:pt-24 pb-8 px-6">
       <div className="max-w-4xl mx-auto text-center">
         <motion.header
           initial={{ opacity: 0, y: 20 }}
