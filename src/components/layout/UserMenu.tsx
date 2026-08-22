@@ -81,7 +81,7 @@ export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
               )}
             >
               <Settings className="w-4 h-4 shrink-0 opacity-70" />
-              Settings
+              Trip settings
             </Link>
           )}
           <button

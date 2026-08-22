@@ -34,3 +34,28 @@ export function enumerateDates(start: string, end: string): string[] {
 export function dayLabel(dayNumber: number, city: string): string {
   return city ? `Day ${dayNumber} · ${city}` : `Day ${dayNumber}`
 }
+
+/** Today as `YYYY-MM-DD` in the viewer's own timezone. */
+export function todayISO(): string {
+  const now = new Date()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${mm}-${dd}`
+}
+
+/**
+ * A trip is past once its last day is behind us. Comparison is on the
+ * `YYYY-MM-DD` strings directly — parsing them into Dates reintroduces the
+ * UTC-vs-local off-by-one these fields keep attracting.
+ *
+ * A trip running right now counts as upcoming, and one with no dates yet is
+ * still being planned, so it isn't past either.
+ */
+export function isPastTrip(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  today = todayISO()
+): boolean {
+  const last = end || start
+  return !!last && last < today
+}

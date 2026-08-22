@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Sparkles, Plus, MapPin, Calendar, ArrowRight, AlertTriangle, Loader2, Trash2 } from 'lucide-react'
@@ -11,6 +11,7 @@ import type { Trip } from '@/types/database'
 import { formatTripDate } from '@/lib/utils'
 import { listUserTrips } from '@/services/tripService'
 import { DeleteTripDialog } from '@/components/trips/DeleteTripDialog'
+import { isPastTrip } from '@/lib/dateRange'
 
 function TripCard({
   trip,
@@ -83,6 +84,20 @@ export function LandingPage() {
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const { upcoming, past } = useMemo(() => {
+    const up: Trip[] = []
+    const done: Trip[] = []
+    for (const t of trips) {
+      (isPastTrip(t.start_date, t.end_date) ? done : up).push(t)
+    }
+    // Upcoming: soonest first, undated trips last. Past: most recent first.
+    up.sort((a, b) => (a.start_date ?? '9999').localeCompare(b.start_date ?? '9999'))
+    done.sort((a, b) =>
+      (b.end_date ?? b.start_date ?? '').localeCompare(a.end_date ?? a.start_date ?? '')
+    )
+    return { upcoming: up, past: done }
+  }, [trips])
+
   useEffect(() => {
     if (!firebaseReady || !user) {
       setLoading(false)
@@ -153,14 +168,16 @@ export function LandingPage() {
         ) : (
           <>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-serif font-semibold text-foreground">My trips</h2>
+              <h2 className="text-2xl font-serif font-semibold text-foreground">
+                {past.length > 0 ? 'Upcoming' : 'My trips'}
+              </h2>
             </div>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              {trips.map((trip, i) => (
+              {upcoming.map((trip, i) => (
                 <motion.div
                   key={trip.slug}
                   initial={{ opacity: 0, y: 16 }}
@@ -177,7 +194,7 @@ export function LandingPage() {
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: trips.length * 0.05 }}
+                transition={{ delay: upcoming.length * 0.05 }}
               >
                 <button
                   onClick={() => setNewTripOpen(true)}
@@ -189,6 +206,38 @@ export function LandingPage() {
                 </button>
               </motion.div>
             </motion.div>
+
+            {past.length > 0 && (
+              <>
+                <div className="flex items-center gap-3 mt-12 mb-6">
+                  <h2 className="text-2xl font-serif font-semibold text-foreground">Past</h2>
+                  <span className="text-xs text-muted-foreground/60">
+                    {past.length} {past.length === 1 ? 'trip' : 'trips'}
+                  </span>
+                </div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                >
+                  {past.map((trip, i) => (
+                    <motion.div
+                      key={trip.slug}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="opacity-75 hover:opacity-100 transition-opacity"
+                    >
+                      <TripCard
+                        trip={trip}
+                        canDelete={trip.owner_uid === user?.uid}
+                        onRequestDelete={() => setTripToDelete(trip)}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </>
+            )}
           </>
         )}
       </main>
