@@ -46,11 +46,20 @@ export function DaySection({ day, flip = false }: DaySectionProps) {
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className=""
     >
-      <div className={`flex flex-col md:items-start md:gap-12 ${flip ? 'md:flex-row-reverse' : 'md:flex-row'}`}>
+      <div
+        data-print="day-grid"
+        className={`flex flex-col md:items-start md:gap-12 ${flip ? 'md:flex-row-reverse' : 'md:flex-row'}`}
+      >
         {/* Image column: full-bleed photo only, no overlay text */}
         {day.image_url && (
-          <div className="md:sticky md:top-24 w-full md:w-[42%] lg:w-[380px] shrink-0 mb-8 md:mb-0 order-first md:order-none">
-            <div className="relative h-64 md:h-[320px] lg:aspect-[3/4] lg:h-auto lg:min-h-[380px] rounded-xl overflow-hidden bg-muted">
+          <div
+            data-print="day-photo"
+            className="md:sticky md:top-24 w-full md:w-[42%] lg:w-[380px] shrink-0 mb-8 md:mb-0 order-first md:order-none"
+          >
+            <div
+              data-print="day-photo-frame"
+              className="relative h-64 md:h-[320px] lg:aspect-[3/4] lg:h-auto lg:min-h-[380px] rounded-xl overflow-hidden bg-muted"
+            >
               <motion.img
                 src={day.image_url}
                 alt={day.label}
@@ -73,7 +82,7 @@ export function DaySection({ day, flip = false }: DaySectionProps) {
 
         {/* Schedule column: day label + title + timeline (charleston-dreams gentle style) */}
         <div className="flex-1 min-w-0">
-          <header className="mb-6">
+          <header data-print="day-header" className="mb-6">
             <span className="inline-block font-sans text-xs tracking-[0.25em] uppercase text-primary font-semibold mb-3">
               Day {dayOrdinal(day.day_number)}
             </span>

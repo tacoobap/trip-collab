@@ -16,7 +16,7 @@ export function TimelineItem({ slot, isLast = false }: TimelineItemProps) {
           <div className="w-2.5 h-2.5 rounded-full bg-primary/40 shrink-0 mt-1.5" />
           {!isLast && <div className="w-px flex-1 bg-border min-h-[20px]" />}
         </div>
-        <div className="pb-4">
+        <div data-print="item-body" className="pb-4">
           <span className="font-sans text-xs text-primary font-semibold tracking-wide">{slot.time_label}</span>
           <p className="font-sans text-foreground font-medium mt-0.5">Still deciding…</p>
         </div>
@@ -34,7 +34,7 @@ export function TimelineItem({ slot, isLast = false }: TimelineItemProps) {
         <div className="w-2.5 h-2.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors duration-300 mt-1.5 shrink-0" />
         {!isLast && <div className="w-px flex-1 bg-border min-h-[24px]" />}
       </div>
-      <div className="pb-4">
+      <div data-print="item-body" className="pb-4">
         <span className="font-sans text-xs text-primary font-semibold tracking-wide">
           {displayTime}
         </span>

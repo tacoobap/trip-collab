@@ -137,7 +137,7 @@
 
 /* ── Print / "Export PDF" (itinerary) ─────────────────────────────────────
    The PDF is the live page repaginated, not a separate layout, so design
-   changes flow through automatically. Triggered from ItineraryExportBar. */
+   changes flow through automatically. Triggered from useItineraryExport. */
 @media print {
   @page {
     size: letter portrait;
@@ -170,16 +170,18 @@
     background: #fff !important;
   }
 
-  /* min-h-screen would otherwise trail a blank sheet */
+  /* White paper with tinted cards reads better than a full-page sand wash
+     floating inside the page margins */
   [data-print='page'] {
     min-height: 0 !important;
+    background: #fff !important;
   }
 
   [data-print='hide'] {
     display: none !important;
   }
 
-  /* Cover: hero fills sheet one (0.1in short of letter to avoid a spill page) */
+  /* ── Cover ── */
   [data-print='hero'] {
     height: 10.9in !important;
     min-height: 0 !important;
@@ -187,20 +189,77 @@
     page-break-after: always;
   }
 
-  /* Content block tucks under the hero on screen via -mt-16 */
+  /* The scrim is weakest at centre, where the title sits — on a bright photo
+     that leaves white-on-white, so carry the contrast in the type itself */
+  [data-print='hero'] h1,
+  [data-print='hero'] p {
+    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  /* The on-screen tagline/date lean on white/60–65 over the scrim; without a
+     guaranteed scrim on paper they need to carry themselves */
+  [data-print='hero'] h1 {
+    color: #fff !important;
+  }
+
+  [data-print='hero'] p {
+    color: rgba(255, 255, 255, 0.93) !important;
+  }
+
   [data-print='content'] {
     margin-top: 0 !important;
     padding-top: 0 !important;
   }
 
-  /* One day per sheet; drop the alternating sand tint (full-page fills band
-     badly on paper and eat ink) */
+  /* ── Days ──
+     No forced break-before: a day that overflows would leave the remainder
+     stranded on an otherwise blank sheet. break-inside keeps each day whole
+     and lets the browser pull it to the next sheet only when it must. */
   [data-print='day'] {
-    break-before: page;
-    page-break-before: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
     background: none !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    padding-top: 0.18in !important;
+    padding-bottom: 0.18in !important;
+  }
+
+  [data-print='day'] + [data-print='day'] {
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  /* Photo beside the timeline rather than above it. The md: layout does this
+     already but never fires — a 7.5in page is 720px, under the 768px break —
+     and stacking costs ~2.7in of vertical room per day. */
+  [data-print='day-grid'] {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 0.3in !important;
+  }
+
+  [data-print='day-photo'] {
+    width: 38% !important;
+    margin-bottom: 0 !important;
+    position: static !important;
+  }
+
+  [data-print='day-photo-frame'] {
+    height: 2.9in !important;
+    min-height: 0 !important;
+  }
+
+  /* ── Tighten vertical rhythm so a full day fits one sheet ── */
+  [data-print='day-header'] {
+    margin-bottom: 0.15in !important;
+  }
+
+  [data-print='day-header'] h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.25 !important;
+    margin-bottom: 0.1in !important;
+  }
+
+  [data-print='item-body'] {
+    padding-bottom: 0.1in !important;
   }
 
   [data-print='glance'] {

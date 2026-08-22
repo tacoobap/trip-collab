@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { SlotWithProposals } from '@/types/database'
-import { CATEGORY_ICONS } from './SlotIconPicker'
+import { CATEGORY_ICONS } from '@/lib/slotEmojis'
 import { cn } from '@/lib/utils'
 
 interface SlotCardProps {
