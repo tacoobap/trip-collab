@@ -134,3 +134,89 @@
     text-transform: uppercase;
   }
 }
+
+/* ── Print / "Export PDF" (itinerary) ─────────────────────────────────────
+   The PDF is the live page repaginated, not a separate layout, so design
+   changes flow through automatically. Triggered from ItineraryExportBar. */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0.5in;
+  }
+
+  /* Cover sheet runs full-bleed */
+  @page :first {
+    margin: 0;
+  }
+
+  /* framer-motion parks un-scrolled sections at opacity:0 via inline styles,
+     which would print blank pages — an author !important outranks inline.
+     Also flattens the looping hero/day zoom to its natural scale. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
+  /* min-h-screen would otherwise trail a blank sheet */
+  [data-print='page'] {
+    min-height: 0 !important;
+  }
+
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  /* Cover: hero fills sheet one (0.1in short of letter to avoid a spill page) */
+  [data-print='hero'] {
+    height: 10.9in !important;
+    min-height: 0 !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  /* Content block tucks under the hero on screen via -mt-16 */
+  [data-print='content'] {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* One day per sheet; drop the alternating sand tint (full-page fills band
+     badly on paper and eat ink) */
+  [data-print='day'] {
+    break-before: page;
+    page-break-before: always;
+    background: none !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  [data-print='glance'] {
+    break-before: page;
+    page-break-before: always;
+    padding-top: 0 !important;
+  }
+
+  /* Never split a single entry or card across sheets */
+  [data-print='item'],
+  [data-print='card'] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a {
+    text-decoration: none !important;
+  }
+}

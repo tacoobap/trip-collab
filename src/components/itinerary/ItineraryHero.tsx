@@ -20,6 +20,7 @@ export function ItineraryHero({
   return (
     <div
       ref={heroRef}
+      data-print="hero"
       className="relative min-h-screen h-[100vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40"
     >
       {currentHero && (

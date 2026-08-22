@@ -4,6 +4,7 @@ import { VibeTagsSection } from '@/components/itinerary/VibeTagsSection'
 import { AtAGlanceSection } from '@/components/itinerary/AtAGlanceSection'
 import { ItineraryHero } from '@/components/itinerary/ItineraryHero'
 import { ItineraryCustomizePanel } from '@/components/itinerary/ItineraryCustomizePanel'
+import { ItineraryExportBar } from '@/components/itinerary/ItineraryExportBar'
 import { ItineraryDaysList } from '@/components/itinerary/ItineraryDaysList'
 import { UpdateTextModal } from '@/components/itinerary/UpdateTextModal'
 import { Loader2 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { uploadImage } from '@/lib/imageUpload'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useNarrativeGeneration } from '@/hooks/useNarrativeGeneration'
+import { useItineraryExport } from '@/hooks/useItineraryExport'
 import { searchImage } from '@/lib/imageSearch'
 import { formatTripDate } from '@/lib/utils'
 
@@ -29,6 +31,7 @@ export function ItineraryPage() {
   const { generate: generateNarrativeResult, error: narrativeError, clearError: clearNarrativeError } = useNarrativeGeneration(trip, days)
   const { displayName } = useDisplayName()
   const { stays } = useStays(trip?.id)
+  const { exporting, exportPdf } = useItineraryExport(trip?.name ?? 'Itinerary')
   const [heroUrl, setHeroUrl] = useState<string | null>(null)
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
   const [heroUploading, setHeroUploading] = useState(false)
@@ -328,7 +331,7 @@ export function ItineraryPage() {
   const currentHero = heroPreview ?? heroUrl ?? trip.image_url
 
   return (
-    <div className="min-h-screen bg-background">
+    <div data-print="page" className="min-h-screen bg-background">
       {!scrolledPastHero && (
         <PageHeader
           trip={trip}
@@ -365,6 +368,7 @@ export function ItineraryPage() {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, amount: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+        data-print="content"
         className="relative -mt-16 pt-4"
       >
         {/* ── Vibe tags ── */}
@@ -373,6 +377,10 @@ export function ItineraryPage() {
             tags={trip.vibe_tags}
             heading={trip.vibe_heading}
           />
+        )}
+
+        {!isMember && (
+          <ItineraryExportBar exporting={exporting} onExport={exportPdf} />
         )}
 
         {isMember && (
@@ -388,6 +396,8 @@ export function ItineraryPage() {
             onGenerate={handleGenerate}
             onOpenUpdateModal={openUpdateTextModal}
             heroInputRef={heroInputRef}
+            exporting={exporting}
+            onExport={exportPdf}
           />
         )}
 

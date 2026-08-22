@@ -11,7 +11,7 @@ export function TimelineItem({ slot, isLast = false }: TimelineItemProps) {
 
   if (slot.status !== 'locked' || !lockedProposal) {
     return (
-      <div className="flex gap-4 group opacity-60">
+      <div data-print="item" className="flex gap-4 group opacity-60">
         <div className="flex flex-col items-center">
           <div className="w-2.5 h-2.5 rounded-full bg-primary/40 shrink-0 mt-1.5" />
           {!isLast && <div className="w-px flex-1 bg-border min-h-[20px]" />}
@@ -29,7 +29,7 @@ export function TimelineItem({ slot, isLast = false }: TimelineItemProps) {
   const note = editorial_caption || lockedProposal.note
 
   return (
-    <div className="flex gap-4 group">
+    <div data-print="item" className="flex gap-4 group">
       <div className="flex flex-col items-center">
         <div className="w-2.5 h-2.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors duration-300 mt-1.5 shrink-0" />
         {!isLast && <div className="w-px flex-1 bg-border min-h-[24px]" />}

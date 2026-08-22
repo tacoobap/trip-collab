@@ -26,6 +26,7 @@ export function PageHeader({
 
   return (
     <header
+      data-print="hide"
       className={cn(
         'top-0 z-20 transition-colors duration-300 border-b',
         isDark

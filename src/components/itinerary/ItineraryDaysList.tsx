@@ -42,6 +42,7 @@ export function ItineraryDaysList({ slug, days, stays }: ItineraryDaysListProps)
         return (
           <div
             key={day.id}
+            data-print="day"
             className={dayIndex % 2 === 0 ? 'bg-sand/30' : 'bg-background'}
           >
             <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-14">

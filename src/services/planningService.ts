@@ -119,6 +119,60 @@ export async function addProposal(input: AddProposalInput): Promise<void> {
   })
 }
 
+export type AddLockedSlotInput = {
+  day_id: string
+  trip_id: string
+  time_label: string
+  sort_order: number
+  category?: SlotCategory
+  proposer_name: string
+  title: string
+}
+
+/**
+ * Create a slot, its single proposal, and lock it — one batch, one round-trip.
+ * Backs the quick-entry row for itineraries that are already decided, where the
+ * propose-then-vote-then-lock cycle is just friction.
+ */
+export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
+  const {
+    day_id,
+    trip_id,
+    time_label,
+    sort_order,
+    category = 'activity',
+    proposer_name,
+    title,
+  } = input
+
+  const batch = writeBatch(db)
+  const slotRef = doc(collection(db, 'slots'))
+  const proposalRef = doc(collection(db, 'proposals'))
+
+  batch.set(slotRef, {
+    day_id,
+    trip_id,
+    time_label,
+    category,
+    icon: null,
+    status: 'locked',
+    locked_proposal_id: proposalRef.id,
+    sort_order,
+  })
+  batch.set(proposalRef, {
+    slot_id: slotRef.id,
+    trip_id,
+    proposer_name,
+    title,
+    note: null,
+    url: null,
+    votes: [],
+    created_at: serverTimestamp(),
+  })
+
+  await batch.commit()
+}
+
 // ── Proposal updates ────────────────────────────────────────────────────────
 
 export type UpdateProposalInput = {

@@ -46,7 +46,7 @@ export function VibeTagsSection({ tags, heading }: VibeTagsSectionProps) {
   const sectionTitle = heading ?? 'Intention Over Itinerary'
 
   return (
-    <section className="py-16 md:py-24 px-6">
+    <section className="pt-16 md:pt-24 pb-8 px-6">
       <div className="max-w-4xl mx-auto text-center">
         <motion.header
           initial={{ opacity: 0, y: 20 }}
@@ -82,6 +82,7 @@ export function VibeTagsSection({ tags, heading }: VibeTagsSectionProps) {
                 viewport={{ once: true, margin: '-20px' }}
                 transition={{ duration: 0.5, delay: 0.08 * i }}
                 whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                data-print="card"
                 className="p-6 rounded-xl bg-card border border-border transition-all duration-300 hover:shadow-md hover:border-transparent group cursor-default"
                 onMouseEnter={(e) => (e.currentTarget.style.background = hoverBg)}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '')}

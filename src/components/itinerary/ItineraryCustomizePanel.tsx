@@ -1,4 +1,4 @@
-import { Loader2, Camera, Sparkles } from 'lucide-react'
+import { Loader2, Camera, Sparkles, FileDown } from 'lucide-react'
 
 interface ItineraryCustomizePanelProps {
   /** Whether hero image is currently uploading. */
@@ -23,6 +23,10 @@ interface ItineraryCustomizePanelProps {
   onOpenUpdateModal: () => void
   /** Ref for the hidden file input. */
   heroInputRef: React.RefObject<HTMLInputElement | null>
+  /** Whether a PDF export is in progress. */
+  exporting: boolean
+  /** Run the export (opens the browser's print-to-PDF). */
+  onExport: () => void
 }
 
 export function ItineraryCustomizePanel({
@@ -37,6 +41,8 @@ export function ItineraryCustomizePanel({
   onGenerate,
   onOpenUpdateModal,
   heroInputRef,
+  exporting,
+  onExport,
 }: ItineraryCustomizePanelProps) {
   const handleGenerateOrUpdate = () => {
     if (hasExistingNarrative) {
@@ -47,7 +53,10 @@ export function ItineraryCustomizePanel({
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 max-sm:pt-6 max-sm:px-3 max-sm:pb-3">
+    <div
+      data-print="hide"
+      className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-4 max-sm:pt-6 max-sm:px-3 max-sm:pb-3"
+    >
       <div className="rounded-xl border border-border bg-card/50 px-4 py-3 flex flex-col items-center gap-3 max-sm:px-3 max-sm:py-2.5">
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
           Customize
@@ -90,6 +99,22 @@ export function ItineraryCustomizePanel({
               <>
                 <Sparkles className="w-3.5 h-3.5" />{' '}
                 {hasExistingNarrative ? 'Update text' : 'Generate text'}
+              </>
+            )}
+          </button>
+          <button
+            onClick={onExport}
+            disabled={exporting}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50 touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
+            title="Export this itinerary as a PDF"
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparing…
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5" /> Export PDF
               </>
             )}
           </button>

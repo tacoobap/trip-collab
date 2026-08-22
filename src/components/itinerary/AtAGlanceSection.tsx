@@ -85,6 +85,7 @@ export function AtAGlanceSection({ days }: AtAGlanceSectionProps) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
+      data-print="glance"
       className="max-w-2xl mx-auto px-4 sm:px-6 pt-16 pb-20"
     >
       <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/60 mb-2">
@@ -97,7 +98,10 @@ export function AtAGlanceSection({ days }: AtAGlanceSectionProps) {
         </p>
 
         {/* Toggle */}
-        <div className="flex items-center rounded-lg border border-border p-0.5 bg-muted/30 shrink-0">
+        <div
+          data-print="hide"
+          className="flex items-center rounded-lg border border-border p-0.5 bg-muted/30 shrink-0"
+        >
           <button
             onClick={() => setMode('locked')}
             className={cn(

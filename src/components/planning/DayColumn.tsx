@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { addSlot } from '@/services/planningService'
+import { addSlot, addLockedSlot } from '@/services/planningService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
@@ -22,7 +22,7 @@ interface DayColumnProps {
   onEditDay?: (day: DayWithSlots) => void
 }
 
-export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick, getToken, canEdit = true, onEditDay }: DayColumnProps) {
+export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, canEdit = true, onEditDay }: DayColumnProps) {
   const getDisplayTime = (slot: SlotWithProposals) => {
     const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
     return locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
@@ -41,6 +41,9 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
 
   const [addingSlot, setAddingSlot] = useState(false)
   const [newLabel, setNewLabel] = useState('')
+  const [newTitle, setNewTitle] = useState('')
+  const timeInputRef = useRef<HTMLInputElement>(null)
+  const titleInputRef = useRef<HTMLInputElement>(null)
   const [savingSlot, setSavingSlot] = useState(false)
   const [addSlotError, setAddSlotError] = useState<string | null>(null)
 
@@ -114,15 +117,30 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
     }
     setAddSlotError(null)
     setSavingSlot(true)
+    const title = newTitle.trim()
     try {
-      await addSlot({
-        day_id: day.id,
-        trip_id: tripId,
-        time_label: formatted,
-        sort_order: day.slots.length,
-      })
+      if (title) {
+        // Already-decided itinerary: skip the propose/vote/lock cycle entirely
+        await addLockedSlot({
+          day_id: day.id,
+          trip_id: tripId,
+          time_label: formatted,
+          sort_order: day.slots.length,
+          proposer_name: currentName,
+          title,
+        })
+      } else {
+        await addSlot({
+          day_id: day.id,
+          trip_id: tripId,
+          time_label: formatted,
+          sort_order: day.slots.length,
+        })
+      }
+      // Stay open and refocus so a whole day can be typed without reaching for the mouse
       setNewLabel('')
-      setAddingSlot(false)
+      setNewTitle('')
+      timeInputRef.current?.focus()
     } finally {
       setSavingSlot(false)
     }
@@ -131,6 +149,7 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
   const cancelAddSlot = () => {
     setAddingSlot(false)
     setNewLabel('')
+    setNewTitle('')
     setAddSlotError(null)
   }
 
@@ -263,8 +282,9 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
             onSubmit={handleAddSlot}
             className="flex flex-col gap-1.5"
           >
-            <div className="flex items-center gap-2 border border-dashed border-primary/40 rounded-lg px-3 py-2.5 bg-primary/5">
+            <div className="flex flex-col gap-1.5 border border-dashed border-primary/40 rounded-lg px-3 py-2.5 bg-primary/5">
               <input
+                ref={timeInputRef}
                 autoFocus
                 placeholder="e.g. 9:00 AM or 2:30 PM"
                 value={newLabel}
@@ -272,36 +292,66 @@ export function DayColumn({ day, tripId, currentName: _currentName, onSlotClick,
                   setNewLabel(e.target.value)
                   if (addSlotError) setAddSlotError(null)
                 }}
+                onKeyDown={(e) => {
+                  // Enter moves to the title rather than submitting, so the fast
+                  // path is: time → Enter → what → Enter → next slot
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    titleInputRef.current?.focus()
+                  }
+                  if (e.key === 'Escape') cancelAddSlot()
+                }}
                 className={cn(
-                  'flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0',
+                  'w-full text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0',
                   addSlotError && 'placeholder:text-destructive/70'
                 )}
+                aria-label="Time"
                 aria-invalid={!!addSlotError}
                 aria-describedby={addSlotError ? 'add-slot-error' : undefined}
               />
-            <button
-              type="submit"
-              disabled={!newLabel.trim() || savingSlot}
-              className={cn(
-                'w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0',
-                newLabel.trim()
-                  ? 'text-primary hover:bg-primary/10'
-                  : 'text-muted-foreground/30 cursor-not-allowed'
-              )}
-            >
-              {savingSlot ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-            </button>
-            <button
-              type="button"
-              onClick={cancelAddSlot}
-              className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <X className="w-3 h-3" />
-            </button>
+
+              <div className="flex items-center gap-2 border-t border-primary/15 pt-1.5">
+                <input
+                  ref={titleInputRef}
+                  placeholder="What's planned? (optional)"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') cancelAddSlot() }}
+                  className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
+                  aria-label="What's planned (optional)"
+                />
+                <button
+                  type="submit"
+                  disabled={!newLabel.trim() || savingSlot}
+                  className={cn(
+                    'w-6 h-6 flex items-center justify-center rounded transition-colors shrink-0',
+                    newLabel.trim()
+                      ? 'text-primary hover:bg-primary/10'
+                      : 'text-muted-foreground/30 cursor-not-allowed'
+                  )}
+                  title={newTitle.trim() ? 'Add and lock it in' : 'Add an empty slot'}
+                >
+                  {savingSlot ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelAddSlot}
+                  className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+                  title="Done adding"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             </div>
-            {addSlotError && (
+            {addSlotError ? (
               <p id="add-slot-error" className="text-xs text-destructive px-1">
                 {addSlotError}
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground/60 px-1">
+                {newTitle.trim()
+                  ? 'Saves locked in — keeps going for the next one'
+                  : 'Add a title to lock it in, or leave blank for an open slot'}
               </p>
             )}
           </form>
