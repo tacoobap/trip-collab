@@ -27,11 +27,14 @@ const CATEGORY_LABELS: Record<CollectionItemCategory, string> = {
   other: 'Other',
 }
 
-// OpenFreeMap serves OSM vector tiles with no API key and no signup. Vector
-// means crisp labels at any zoom and a designed palette, rather than the
-// raster Mapnik sheets that read as a decade old.
+// OpenFreeMap serves OSM vector tiles with no API key and no signup.
+//
+// Positron and its dark counterpart are deliberately quiet: a neutral grey
+// canvas that lets the photo pins carry the colour. Avoid `bright`, which is
+// OSM Bright — it paints roads the classic Mapnik yellow (#fea) and orange
+// (#fc8) and reads as the raster map this replaced.
 const STYLE_URL = {
-  light: 'https://tiles.openfreemap.org/styles/bright',
+  light: 'https://tiles.openfreemap.org/styles/positron',
   dark: 'https://tiles.openfreemap.org/styles/dark',
 }
 
@@ -113,6 +116,9 @@ export function CollectionMap({
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef(new Map<string, maplibregl.Marker>())
   const pinElementsRef = useRef(new Map<string, HTMLElement>())
+  // Read by the mount-once effect to frame the city on the very first paint.
+  const itemsRef = useRef(items)
+  itemsRef.current = items
 
   const [ready, setReady] = useState(false)
   const [zoom, setZoom] = useState<number | null>(null)
@@ -124,13 +130,20 @@ export function CollectionMap({
     const el = containerRef.current
     if (!el) return
 
+    // Frame the city up front. Opening on a world view and then jumping shows
+    // a flash of low-zoom relief before the real map arrives.
+    const initialBounds = new maplibregl.LngLatBounds()
+    for (const item of itemsRef.current) initialBounds.extend([item.longitude, item.latitude])
+
     const map = new maplibregl.Map({
       container: el,
       style: document.documentElement.classList.contains('dark')
         ? STYLE_URL.dark
         : STYLE_URL.light,
-      center: [0, 20],
-      zoom: 1,
+      bounds: initialBounds.isEmpty() ? undefined : initialBounds,
+      fitBoundsOptions: { padding: 56, maxZoom: 15 },
+      center: initialBounds.isEmpty() ? [0, 20] : undefined,
+      zoom: initialBounds.isEmpty() ? 1 : undefined,
       // The map sits in a scrolling page: plain wheel and one-finger drag stay
       // with the page, ctrl+wheel and two fingers drive the map.
       cooperativeGestures: true,
@@ -259,7 +272,7 @@ export function CollectionMap({
     const el = containerRef.current
     if (!map || !el || !activeItem) return
     const point = map.project([activeItem.longitude, activeItem.latitude])
-    const inset = { top: 56, right: 24, bottom: 215, left: 24 }
+    const inset = { top: 56, right: 24, bottom: 230, left: 24 }
     const dx =
       point.x < inset.left
         ? point.x - inset.left
@@ -331,7 +344,7 @@ export function CollectionMap({
       </button>
 
       {activeItem && (
-        <div className="absolute inset-x-2 bottom-6 z-[1100] sm:inset-x-3">
+        <div className="absolute inset-x-2 bottom-10 z-[1100] sm:inset-x-3">
           <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md">
             <div className="flex gap-3 p-3">
               <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-violet-100 dark:bg-violet-950/40">
