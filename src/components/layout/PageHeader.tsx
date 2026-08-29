@@ -34,7 +34,7 @@ export function PageHeader({
           : 'sticky top-0 bg-warm-white/80 backdrop-blur-sm border-border'
       )}
     >
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3">
+      <div className="relative max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3">
         {/* Left: Trup */}
         <Link
           to="/home"

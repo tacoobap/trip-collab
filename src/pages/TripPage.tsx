@@ -145,7 +145,7 @@ export function TripPage() {
       <PageHeader trip={trip} currentName={displayName ?? ''} />
       {user && isMember === false && (
         <div className="border-b border-warning/30 bg-warning/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="max-w-7xl mx-auto px-5 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-warning-foreground">
               You're viewing this trip as a guest. You can't edit the plan, add ideas, or change stays until you join.
             </p>
@@ -166,7 +166,7 @@ export function TripPage() {
             </Button>
           </div>
           {joinError && (
-            <p className="max-w-7xl mx-auto px-4 sm:px-6 pb-2.5 text-xs text-destructive">
+            <p className="max-w-7xl mx-auto px-5 sm:px-6 pb-2.5 text-xs text-destructive">
               {joinError}
             </p>
           )}
@@ -174,7 +174,7 @@ export function TripPage() {
       )}
 
       <div className="border-b border-border bg-warm-white/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
@@ -218,7 +218,7 @@ export function TripPage() {
           </div>
         </div>
       </div>
-      <main className="pt-8 pb-10 px-4 sm:px-6 max-w-7xl mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8">
+      <main className="pt-8 pb-10 px-5 sm:px-6 max-w-7xl mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8">
         <PlanningBoard
           trip={trip}
           days={days}

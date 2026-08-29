@@ -139,14 +139,17 @@ export function PlanningBoard({ trip, days, currentName, getToken, isMember, isO
         )}
       </div>
 
-      <div className="relative w-full min-w-0 max-sm:-mx-2">
+      <div className="relative w-full min-w-0">
+        {/* Scroll hint is desktop-only: on mobile the day pills above already
+            say there is more, and a 64px fade over a 335px card swallowed the
+            city tag and camera button sitting in that corner */}
         {hasMoreDaysRight && (
           <>
             <div
-              className="pointer-events-none absolute right-0 top-0 bottom-6 max-sm:bottom-4 w-16 sm:w-20 bg-gradient-to-l from-background to-transparent z-10"
+              className="pointer-events-none hidden sm:block absolute right-0 top-0 bottom-6 w-20 bg-gradient-to-l from-background to-transparent z-10"
               aria-hidden
             />
-            <div className="pointer-events-none absolute right-2 bottom-8 max-sm:bottom-6 z-10 flex items-center gap-1 text-xs text-muted-foreground max-sm:right-3">
+            <div className="pointer-events-none hidden sm:flex absolute right-2 bottom-8 z-10 items-center gap-1 text-xs text-muted-foreground">
               <span className="text-muted-foreground/70">→</span>
             </div>
           </>

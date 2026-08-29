@@ -180,7 +180,7 @@ export function CollectionPage() {
         onAddClick={() => setAddOpen(true)}
       />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 max-sm:py-4">
+      <main className="max-w-4xl mx-auto px-5 sm:px-6 py-6 max-sm:py-4">
         <CollectionList
           itemsLoading={itemsLoading}
           items={items}

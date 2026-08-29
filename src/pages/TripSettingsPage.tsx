@@ -50,7 +50,7 @@ export function TripSettingsPage() {
     <div className="min-h-screen bg-background">
       <PageHeader trip={trip} currentName={displayName ?? ''} />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 max-sm:py-6">
+      <div className="max-w-2xl mx-auto px-5 sm:px-6 py-10 max-sm:py-6">
         <h1 className="font-serif text-2xl sm:text-3xl text-foreground mb-1">Settings</h1>
         <p className="text-sm text-muted-foreground mb-8">{trip.name}</p>
 
