@@ -16,6 +16,8 @@ import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
+import { useImageDrop } from '@/hooks/useImageDrop'
+import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useNarrativeGeneration } from '@/hooks/useNarrativeGeneration'
@@ -64,31 +66,46 @@ export function ItineraryPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !trip) return
+  const applyHeroImage = async (image: DroppedImage) => {
+    if (!trip) return
 
     // Show the local file immediately — no CDN round-trip needed
-    const preview = URL.createObjectURL(file)
+    const preview = image.kind === 'file' ? URL.createObjectURL(image.file) : image.url
     setHeroPreview(preview)
 
     setHeroUploading(true)
     setHeroPct(0)
     try {
-      const url = await uploadImage(`trips/${trip.id}/hero.jpg`, file, setHeroPct, getIdToken)
+      const url =
+        image.kind === 'file'
+          ? await uploadImage(`trips/${trip.id}/hero.jpg`, image.file, setHeroPct, getIdToken)
+          : image.url
       await updateDoc(doc(db, 'trips', trip.id), { image_url: url })
       setHeroUrl(url)
       addToast('Hero image updated.')
     } catch (err) {
       console.error('Hero upload failed', err)
       addToast('Failed to upload hero image. Try again.', { variant: 'error' })
-      URL.revokeObjectURL(preview)
+      if (image.kind === 'file') URL.revokeObjectURL(preview)
       setHeroPreview(null)
     } finally {
       setHeroUploading(false)
       if (heroInputRef.current) heroInputRef.current.value = ''
     }
   }
+
+  const handleHeroUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) void applyHeroImage({ kind: 'file', file })
+  }
+
+  const heroDrop = useImageDrop({
+    onImage: applyHeroImage,
+    disabled: !isMember || heroUploading,
+    // The itinerary has no other paste target, so ⌘V anywhere sets the cover —
+    // unless the update-text modal has the page's attention.
+    pasteOnWindow: !!isMember && !updateTextModalOpen,
+  })
 
   const handleGenerate = async () => {
     if (!trip || generating) return
@@ -345,6 +362,8 @@ export function ItineraryPage() {
         currentHero={currentHero}
         heroRef={heroRef}
         dateRange={dateRange}
+        dropHandlers={isMember ? heroDrop.dropHandlers : undefined}
+        isDropTarget={heroDrop.isDragging}
       />
 
       {/* Sticky header in flow when scrolled — fade in for smoother transition */}

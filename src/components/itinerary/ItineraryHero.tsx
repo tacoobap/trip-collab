@@ -9,6 +9,10 @@ interface ItineraryHeroProps {
   heroRef: React.RefObject<HTMLDivElement | null>
   /** Formatted date range string, e.g. "March 1 – March 5". */
   dateRange: string | null
+  /** Drag-and-drop handlers for replacing the cover photo; omitted on read-only views. */
+  dropHandlers?: React.HTMLAttributes<HTMLDivElement>
+  /** True while a photo is being dragged over the hero. */
+  isDropTarget?: boolean
 }
 
 export function ItineraryHero({
@@ -16,11 +20,14 @@ export function ItineraryHero({
   currentHero,
   heroRef,
   dateRange,
+  dropHandlers,
+  isDropTarget = false,
 }: ItineraryHeroProps) {
   return (
     <div
       ref={heroRef}
       data-print="hero"
+      {...dropHandlers}
       className="relative min-h-screen h-[100vh] overflow-hidden bg-gradient-to-br from-navy/80 via-sage/50 to-golden/40"
     >
       {currentHero && (
@@ -40,6 +47,17 @@ export function ItineraryHero({
       )}
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/5" />
+
+      {isDropTarget && (
+        <div
+          data-print="hide"
+          className="absolute inset-4 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-white/80 bg-black/40 pointer-events-none"
+        >
+          <span className="font-sans text-sm font-medium text-white tracking-wide">
+            Drop to set the cover photo
+          </span>
+        </div>
+      )}
       <div
         className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
         style={{

@@ -4,6 +4,8 @@ import { db } from '@/lib/firebase'
 import { addSlot, addLockedSlot } from '@/services/planningService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
+import { useImageDrop } from '@/hooks/useImageDrop'
+import type { DroppedImage } from '@/lib/imageFromTransfer'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
 import { CityTag } from '@/components/shared/CityTag'
@@ -49,20 +51,22 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
 
   const imageWorking = uploading || autoLoading
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const applyImage = async (image: DroppedImage) => {
     setPhotoMenuOpen(false)
     setUploading(true)
     setUploadPct(0)
     try {
-      const url = await uploadImage(
-        `trips/${tripId}/days/${day.id}.jpg`,
-        file,
-        setUploadPct,
-        getToken
-      )
-      await updateDoc(doc(db, 'days', day.id), { image_url: url })
+      const url =
+        image.kind === 'file'
+          ? await uploadImage(
+              `trips/${tripId}/days/${day.id}.jpg`,
+              image.file,
+              setUploadPct,
+              getToken
+            )
+          : image.url
+      // The photo is the user's now, so any Unsplash credit no longer applies
+      await updateDoc(doc(db, 'days', day.id), { image_url: url, image_attribution: null })
     } catch (err) {
       console.error('Image upload failed', err)
     } finally {
@@ -70,6 +74,18 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) void applyImage({ kind: 'file', file })
+  }
+
+  const { isDragging, dropHandlers } = useImageDrop({
+    onImage: applyImage,
+    disabled: !canEdit || imageWorking,
+    // Scope ⌘V to the day whose photo menu is open, so a paste has one target
+    pasteOnWindow: photoMenuOpen,
+  })
 
   const handleAutoImage = async () => {
     setPhotoMenuOpen(false)
@@ -154,7 +170,18 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
   }
 
   return (
-    <div className="flex flex-col w-[calc(100vw-2.5rem)] min-w-[260px] sm:w-[260px] sm:min-w-[260px] flex-shrink-0 max-sm:shrink-0">
+    <div
+      {...dropHandlers}
+      className="relative flex flex-col w-[calc(100vw-2.5rem)] min-w-[260px] sm:w-[260px] sm:min-w-[260px] flex-shrink-0 max-sm:shrink-0"
+    >
+      {isDragging && (
+        <div className="absolute -inset-2 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/10 pointer-events-none">
+          <span className="text-xs font-medium text-primary bg-background/90 rounded-full px-3 py-1">
+            Drop photo for Day {day.day_number}
+          </span>
+        </div>
+      )}
+
       {/* Day image thumbnail */}
       <div
         className="relative mb-4 rounded-lg overflow-hidden"
@@ -237,7 +264,12 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors"
                     >
                       <Upload className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      Upload from computer
+                      <span>
+                        Upload from computer
+                        <span className="block text-[11px] text-muted-foreground font-normal">
+                          or drop a photo here, or paste one
+                        </span>
+                      </span>
                     </button>
                     <button
                       onClick={handleAutoImage}

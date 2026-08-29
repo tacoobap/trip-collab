@@ -3,7 +3,7 @@ async function compressImage(
   maxWidth = 3840,
   quality = 0.92
 ): Promise<Blob> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
     img.onload = () => {
@@ -14,6 +14,11 @@ async function compressImage(
       canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
       URL.revokeObjectURL(url)
       canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', quality)
+    }
+    // Dropped and pasted data isn't always decodable — fail instead of hanging
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error("That file doesn't look like an image the browser can read."))
     }
     img.src = url
   })

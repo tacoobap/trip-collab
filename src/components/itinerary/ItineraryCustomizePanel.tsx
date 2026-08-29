@@ -83,7 +83,7 @@ export function ItineraryCustomizePanel({
             onClick={onHeroClick}
             disabled={heroUploading}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
-            title="Change or add cover photo"
+            title="Change or add cover photo — or drag one onto the hero, or paste one"
           >
             {heroUploading ? (
               <>

@@ -6,6 +6,8 @@ import {
 } from '@/services/collectionService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
+import { useImageDrop } from '@/hooks/useImageDrop'
+import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
 import type { CollectionItem, CollectionItemCategory } from '@/types/database'
 import { Button } from '@/components/ui/button'
@@ -101,6 +103,25 @@ export function CollectionItemForm({
     setSubmitError(null)
   }
 
+  const handleDroppedImage = (image: DroppedImage) => {
+    setSubmitError(null)
+    if (image.kind === 'file') {
+      setPhotoFile(image.file)
+    } else {
+      // No bytes to upload — link it the way a searched image is linked
+      setPhotoFile(null)
+      setFetchedImageUrl(image.url)
+    }
+  }
+
+  // The form lives in a dialog, so a paste anywhere in it means the photo —
+  // except while typing, where a pasted link belongs to the field.
+  const { isDragging, dropHandlers } = useImageDrop({
+    onImage: handleDroppedImage,
+    disabled: loading,
+    pasteOnWindow: true,
+  })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -171,7 +192,7 @@ export function CollectionItemForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 min-w-0">
+    <form onSubmit={handleSubmit} {...dropHandlers} className="space-y-4 min-w-0">
       <div className="min-w-0">
         <label className="block text-sm font-medium text-foreground mb-1">
           Google Maps link (optional)
@@ -310,7 +331,12 @@ export function CollectionItemForm({
         <label className="block text-sm font-medium text-foreground mb-1">
           {isEdit ? 'Replace photo (optional)' : 'Photo (optional)'}
         </label>
-        <div className="flex flex-wrap items-center gap-3">
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-3 rounded-lg border border-dashed p-3 transition-colors',
+            isDragging ? 'border-primary bg-primary/10' : 'border-border/60'
+          )}
+        >
           {fetchedImageUrl && !photoFile && (
             <div className="flex items-center gap-2">
               <img
@@ -373,6 +399,9 @@ export function CollectionItemForm({
           {loading && photoFile && (
             <span className="text-xs text-muted-foreground">Uploading… {uploadPct}%</span>
           )}
+          <span className="text-xs text-muted-foreground basis-full">
+            {isDragging ? 'Drop it anywhere in this form' : 'or drag an image in, or paste one'}
+          </span>
         </div>
       </div>
       {submitError && (
