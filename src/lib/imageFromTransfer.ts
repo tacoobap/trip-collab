@@ -14,7 +14,12 @@ export type DroppedImage =
 /** What a DataTransfer held, before we've tried to turn a link into bytes. */
 export type TransferredImage =
   | { kind: 'file'; file: File }
-  | { kind: 'link'; url: string }
+  /**
+   * `vouched` means the source said this is an image — a drag's uri-list, an
+   * `<img src>`, or an image file extension. Unvouched links are bare pasted
+   * URLs that only count if fetching one actually returns an image.
+   */
+  | { kind: 'link'; url: string; vouched: boolean }
 
 const IMAGE_EXTENSION = /\.(png|jpe?g|gif|webp|avif|bmp|heic|svg)(\?|#|$)/i
 const IMAGE_HREF = /^(https?:|data:image\/)/i
@@ -75,12 +80,12 @@ export function readImageTransfer(
 
   // An image dragged from another tab: the browser vouches for it being an image.
   const dragged = firstHref(dt.getData('text/uri-list')) ?? srcFromHtml(dt.getData('text/html'))
-  if (dragged) return { kind: 'link', url: dragged }
+  if (dragged) return { kind: 'link', url: dragged, vouched: true }
 
-  // Loose text only counts when it looks like an image, so pasting a Maps link
-  // somewhere on the page doesn't silently turn into a photo.
+  // Loose text. An image extension is proof enough; anything else has to be
+  // confirmed by fetching it, so pasting a Maps link doesn't become a photo.
   const pasted = firstHref(dt.getData('text/plain'))
-  if (pasted && IMAGE_EXTENSION.test(pasted)) return { kind: 'link', url: pasted }
+  if (pasted) return { kind: 'link', url: pasted, vouched: IMAGE_EXTENSION.test(pasted) }
 
   return null
 }
@@ -100,7 +105,10 @@ async function linkToFile(url: string): Promise<File | 'not-an-image' | null> {
 /**
  * Turn a read transfer into something uploadable. Links are fetched so the
  * image ends up on our own host like every other upload; when the host blocks
- * that, we fall back to linking it (same as an Unsplash result).
+ * that, a vouched link falls back to being linked (same as an Unsplash result).
+ *
+ * A bare pasted URL that we can neither read nor recognise is dropped rather
+ * than guessed at — plenty of pasted URLs aren't photos.
  */
 export async function resolveImageTransfer(
   found: TransferredImage
@@ -109,7 +117,7 @@ export async function resolveImageTransfer(
   const fetched = await linkToFile(found.url)
   if (fetched === 'not-an-image') return null
   if (fetched) return { kind: 'file', file: fetched }
-  return { kind: 'url', url: found.url }
+  return found.vouched ? { kind: 'url', url: found.url } : null
 }
 
 /**

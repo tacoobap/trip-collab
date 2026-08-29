@@ -58,6 +58,8 @@ export function CollectionItemForm({
   const [uploadPct, setUploadPct] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const photoFieldRef = useRef<HTMLDivElement>(null)
+  const revealPhotoRef = useRef(false)
 
   const parsed = mapsUrl.trim() ? parseGoogleMapsUrl(mapsUrl.trim()) : null
   const searchQuery = parsed ? (parsed.placeName?.trim() || name.trim() || null) : null
@@ -112,7 +114,19 @@ export function CollectionItemForm({
       setPhotoFile(null)
       setFetchedImageUrl(image.url)
     }
+    revealPhotoRef.current = true
   }
+
+  // The photo field is last in a scrolling dialog, so an image pasted from the
+  // top of the form otherwise lands out of sight and reads as a no-op. This has
+  // to wait for the re-render — the field grows by the height of the thumbnail,
+  // and scrolling before that undershoots by exactly that much. Instant, not
+  // smooth: a smooth scroll started here gets cancelled and never leaves the top.
+  useEffect(() => {
+    if (!revealPhotoRef.current) return
+    revealPhotoRef.current = false
+    photoFieldRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [photoFile, fetchedImageUrl])
 
   // The form lives in a dialog, so a paste anywhere in it means the photo —
   // except while typing, where a pasted link belongs to the field.
@@ -327,7 +341,7 @@ export function CollectionItemForm({
           </div>
         </div>
       )}
-      <div>
+      <div ref={photoFieldRef}>
         <label className="block text-sm font-medium text-foreground mb-1">
           {isEdit ? 'Replace photo (optional)' : 'Photo (optional)'}
         </label>
