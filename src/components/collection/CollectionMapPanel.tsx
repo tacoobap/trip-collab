@@ -47,7 +47,8 @@ export function CollectionMapPanel({
             <>
               {plural(unmappable.shortLinks)} here {unmappable.shortLinks === 1 ? 'uses' : 'use'} a
               shortened Google Maps link (maps.app.goo.gl/…), which carries no
-              coordinates. Open it in Maps and paste the full URL to pin it.
+              coordinates. Open {unmappable.shortLinks === 1 ? 'it' : 'one'} for editing and save
+              again — the link gets expanded automatically.
             </>
           )}
           {unmappable.shortLinks > 0 && unmappable.linksWithoutPosition > 0 && ' '}

@@ -41,6 +41,18 @@ const STYLE_URL = {
 /** Pins closer than this (in screen pixels) overlap, so they get grouped. */
 const CLUSTER_RADIUS = 46
 
+/**
+ * How close the map will zoom when framing places.
+ *
+ * A lone place has no extent to fit, so `fitBounds` runs straight to the cap —
+ * and Positron turns on every side-street name at z15, which is what made a
+ * single pin look like a street directory. Stop short of that: major roads and
+ * neighbourhood names, no side streets.
+ */
+function fitOptions(placeCount: number) {
+  return { padding: 56, maxZoom: placeCount <= 1 ? 13.5 : 14 }
+}
+
 function mapsHref(item: MappableItem): string {
   return (
     item.google_maps_url?.trim() ||
@@ -141,7 +153,7 @@ export function CollectionMap({
         ? STYLE_URL.dark
         : STYLE_URL.light,
       bounds: initialBounds.isEmpty() ? undefined : initialBounds,
-      fitBoundsOptions: { padding: 56, maxZoom: 15 },
+      fitBoundsOptions: fitOptions(itemsRef.current.length),
       center: initialBounds.isEmpty() ? [0, 20] : undefined,
       zoom: initialBounds.isEmpty() ? 1 : undefined,
       // The map sits in a scrolling page: plain wheel and one-finger drag stay
@@ -199,7 +211,7 @@ export function CollectionMap({
     const bounds = new maplibregl.LngLatBounds()
     for (const item of items) bounds.extend([item.longitude, item.latitude])
     map.resize()
-    map.fitBounds(bounds, { padding: 56, maxZoom: 15, animate: false })
+    map.fitBounds(bounds, { ...fitOptions(items.length), animate: false })
   }, [items])
 
   // Refit only when the set of coordinates actually changes, not on every

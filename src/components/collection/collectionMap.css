@@ -45,14 +45,16 @@
 }
 
 .tc-map .maplibregl-ctrl-attrib {
-  background: hsl(var(--card) / 0.85);
+  background: hsl(var(--card) / 0.7);
   border-radius: 0.5rem;
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
+  font-size: 9px;
+  line-height: 1.5;
+  padding: 0 5px;
+  color: hsl(var(--muted-foreground) / 0.75);
 }
 
 .tc-map .maplibregl-ctrl-attrib a {
-  color: hsl(var(--muted-foreground));
+  color: hsl(var(--muted-foreground) / 0.75);
 }
 
 .tc-map .maplibregl-ctrl-attrib-button {

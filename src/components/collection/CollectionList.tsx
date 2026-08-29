@@ -150,7 +150,7 @@ export function CollectionList({
                     onLike={isMember ? onLike : undefined}
                   />
                 ) : (
-                  <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Nothing here has a Google Maps link with coordinates yet.
                   </p>
                 )
