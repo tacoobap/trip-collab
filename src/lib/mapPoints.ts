@@ -1,3 +1,4 @@
+import { isShortMapsUrl } from '@/lib/parseGoogleMapsUrl'
 import type { CollectionItem } from '@/types/database'
 
 /** A collection item that parsed to real coordinates, so it can be pinned. */
@@ -12,12 +13,54 @@ export function hasCoordinates(item: CollectionItem): item is MappableItem {
   )
 }
 
-/**
- * An item that names a place but has no coordinates — a shortened maps link
- * (maps.app.goo.gl/…) carries no lat/lng, so it can't be pinned.
- */
+/** An item that links to a place but has no coordinates, so it can't be pinned. */
 export function hasUnmappableLink(item: CollectionItem): boolean {
   return !!item.google_maps_url?.trim() && !hasCoordinates(item)
+}
+
+/**
+ * Why a city's places are missing from its map. A shortened link has to be
+ * followed before it means anything; other links simply never carried a
+ * position (a `cid=` link, or a search for a name).
+ */
+export function countUnmappable(items: CollectionItem[]): {
+  shortLinks: number
+  linksWithoutPosition: number
+  total: number
+} {
+  let shortLinks = 0
+  let linksWithoutPosition = 0
+  for (const item of items) {
+    if (!hasUnmappableLink(item)) continue
+    if (isShortMapsUrl(item.google_maps_url!)) shortLinks += 1
+    else linksWithoutPosition += 1
+  }
+  return { shortLinks, linksWithoutPosition, total: shortLinks + linksWithoutPosition }
+}
+
+// ── Web Mercator ────────────────────────────────────────────────────────────
+// Clustering works in world pixels at a given zoom, which keeps groups stable
+// while panning. Doing the projection here rather than asking the map keeps it
+// pure, testable, and independent of the rendering library.
+
+const TILE_SIZE = 512
+
+export function projectToWorld(lat: number, lng: number, zoom: number): { x: number; y: number } {
+  const scale = TILE_SIZE * Math.pow(2, zoom)
+  const sin = Math.sin((lat * Math.PI) / 180)
+  return {
+    x: ((lng + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+  }
+}
+
+export function unprojectFromWorld(x: number, y: number, zoom: number): { lat: number; lng: number } {
+  const scale = TILE_SIZE * Math.pow(2, zoom)
+  const n = Math.PI * (1 - (2 * y) / scale)
+  return {
+    lng: (x / scale) * 360 - 180,
+    lat: (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))),
+  }
 }
 
 export interface ProjectedPoint<T> {

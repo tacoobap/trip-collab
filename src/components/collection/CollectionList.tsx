@@ -3,7 +3,7 @@ import { LayoutGrid, Loader2, Map as MapIcon, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
 import { CollectionMapPanel } from '@/components/collection/CollectionMapPanel'
-import { hasCoordinates, hasUnmappableLink } from '@/lib/mapPoints'
+import { countUnmappable, hasCoordinates } from '@/lib/mapPoints'
 import { cn } from '@/lib/utils'
 import type { CollectionItem } from '@/types/database'
 
@@ -135,7 +135,7 @@ export function CollectionList({
       <div className="space-y-10 max-sm:space-y-8">
         {sections.map(({ label, items: list }) => {
           const mappable = list.filter(hasCoordinates)
-          const unmappableCount = list.filter(hasUnmappableLink).length
+          const unmappable = countUnmappable(list)
           return (
             <section key={label}>
               <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4 max-sm:mb-3">
@@ -145,7 +145,7 @@ export function CollectionList({
                 mappable.length > 0 ? (
                   <CollectionMapPanel
                     items={mappable}
-                    unmappableCount={unmappableCount}
+                    unmappable={unmappable}
                     currentName={displayName}
                     onLike={isMember ? onLike : undefined}
                   />

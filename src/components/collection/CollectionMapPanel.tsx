@@ -7,15 +7,19 @@ const CollectionMap = lazy(() => import('./CollectionMap'))
 
 interface CollectionMapPanelProps {
   items: MappableItem[]
-  /** Places in this city whose maps link carries no coordinates. */
-  unmappableCount: number
+  /** Why places in this city are missing from the map, if any are. */
+  unmappable: { shortLinks: number; linksWithoutPosition: number; total: number }
   currentName: string
   onLike?: (itemId: string) => void
 }
 
+function plural(n: number) {
+  return n === 1 ? '1 place' : `${n} places`
+}
+
 export function CollectionMapPanel({
   items,
-  unmappableCount,
+  unmappable,
   currentName,
   onLike,
 }: CollectionMapPanelProps) {
@@ -24,7 +28,7 @@ export function CollectionMapPanel({
       <div className="h-[400px] sm:h-[520px]">
         <Suspense
           fallback={
-            <div className="flex h-full w-full items-center justify-center rounded-xl border border-border/60 bg-muted/40">
+            <div className="flex h-full w-full items-center justify-center rounded-2xl border border-border/50 bg-muted/40">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           }
@@ -37,11 +41,23 @@ export function CollectionMapPanel({
           />
         </Suspense>
       </div>
-      {unmappableCount > 0 && (
+      {unmappable.total > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {unmappableCount === 1 ? '1 place isn’t' : `${unmappableCount} places aren’t`} on
-          the map — a shortened Google Maps link (maps.app.goo.gl/…) carries no
-          coordinates. Open it and paste the full URL to pin it.
+          {unmappable.shortLinks > 0 && (
+            <>
+              {plural(unmappable.shortLinks)} here {unmappable.shortLinks === 1 ? 'uses' : 'use'} a
+              shortened Google Maps link (maps.app.goo.gl/…), which carries no
+              coordinates. Open it in Maps and paste the full URL to pin it.
+            </>
+          )}
+          {unmappable.shortLinks > 0 && unmappable.linksWithoutPosition > 0 && ' '}
+          {unmappable.linksWithoutPosition > 0 && (
+            <>
+              {plural(unmappable.linksWithoutPosition)}{' '}
+              {unmappable.linksWithoutPosition === 1 ? 'links' : 'link'} to Maps without a
+              position — search for the place and copy the link from the address bar.
+            </>
+          )}
         </p>
       )}
     </div>

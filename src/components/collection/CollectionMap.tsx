@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import './collectionMap.css'
 import { ChevronLeft, ChevronRight, Heart, Maximize2, MapPin, X } from 'lucide-react'
 import {
   clusterProjectedPoints,
+  projectToWorld,
+  unprojectFromWorld,
   type MappableItem,
   type PointCluster,
 } from '@/lib/mapPoints'
@@ -25,12 +27,13 @@ const CATEGORY_LABELS: Record<CollectionItemCategory, string> = {
   other: 'Other',
 }
 
-// Standard OSM tiles: no API key, and low-volume use is within the tile usage
-// policy. CARTO's basemaps now stamp "API KEY REQUIRED" over anonymous tiles.
-// Dark mode inverts these in CSS rather than swapping providers.
-const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-const ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+// OpenFreeMap serves OSM vector tiles with no API key and no signup. Vector
+// means crisp labels at any zoom and a designed palette, rather than the
+// raster Mapnik sheets that read as a decade old.
+const STYLE_URL = {
+  light: 'https://tiles.openfreemap.org/styles/bright',
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+}
 
 /** Pins closer than this (in screen pixels) overlap, so they get grouped. */
 const CLUSTER_RADIUS = 46
@@ -107,76 +110,83 @@ export function CollectionMap({
   className,
 }: CollectionMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<L.Map | null>(null)
-  const markerLayerRef = useRef<L.LayerGroup | null>(null)
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const markersRef = useRef(new Map<string, maplibregl.Marker>())
   const pinElementsRef = useRef(new Map<string, HTMLElement>())
 
   const [ready, setReady] = useState(false)
   const [zoom, setZoom] = useState<number | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [styleFailed, setStyleFailed] = useState(false)
 
   // ── Map lifecycle ────────────────────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
 
-    const map = L.map(el, {
-      // The map lives inside a scrolling page, so the wheel stays with the page.
-      scrollWheelZoom: false,
-      zoomControl: true,
-      attributionControl: true,
-    }).setView([0, 0], 2)
-
+    const map = new maplibregl.Map({
+      container: el,
+      style: document.documentElement.classList.contains('dark')
+        ? STYLE_URL.dark
+        : STYLE_URL.light,
+      center: [0, 20],
+      zoom: 1,
+      // The map sits in a scrolling page: plain wheel and one-finger drag stay
+      // with the page, ctrl+wheel and two fingers drive the map.
+      cooperativeGestures: true,
+      attributionControl: { compact: true },
+    })
     mapRef.current = map
-    markerLayerRef.current = L.layerGroup().addTo(map)
-    map.zoomControl.setPosition('topright')
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
+    map.on('error', (e) => {
+      // A failed style or tile request otherwise fails silently on the canvas.
+      console.error('[collection map]', e.error?.message ?? e)
+    })
 
     const syncZoom = () => setZoom(map.getZoom())
-    map.on('zoomend', syncZoom)
+    map.on('moveend', syncZoom)
     map.on('click', () => setSelectedId(null))
+    map.on('load', () => {
+      setZoom(map.getZoom())
+      setReady(true)
+    })
 
-    setZoom(map.getZoom())
-    setReady(true)
+    // The basemap is a third-party service; without this a failure is just a
+    // silent grey rectangle.
+    const styleTimeout = setTimeout(() => {
+      if (!map.isStyleLoaded()) setStyleFailed(true)
+    }, 12000)
+    map.on('styledata', () => setStyleFailed(false))
 
-    // The panel can mount before it has a size (collapsed, or off-screen).
-    const observer = new ResizeObserver(() => map.invalidateSize({ animate: false }))
+    // The panel can mount before the container has its final size.
+    const observer = new ResizeObserver(() => map.resize())
     observer.observe(el)
 
+    const markers = markersRef.current
     const pinElements = pinElementsRef.current
     return () => {
+      clearTimeout(styleTimeout)
       observer.disconnect()
-      map.off()
+      for (const marker of markers.values()) marker.remove()
+      markers.clear()
+      pinElements.clear()
       map.remove()
       mapRef.current = null
-      markerLayerRef.current = null
-      pinElements.clear()
       setReady(false)
       setZoom(null)
     }
   }, [])
 
-  // ── Tiles ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !ready) return
-    const layer = L.tileLayer(TILE_URL, {
-      attribution: ATTRIBUTION,
-      maxZoom: 19,
-    }).addTo(map)
-    return () => {
-      layer.remove()
-    }
-  }, [ready])
-
   // ── Framing ──────────────────────────────────────────────────────────────
   const fitAll = useCallback(() => {
     const map = mapRef.current
     if (!map || items.length === 0) return
-    map.invalidateSize({ animate: false })
-    map.fitBounds(
-      L.latLngBounds(items.map((i) => [i.latitude, i.longitude] as L.LatLngTuple)),
-      { padding: [48, 48], maxZoom: 15, animate: false }
-    )
+    const bounds = new maplibregl.LngLatBounds()
+    for (const item of items) bounds.extend([item.longitude, item.latitude])
+    map.resize()
+    map.fitBounds(bounds, { padding: 56, maxZoom: 15, animate: false })
   }, [items])
 
   // Refit only when the set of coordinates actually changes, not on every
@@ -189,40 +199,29 @@ export function CollectionMap({
 
   // ── Clustering ───────────────────────────────────────────────────────────
   const clusters = useMemo(() => {
-    const map = mapRef.current
-    if (!map || !ready || zoom === null || items.length === 0) return []
-    const projected = items.map((item) => {
-      const point = map.project([item.latitude, item.longitude], zoom)
-      return { item, x: point.x, y: point.y }
-    })
+    if (zoom === null || items.length === 0) return []
+    const projected = items.map((item) => ({
+      item,
+      ...projectToWorld(item.latitude, item.longitude, zoom),
+    }))
     return clusterProjectedPoints(projected, CLUSTER_RADIUS, (item) => item.id)
-  }, [items, ready, zoom])
+  }, [items, zoom])
 
   // ── Markers ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current
-    const layer = markerLayerRef.current
-    if (!map || !layer || zoom === null) return
+    if (!map || !ready || zoom === null) return
 
-    layer.clearLayers()
+    for (const marker of markersRef.current.values()) marker.remove()
+    markersRef.current.clear()
     pinElementsRef.current.clear()
 
     for (const cluster of clusters) {
-      const marker = L.marker(map.unproject([cluster.x, cluster.y], zoom), {
-        icon: L.divIcon({
-          html: buildPin(cluster),
-          className: 'tc-pin-icon',
-          iconSize: [40, 46],
-          iconAnchor: [20, 46],
-        }),
-        riseOnHover: true,
-        title:
-          cluster.items.length === 1
-            ? cluster.items[0].name
-            : `${cluster.items.length} places`,
-      })
-      marker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e)
+      const { lat, lng } = unprojectFromWorld(cluster.x, cluster.y, zoom)
+      const element = buildPin(cluster)
+      element.addEventListener('click', (e) => {
+        // Keep the map's own click from clearing the selection we just made.
+        e.stopPropagation()
         setSelectedId((current) => {
           const index = cluster.items.findIndex((i) => i.id === current)
           // Re-clicking a group steps through it rather than resetting.
@@ -231,11 +230,13 @@ export function CollectionMap({
             : cluster.items[0].id
         })
       })
-      layer.addLayer(marker)
-      const element = marker.getElement()
-      if (element) pinElementsRef.current.set(cluster.key, element)
+      const marker = new maplibregl.Marker({ element, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(map)
+      markersRef.current.set(cluster.key, marker)
+      pinElementsRef.current.set(cluster.key, element)
     }
-  }, [clusters, zoom])
+  }, [clusters, ready, zoom])
 
   // Highlight without rebuilding the markers, so pin images don't flicker.
   useEffect(() => {
@@ -251,14 +252,27 @@ export function CollectionMap({
     : -1
   const activeItem = activeIndex >= 0 ? activeCluster!.items[activeIndex] : null
 
-  // Keep the selected pin clear of the detail card.
+  // Keep the selected pin clear of the detail card, nudging only when it would
+  // otherwise sit underneath it.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !activeItem) return
-    map.panInside([activeItem.latitude, activeItem.longitude], {
-      paddingTopLeft: [24, 24],
-      paddingBottomRight: [24, 215],
-    })
+    const el = containerRef.current
+    if (!map || !el || !activeItem) return
+    const point = map.project([activeItem.longitude, activeItem.latitude])
+    const inset = { top: 56, right: 24, bottom: 215, left: 24 }
+    const dx =
+      point.x < inset.left
+        ? point.x - inset.left
+        : point.x > el.clientWidth - inset.right
+          ? point.x - (el.clientWidth - inset.right)
+          : 0
+    const dy =
+      point.y < inset.top
+        ? point.y - inset.top
+        : point.y > el.clientHeight - inset.bottom
+          ? point.y - (el.clientHeight - inset.bottom)
+          : 0
+    if (dx !== 0 || dy !== 0) map.panBy([dx, dy], { duration: 300 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeItem?.id])
 
@@ -291,16 +305,25 @@ export function CollectionMap({
   return (
     <div
       className={cn(
-        'tc-map relative overflow-hidden rounded-xl border border-border/60 bg-muted',
+        'tc-map relative overflow-hidden rounded-2xl border border-border/50 bg-muted shadow-sm',
         className
       )}
     >
       <div ref={containerRef} className="absolute inset-0" />
 
+      {styleFailed && (
+        <div className="absolute inset-0 z-[1200] flex items-center justify-center bg-muted px-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            The map couldn’t load. Your places are still safe in the list —
+            switch back to List view to see them.
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={fitAll}
-        className="absolute top-2 left-2 z-[1000] inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/90 px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:text-foreground"
+        className="absolute top-2.5 left-2.5 z-[1000] inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/90 px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-md transition-colors hover:text-foreground"
         aria-label="Fit all places in view"
       >
         <Maximize2 className="h-3.5 w-3.5" />
@@ -309,7 +332,7 @@ export function CollectionMap({
 
       {activeItem && (
         <div className="absolute inset-x-2 bottom-6 z-[1100] sm:inset-x-3">
-          <div className="overflow-hidden rounded-xl border border-border bg-card/95 shadow-lg backdrop-blur-sm">
+          <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md">
             <div className="flex gap-3 p-3">
               <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-violet-100 dark:bg-violet-950/40">
                 {activeItem.image_url ? (

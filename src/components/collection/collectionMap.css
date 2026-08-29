@@ -1,46 +1,72 @@
-/* Leaflet ships its own chrome; this restyles it to match the app and defines
+/* MapLibre ships its own chrome; this restyles it to match the app and defines
    the thumbnail pins, which are built imperatively rather than in JSX. */
 
-.tc-map .leaflet-container {
-  background: hsl(var(--muted));
+.tc-map .maplibregl-map {
   font-family: inherit;
-}
-
-/* Pins are our own markup — drop Leaflet's default box around a div icon. */
-.tc-map .tc-pin-icon {
-  background: transparent;
-  border: 0;
-}
-
-.tc-map .leaflet-control-zoom {
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
-}
-
-.tc-map .leaflet-control-zoom a {
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  border-bottom-color: hsl(var(--border));
-  width: 30px;
-  height: 30px;
-  line-height: 30px;
-}
-
-.tc-map .leaflet-control-zoom a:hover {
   background: hsl(var(--muted));
+  /* MapLibre's stylesheet sets `position: relative` on the container and loads
+     after Tailwind's utilities, so it beats `absolute inset-0` on equal
+     specificity and collapses the map to nothing. Pin it back here — this file
+     is imported after maplibre-gl.css. */
+  position: absolute;
+  inset: 0;
 }
 
-.tc-map .leaflet-control-attribution {
+.tc-map .maplibregl-canvas {
+  outline: none;
+}
+
+.tc-map .maplibregl-ctrl-group {
+  background: hsl(var(--card) / 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+
+.tc-map .maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+}
+
+.tc-map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid hsl(var(--border) / 0.6);
+}
+
+.tc-map .maplibregl-ctrl-group button:hover {
+  background-color: hsl(var(--muted));
+}
+
+/* The control glyphs are dark-inked SVGs baked into MapLibre's stylesheet. */
+.dark .tc-map .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+
+.tc-map .maplibregl-ctrl-attrib {
   background: hsl(var(--card) / 0.85);
-  color: hsl(var(--muted-foreground));
+  border-radius: 0.5rem;
   font-size: 10px;
-  padding: 1px 5px;
+  color: hsl(var(--muted-foreground));
 }
 
-.tc-map .leaflet-control-attribution a {
+.tc-map .maplibregl-ctrl-attrib a {
   color: hsl(var(--muted-foreground));
+}
+
+.tc-map .maplibregl-ctrl-attrib-button {
+  background-color: hsl(var(--card) / 0.85);
+}
+
+.dark .tc-map .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+/* Shown when a plain wheel or one finger tries to drive the map. */
+.tc-map .maplibregl-cooperative-gesture-screen {
+  font-family: inherit;
+  border-radius: 1rem;
 }
 
 /* ── Pins ──────────────────────────────────────────────────────────────── */
@@ -147,10 +173,4 @@
 
 .tc-pin--active .tc-pin__stem {
   transform: translateY(2px) scale(1.15);
-}
-
-/* OSM has no dark basemap; inverting the tiles gives it one without pulling in
-   a second, keyed tile provider. Pins and controls sit in other panes. */
-.dark .tc-map .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
 }
