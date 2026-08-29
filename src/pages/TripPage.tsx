@@ -234,6 +234,7 @@ export function TripPage() {
         open={editTripOpen}
         onOpenChange={setEditTripOpen}
         trip={trip}
+        days={days}
       />
 
       <StaysDrawer

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import type { DayWithSlots } from '@/types/database'
 import type { Trip } from '@/types/database'
-import { updateDay } from '@/services/planningService'
+import { updateDay, renumberTripDays } from '@/services/planningService'
 
 interface EditDayModalProps {
   open: boolean
@@ -64,6 +64,11 @@ export function EditDayModal({
         city: effectiveCity,
         date: date || null,
       })
+      // Moving a day's date moves it in the sequence; day numbers are derived
+      // from date order, so re-derive them rather than leave a gap
+      if (date !== (day.date ?? '')) {
+        await renumberTripDays(trip.id)
+      }
       onOpenChange(false)
       onSaved?.()
     } catch (err) {

@@ -17,89 +17,107 @@ import { suggestEmoji } from '@/lib/slotEmojis'
 
 export type SlotCategory = Slot['category']
 
-export type CreateDayInput = {
-  date: string
-  dayNumber: number
-  city: string
+/** Firestore `in` queries take at most 10 values. */
+const IN_QUERY_MAX = 10
+
+/** A write batch caps at 500 operations; leave headroom. */
+const BATCH_LIMIT = 450
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
 }
 
 /**
- * Create day docs for each day in one batch. Days start empty — the quick-entry
- * row fills them faster than placeholder slots can be edited.
- * useTrip's subscription will pick up the new days automatically.
+ * Chronological, undated days last. `day_number` is a view of this order, never
+ * data of its own — deriving it anywhere else is how days end up out of sequence.
  */
-export async function createDays(
-  tripId: string,
-  days: CreateDayInput[]
-): Promise<void> {
-  const batch = writeBatch(db)
-  for (const day of days) {
-    const dayRef = doc(collection(db, 'days'))
-    batch.set(dayRef, {
-      trip_id: tripId,
-      city: day.city,
-      label: `Day ${day.dayNumber} · ${day.city}`,
-      day_number: day.dayNumber,
-      date: day.date,
-    })
-  }
-  await batch.commit()
+function byDate(a: { date: string | null }, b: { date: string | null }): number {
+  if (a.date === b.date) return 0
+  if (!a.date) return 1
+  if (!b.date) return -1
+  return a.date < b.date ? -1 : 1
 }
 
-/**
- * Reconcile a trip's day docs with its date range.
- *
- * Editing the range only ever wrote `start_date`/`end_date` on the trip, so
- * extending a trip left the extra days missing entirely. This fills in any
- * date in range that has no day doc (with the same default slots as initial
- * setup) and renumbers everything by date so `Day N` stays in order.
- *
- * Days outside the new range are deliberately left alone — they may carry
- * slots, proposals and photos, and deleting that silently on a date tweak
- * would be far worse than leaving a stray day on the board.
- */
-export async function syncTripDays(
-  tripId: string,
-  startDate: string | null,
-  endDate: string | null,
-  fallbackCity: string
-): Promise<void> {
-  if (!startDate || !endDate) return
-  const dates = enumerateDates(startDate, endDate)
-  if (dates.length === 0) return
-
+async function fetchTripDays(tripId: string): Promise<Day[]> {
   const snap = await getDocs(
     query(collection(db, 'days'), where('trip_id', '==', tripId))
   )
-  const existing = snap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Day, 'id'>),
-  }))
-  const byDate = new Map(
-    existing.filter((d) => d.date).map((d) => [d.date as string, d])
-  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Day, 'id'>) }))
+}
 
-  // Carry the city forward from the nearest earlier day, so extending a Lisbon
-  // trip yields more Lisbon days rather than blank ones
-  const cityFor = (date: string): string => {
-    const earlier = existing
-      .filter((d): d is typeof d & { date: string } => !!d.date && d.date < date)
-      .sort((a, b) => b.date.localeCompare(a.date))[0]
-    return earlier?.city || existing[0]?.city || fallbackCity
+/** Slots held by each of the given days. Days with none are absent from the map. */
+async function slotCountByDay(dayIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  for (const ids of chunk(dayIds, IN_QUERY_MAX)) {
+    const snap = await getDocs(
+      query(collection(db, 'slots'), where('day_id', 'in', ids))
+    )
+    for (const d of snap.docs) {
+      const dayId = (d.data() as Slot).day_id
+      counts.set(dayId, (counts.get(dayId) ?? 0) + 1)
+    }
+  }
+  return counts
+}
+
+/**
+ * Delete days along with the slots and proposals hanging off them. Deletes run
+ * leaf-first so a failure part-way can't leave a slot pointing at a proposal
+ * that no longer exists.
+ */
+export async function deleteDays(dayIds: string[]): Promise<void> {
+  if (dayIds.length === 0) return
+
+  const slotIds: string[] = []
+  for (const ids of chunk(dayIds, IN_QUERY_MAX)) {
+    const snap = await getDocs(
+      query(collection(db, 'slots'), where('day_id', 'in', ids))
+    )
+    slotIds.push(...snap.docs.map((d) => d.id))
   }
 
-  // Final ordering: everything in range, plus any out-of-range stragglers after
-  const inRange = dates.map((date) => ({ date, current: byDate.get(date) ?? null }))
-  const strays = existing
-    .filter((d) => !d.date || !dates.includes(d.date))
-    .map((d) => ({ date: d.date ?? '', current: d }))
-  const ordered = [...inRange, ...strays]
+  const proposalIds: string[] = []
+  for (const ids of chunk(slotIds, IN_QUERY_MAX)) {
+    const snap = await getDocs(
+      query(collection(db, 'proposals'), where('slot_id', 'in', ids))
+    )
+    proposalIds.push(...snap.docs.map((d) => d.id))
+  }
 
-  // Chunked: a batch caps at 500 writes
+  const refs = [
+    ...proposalIds.map((id) => doc(db, 'proposals', id)),
+    ...slotIds.map((id) => doc(db, 'slots', id)),
+    ...dayIds.map((id) => doc(db, 'days', id)),
+  ]
+  for (const group of chunk(refs, BATCH_LIMIT)) {
+    const batch = writeBatch(db)
+    group.forEach((ref) => batch.delete(ref))
+    await batch.commit()
+  }
+}
+
+type OrderedDay = {
+  date: string | null
+  /** The day doc at this position, or null to create one. */
+  current: Day | null
+  /** City to write. Leaves an existing day's city alone when undefined. */
+  city?: string
+}
+
+/**
+ * Write `day_number` and the derived label so the board reads Day 1..N in the
+ * given order, creating any day that has no doc yet.
+ */
+async function writeDayOrder(
+  tripId: string,
+  ordered: OrderedDay[]
+): Promise<void> {
   let batch = writeBatch(db)
   let ops = 0
   const flush = async (force = false) => {
-    if (ops >= 450 || (force && ops > 0)) {
+    if (ops >= BATCH_LIMIT || (force && ops > 0)) {
       await batch.commit()
       batch = writeBatch(db)
       ops = 0
@@ -107,16 +125,15 @@ export async function syncTripDays(
   }
 
   for (let i = 0; i < ordered.length; i++) {
-    const { date, current } = ordered[i]
+    const { date, current, city } = ordered[i]
     const dayNumber = i + 1
 
     if (!current) {
-      const city = cityFor(date)
-      const dayRef = doc(collection(db, 'days'))
-      batch.set(dayRef, {
+      const dayCity = city ?? ''
+      batch.set(doc(collection(db, 'days')), {
         trip_id: tripId,
-        city,
-        label: dayLabel(dayNumber, city),
+        city: dayCity,
+        label: dayLabel(dayNumber, dayCity),
         day_number: dayNumber,
         date,
         image_url: null,
@@ -124,20 +141,149 @@ export async function syncTripDays(
         narrative_title: null,
       })
       ops++
-    } else if (current.day_number !== dayNumber) {
+    } else {
+      const nextCity = city ?? current.city
+      const nextLabel = dayLabel(dayNumber, nextCity)
       // Labels are always derived (`Day N · City`), never free text, so
       // rewriting them here can't clobber anything the user typed
-      batch.update(doc(db, 'days', current.id), {
-        day_number: dayNumber,
-        label: dayLabel(dayNumber, current.city),
-      })
-      ops++
+      if (
+        current.day_number !== dayNumber ||
+        current.city !== nextCity ||
+        current.label !== nextLabel
+      ) {
+        batch.update(doc(db, 'days', current.id), {
+          day_number: dayNumber,
+          city: nextCity,
+          label: nextLabel,
+        })
+        ops++
+      }
     }
 
     await flush()
   }
 
   await flush(true)
+}
+
+/**
+ * Re-derive every day's number and label from its date. Call after anything
+ * that can move a day in the sequence — editing a day's date, adding one out
+ * of order — so the board never shows Day 14 sitting before Day 3.
+ */
+export async function renumberTripDays(tripId: string): Promise<void> {
+  const existing = await fetchTripDays(tripId)
+  await writeDayOrder(
+    tripId,
+    [...existing]
+      .sort(byDate)
+      .map((d) => ({ date: d.date, current: d }))
+  )
+}
+
+export type SyncTripDaysOptions = {
+  /** City to write per `YYYY-MM-DD`. Applies to new and existing days alike. */
+  cityByDate?: Record<string, string>
+  /**
+   * Days dated outside the new range. `remove` deletes them along with their
+   * slots and proposals; `keep` leaves them on the board, still in date order.
+   *
+   * Either way an out-of-range day carrying nothing — no slots, no photo, no
+   * narrative — is removed. It only ever existed because the range used to
+   * reach that far, and keeping it is what made days the user had trimmed off
+   * the front reappear at the end of the board.
+   */
+  outOfRange?: 'keep' | 'remove'
+}
+
+/**
+ * Reconcile a trip's day docs with its date range: create the days that are
+ * missing, drop the ones the range no longer covers, and renumber everything
+ * by date so `Day N` always ascends.
+ */
+export async function syncTripDays(
+  tripId: string,
+  startDate: string | null,
+  endDate: string | null,
+  fallbackCity: string,
+  options: SyncTripDaysOptions = {}
+): Promise<void> {
+  const { cityByDate = {}, outOfRange = 'keep' } = options
+  const dates = startDate && endDate ? enumerateDates(startDate, endDate) : []
+  const existing = await fetchTripDays(tripId)
+
+  // No usable range — nothing to create or drop, but keep the order honest
+  if (dates.length === 0) {
+    await writeDayOrder(
+      tripId,
+      [...existing].sort(byDate).map((d) => ({
+        date: d.date,
+        current: d,
+        city: d.date ? cityByDate[d.date] : undefined,
+      }))
+    )
+    return
+  }
+
+  const inRange = new Set(dates)
+  const strays = existing.filter((d) => d.date && !inRange.has(d.date))
+  const counts =
+    strays.length > 0
+      ? await slotCountByDay(strays.map((d) => d.id))
+      : new Map<string, number>()
+
+  const doomed =
+    outOfRange === 'remove'
+      ? strays
+      : strays.filter(
+          (d) => !counts.get(d.id) && !d.image_url && !d.narrative_title
+        )
+  await deleteDays(doomed.map((d) => d.id))
+
+  const removed = new Set(doomed.map((d) => d.id))
+  const survivors = existing.filter((d) => !removed.has(d.id))
+  const byDateMap = new Map(
+    survivors.filter((d) => d.date).map((d) => [d.date as string, d])
+  )
+  const dated = survivors
+    .filter((d): d is Day & { date: string } => !!d.date)
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+
+  /** Nearest earlier day's city, so extending a Lisbon trip yields more Lisbon days. */
+  const nearestEarlierCity = (date: string): string => {
+    for (let i = dated.length - 1; i >= 0; i--) {
+      if (dated[i].date < date) return dated[i].city
+    }
+    return dated[0]?.city ?? ''
+  }
+
+  const ordered: OrderedDay[] = []
+  let carry = ''
+  for (const date of dates) {
+    const current = byDateMap.get(date) ?? null
+    const assigned = cityByDate[date]
+    if (current) {
+      ordered.push({ date, current, city: assigned })
+      carry = assigned || current.city || carry
+    } else {
+      const city = assigned || carry || nearestEarlierCity(date) || fallbackCity
+      ordered.push({ date, current: null, city })
+      carry = city
+    }
+  }
+
+  // Kept out-of-range days belong in the sequence by date, never bolted on at
+  // the end — that is what turned trimmed-off early days into Day 14 and 15
+  for (const day of survivors) {
+    if (day.date && inRange.has(day.date)) continue
+    ordered.push({
+      date: day.date,
+      current: day,
+      city: day.date ? cityByDate[day.date] : undefined,
+    })
+  }
+
+  await writeDayOrder(tripId, ordered.sort(byDate))
 }
 
 export type AddSlotInput = {

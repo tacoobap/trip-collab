@@ -4,6 +4,7 @@ import { DayColumn } from './DayColumn'
 import { ProposalDrawer } from './ProposalDrawer'
 import { TripSetupPanel } from './TripSetupPanel'
 import { EditDayModal } from './EditDayModal'
+import { CalendarPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface PlanningBoardProps {
@@ -178,6 +179,21 @@ export function PlanningBoard({ trip, days, currentName, getToken, isMember, isO
               />
             </div>
           ))}
+          {/* Days follow the trip's date range, so the way to add or drop one
+              is the same editor that owns the range */}
+          {isMember && onOpenEditTrip && (
+            <button
+              type="button"
+              onClick={onOpenEditTrip}
+              className="flex flex-col items-center justify-center gap-2 w-[200px] min-w-[200px] shrink-0 self-stretch min-h-[180px] rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors max-sm:w-[160px] max-sm:min-w-[160px]"
+            >
+              <CalendarPlus className="w-5 h-5" />
+              <span className="text-sm font-medium">Add or edit days</span>
+              <span className="text-xs text-muted-foreground/70 px-4 text-center">
+                Change the dates and cities
+              </span>
+            </button>
+          )}
           </div>
         </div>
       </div>

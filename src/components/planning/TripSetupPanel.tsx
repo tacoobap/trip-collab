@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { createDays } from '@/services/planningService'
+import { syncTripDays } from '@/services/planningService'
 import { Loader2, CalendarDays, Plus, Pencil } from 'lucide-react'
 import { AddDayDialog } from './AddDayDialog'
 import { Button } from '@/components/ui/button'
@@ -75,13 +75,18 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
     setError('')
 
     try {
-      await createDays(
+      // Same path the trip editor uses, so first setup and every later date
+      // change agree on numbering and on which city a day belongs to
+      await syncTripDays(
         trip.id,
-        resolved.map((d) => ({
-          date: d.date,
-          dayNumber: d.dayNumber,
-          city: d.effectiveCity,
-        }))
+        trip.start_date,
+        trip.end_date,
+        trip.destinations[0] ?? '',
+        {
+          cityByDate: Object.fromEntries(
+            resolved.map((d) => [d.date, d.effectiveCity])
+          ),
+        }
       )
       // useTrip's onSnapshot will pick up the new days automatically
     } catch (err) {
