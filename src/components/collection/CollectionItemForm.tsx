@@ -433,12 +433,31 @@ export function CollectionItemForm({
           {loading && photoFile && (
             <span className="text-xs text-muted-foreground">Uploading… {uploadPct}%</span>
           )}
+          {/*
+            The reliable route on a phone. iOS won't hand a page the clipboard
+            without its own permission prompt, and won't put image data into a
+            plain input at all — but a contenteditable takes a long-press Paste
+            with no prompt, and carries the image with it. Cleared on input so
+            stray text can't collect here.
+          */}
+          <div
+            data-image-paste-target
+            data-placeholder="Long-press here, then tap Paste"
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-label="Paste an image here"
+            onInput={(e) => { e.currentTarget.textContent = '' }}
+            className={cn(
+              'basis-full min-h-[44px] rounded-md border border-dashed px-3 py-2.5 text-sm outline-none transition-colors',
+              'text-foreground border-border/70 focus:border-primary focus:bg-primary/5',
+              "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/70"
+            )}
+          />
           <span className="text-xs text-muted-foreground basis-full">
             {isDragging
               ? 'Drop it anywhere in this form'
-              : canPaste
-                ? 'Drag an image in, or tap Paste image to use the one you copied'
-                : 'or drag an image in, or paste one'}
+              : 'Drag an image in, paste one, or use the box above on a phone'}
           </span>
           {pasteError && (
             <span className="text-xs text-destructive basis-full">{pasteError}</span>

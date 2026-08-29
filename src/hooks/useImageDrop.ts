@@ -13,6 +13,9 @@ import {
 function isEditable(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null
   if (!el || typeof el.tagName !== 'string') return false
+  // A dedicated paste box is a photo target, not somewhere to type, so a link
+  // pasted into it counts as the photo rather than as text.
+  if (typeof el.closest === 'function' && el.closest('[data-image-paste-target]')) return false
   const tag = el.tagName.toLowerCase()
   return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable
 }
@@ -35,7 +38,11 @@ export function pasteResultMessage(result: ClipboardPasteResult): string | null 
     case 'unsupported':
       return "This browser won't let a page read the clipboard."
     case 'empty':
-      return `Couldn't get an image from the clipboard — it held ${result.held}. Try copying the image itself rather than a link to the page it sits on.`
+      // An empty read is almost always the browser withholding the clipboard
+      // rather than an actually empty one — say what to do about it.
+      return result.held === 'nothing'
+        ? "Couldn't read the clipboard. If your browser asked permission, tap Paste on that prompt — or long-press the box below and choose Paste."
+        : `Couldn't get an image from the clipboard — it held ${result.held}. Try copying the image itself rather than a link to the page it sits on.`
   }
 }
 
