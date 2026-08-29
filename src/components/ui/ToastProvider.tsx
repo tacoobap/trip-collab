@@ -72,7 +72,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 function ToastList({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
   return (
     <div
-      className="fixed bottom-4 right-4 z-[100] flex max-w-[min(24rem,calc(100vw-2rem)) flex-col gap-2"
+      className="fixed bottom-4 right-4 z-[100] flex max-w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
       aria-live="polite"
       role="region"
       aria-label="Notifications"
