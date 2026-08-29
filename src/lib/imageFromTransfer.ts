@@ -52,8 +52,27 @@ function firstHref(raw: string): string | null {
 }
 
 function srcFromHtml(html: string): string | null {
-  const src = html.match(/<img[^>]+\bsrc=["']([^"']+)["']/i)?.[1]
+  const m = html.match(/<img[^>]+\bsrc=(?:["']([^"']+)["']|([^\s>]+))/i)
+  const src = m?.[1] ?? m?.[2]
   return src && IMAGE_HREF.test(src) ? src : null
+}
+
+/**
+ * Find an image link among the text flavours of a payload, whichever way it
+ * reached us. `get` returns '' for a flavour that isn't present.
+ */
+function linkFromText(get: (type: string) => string): TransferredImage | null {
+  // uri-list, or the markup around a copied image: the source is telling us
+  // this is an image, so take its word for it.
+  const vouchedUrl = firstHref(get('text/uri-list')) ?? srcFromHtml(get('text/html'))
+  if (vouchedUrl) return { kind: 'link', url: vouchedUrl, vouched: true }
+
+  // Loose text. An image extension is proof enough; anything else has to be
+  // confirmed by fetching it, so pasting a Maps link doesn't become a photo.
+  const plain = firstHref(get('text/plain'))
+  if (plain) return { kind: 'link', url: plain, vouched: IMAGE_EXTENSION.test(plain) }
+
+  return null
 }
 
 function nameFromUrl(url: string): string {
@@ -78,16 +97,7 @@ export function readImageTransfer(
   if (file) return { kind: 'file', file }
   if (!allowLink) return null
 
-  // An image dragged from another tab: the browser vouches for it being an image.
-  const dragged = firstHref(dt.getData('text/uri-list')) ?? srcFromHtml(dt.getData('text/html'))
-  if (dragged) return { kind: 'link', url: dragged, vouched: true }
-
-  // Loose text. An image extension is proof enough; anything else has to be
-  // confirmed by fetching it, so pasting a Maps link doesn't become a photo.
-  const pasted = firstHref(dt.getData('text/plain'))
-  if (pasted) return { kind: 'link', url: pasted, vouched: IMAGE_EXTENSION.test(pasted) }
-
-  return null
+  return linkFromText((type) => dt.getData(type))
 }
 
 async function linkToFile(url: string): Promise<File | 'not-an-image' | null> {
@@ -143,21 +153,30 @@ export async function readClipboardImage(): Promise<TransferredImage | null> {
   for (const item of contents) {
     const type = item.types.find((t) => t.startsWith('image/'))
     if (!type) continue
-    const blob = await item.getType(type)
-    const ext = type.split('/')[1]?.split('+')[0] || 'png'
-    return { kind: 'file', file: new File([blob], `pasted-image.${ext}`, { type: blob.type }) }
-  }
-
-  // Nothing but text on the clipboard — it may still be a link to an image.
-  for (const item of contents) {
-    if (!item.types.includes('text/plain')) continue
-    const text = (await (await item.getType('text/plain')).text()).trim()
-    if (IMAGE_HREF.test(text)) {
-      return { kind: 'link', url: text, vouched: IMAGE_EXTENSION.test(text) }
+    try {
+      const blob = await item.getType(type)
+      const ext = type.split('/')[1]?.split('+')[0] || 'png'
+      return { kind: 'file', file: new File([blob], `pasted-image.${ext}`, { type: blob.type }) }
+    } catch {
+      // Safari lists flavours it won't always hand over; fall through to the link
     }
   }
 
-  return null
+  // No bytes. Copying an image from a page on a phone usually leaves only the
+  // markup around it, so read that the same way a drag would.
+  const text: Record<string, string> = {}
+  for (const item of contents) {
+    for (const type of item.types) {
+      if (!type.startsWith('text/') || text[type]) continue
+      try {
+        text[type] = await (await item.getType(type)).text()
+      } catch {
+        // same as above — an unreadable flavour just isn't a candidate
+      }
+    }
+  }
+
+  return linkFromText((type) => text[type] ?? '')
 }
 
 /**
