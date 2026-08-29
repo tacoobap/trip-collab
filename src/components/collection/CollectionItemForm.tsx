@@ -1,18 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, ImagePlus, X, ClipboardPaste } from 'lucide-react'
+import { Loader2, ImagePlus, X } from 'lucide-react'
 import {
   addCollectionItem,
   updateCollectionItem,
 } from '@/services/collectionService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
-import { useImageDrop, pasteResultMessage } from '@/hooks/useImageDrop'
+import { useImageDrop } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
 import type { CollectionItem, CollectionItemCategory } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
 
 const CATEGORIES: { value: CollectionItemCategory; label: string }[] = [
   { value: 'food', label: 'Food' },
@@ -57,7 +58,6 @@ export function CollectionItemForm({
   const [loading, setLoading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [pasteError, setPasteError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoFieldRef = useRef<HTMLDivElement>(null)
   const revealPhotoRef = useRef(false)
@@ -131,16 +131,11 @@ export function CollectionItemForm({
 
   // The form lives in a dialog, so a paste anywhere in it means the photo —
   // except while typing, where a pasted link belongs to the field.
-  const { isDragging, dropHandlers, pasteFromClipboard, canPaste } = useImageDrop({
+  const { isDragging, dropHandlers } = useImageDrop({
     onImage: handleDroppedImage,
     disabled: loading,
     pasteOnWindow: true,
   })
-
-  const handlePasteClick = async () => {
-    setPasteError(null)
-    setPasteError(pasteResultMessage(await pasteFromClipboard()))
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -416,52 +411,13 @@ export function CollectionItemForm({
             <ImagePlus className="w-3.5 h-3.5" />
             {photoFile ? photoFile.name : isEdit ? 'Choose new image' : 'Choose image'}
           </Button>
-          {canPaste && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handlePasteClick}
-              disabled={loading}
-              className="gap-1.5"
-              title="Use the image on your clipboard"
-            >
-              <ClipboardPaste className="w-3.5 h-3.5" />
-              Paste image
-            </Button>
-          )}
           {loading && photoFile && (
             <span className="text-xs text-muted-foreground">Uploading… {uploadPct}%</span>
           )}
-          {/*
-            The reliable route on a phone. iOS won't hand a page the clipboard
-            without its own permission prompt, and won't put image data into a
-            plain input at all — but a contenteditable takes a long-press Paste
-            with no prompt, and carries the image with it. Cleared on input so
-            stray text can't collect here.
-          */}
-          <div
-            data-image-paste-target
-            data-placeholder="Long-press here, then tap Paste"
-            contentEditable
-            suppressContentEditableWarning
-            role="textbox"
-            aria-label="Paste an image here"
-            onInput={(e) => { e.currentTarget.textContent = '' }}
-            className={cn(
-              'basis-full min-h-[44px] rounded-md border border-dashed px-3 py-2.5 text-sm outline-none transition-colors',
-              'text-foreground border-border/70 focus:border-primary focus:bg-primary/5',
-              "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/70"
-            )}
-          />
+          <ImagePasteBox className="basis-full" />
           <span className="text-xs text-muted-foreground basis-full">
-            {isDragging
-              ? 'Drop it anywhere in this form'
-              : 'Drag an image in, paste one, or use the box above on a phone'}
+            {isDragging ? 'Drop it anywhere in this form' : 'or drag an image in'}
           </span>
-          {pasteError && (
-            <span className="text-xs text-destructive basis-full">{pasteError}</span>
-          )}
         </div>
       </div>
       {submitError && (

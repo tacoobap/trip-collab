@@ -4,12 +4,13 @@ import { db } from '@/lib/firebase'
 import { addSlot, addLockedSlot } from '@/services/planningService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
-import { useImageDrop, pasteResultMessage } from '@/hooks/useImageDrop'
+import { useImageDrop } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
 import { CityTag } from '@/components/shared/CityTag'
-import { Camera, Loader2, Plus, Check, X, Upload, Sparkles, Pencil, ClipboardPaste } from 'lucide-react'
+import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
+import { Camera, Loader2, Plus, Check, X, Upload, Sparkles, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseTimeToMinutes, formatTimeLabel } from '@/lib/timeUtils'
 
@@ -40,7 +41,6 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
   const [uploadPct, setUploadPct] = useState(0)
   const [autoLoading, setAutoLoading] = useState(false)
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
-  const [pasteError, setPasteError] = useState<string | null>(null)
 
   const [addingSlot, setAddingSlot] = useState(false)
   const [newLabel, setNewLabel] = useState('')
@@ -81,18 +81,12 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
     if (file) void applyImage({ kind: 'file', file })
   }
 
-  const { isDragging, dropHandlers, pasteFromClipboard, canPaste } = useImageDrop({
+  const { isDragging, dropHandlers } = useImageDrop({
     onImage: applyImage,
     disabled: !canEdit || imageWorking,
     // Scope ⌘V to the day whose photo menu is open, so a paste has one target
     pasteOnWindow: photoMenuOpen,
   })
-
-  const handlePasteClick = async () => {
-    const message = pasteResultMessage(await pasteFromClipboard())
-    setPasteError(message)
-    if (message) setPhotoMenuOpen(false)
-  }
 
   const handleAutoImage = async () => {
     setPhotoMenuOpen(false)
@@ -274,24 +268,13 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
                       <span>
                         Upload from computer
                         <span className="block text-[11px] text-muted-foreground font-normal">
-                          or drop a photo here, or paste one
+                          or drop one onto the day
                         </span>
                       </span>
                     </button>
-                    {canPaste && (
-                      <button
-                        onClick={handlePasteClick}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
-                      >
-                        <ClipboardPaste className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <span>
-                          Paste image
-                          <span className="block text-[11px] text-muted-foreground font-normal">
-                            uses the image you copied
-                          </span>
-                        </span>
-                      </button>
-                    )}
+                    <div className="px-4 py-2.5 border-t border-border">
+                      <ImagePasteBox className="w-full" label="Paste an image here" />
+                    </div>
                     <button
                       onClick={handleAutoImage}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
@@ -309,9 +292,6 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
             )}
           </div>
         </div>
-        {pasteError && (
-          <p className="text-[11px] text-destructive mt-1.5">{pasteError}</p>
-        )}
         {day.date && (
           <p className="text-sm text-muted-foreground mt-1">
             {new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {

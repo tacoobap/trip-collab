@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  canReadClipboard,
   dragMayCarryImage,
-  readClipboardImage,
   readImageTransfer,
   resolveImageTransfer,
-  type ClipboardRead,
   type DroppedImage,
   type TransferredImage,
 } from '@/lib/imageFromTransfer'
@@ -18,32 +15,6 @@ function isEditable(target: EventTarget | null): boolean {
   if (typeof el.closest === 'function' && el.closest('[data-image-paste-target]')) return false
   const tag = el.tagName.toLowerCase()
   return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable
-}
-
-/** Outcome of a tap on a Paste button, so callers can say what went wrong. */
-export type ClipboardPasteResult =
-  | { status: 'ok' }
-  /** Nothing usable — `held` describes what was on the clipboard instead. */
-  | { status: 'empty'; held: string }
-  | { status: 'denied' }
-  | { status: 'unsupported' }
-
-/** The message to show when a Paste tap didn't produce an image. */
-export function pasteResultMessage(result: ClipboardPasteResult): string | null {
-  switch (result.status) {
-    case 'ok':
-      return null
-    case 'denied':
-      return 'Clipboard access was declined.'
-    case 'unsupported':
-      return "This browser won't let a page read the clipboard."
-    case 'empty':
-      // An empty read is almost always the browser withholding the clipboard
-      // rather than an actually empty one — say what to do about it.
-      return result.held === 'nothing'
-        ? "Couldn't read the clipboard. If your browser asked permission, tap Paste on that prompt — or long-press the box below and choose Paste."
-        : `Couldn't get an image from the clipboard — it held ${result.held}. Try copying the image itself rather than a link to the page it sits on.`
-  }
 }
 
 export interface UseImageDropOptions {
@@ -92,27 +63,6 @@ export function useImageDrop({
     return () => window.removeEventListener('paste', onPaste)
   }, [disabled, pasteOnWindow, accept])
 
-  /**
-   * Pull an image off the clipboard on demand — the phone path, where there is
-   * no paste event to listen for. Safe to call from a button's onClick; both
-   * mobile browsers require that user gesture.
-   */
-  const pasteFromClipboard = useCallback(async (): Promise<ClipboardPasteResult> => {
-    if (disabled) return { status: 'empty', held: 'nothing' }
-    if (!canReadClipboard()) return { status: 'unsupported' }
-    let read: ClipboardRead
-    try {
-      read = await readClipboardImage()
-    } catch {
-      return { status: 'denied' } // prompt dismissed, or permission refused
-    }
-    if (!read.image) return { status: 'empty', held: read.held }
-    // A link is only a candidate until we've actually fetched it — reporting
-    // success before that turns an unreachable image into a silent no-op.
-    const delivered = await accept(read.image)
-    return delivered ? { status: 'ok' } : { status: 'empty', held: read.held }
-  }, [disabled, accept])
-
   const dropHandlers = {
     onDragEnter: (e: React.DragEvent) => {
       if (disabled || !dragMayCarryImage(e.dataTransfer)) return
@@ -140,11 +90,5 @@ export function useImageDrop({
     },
   }
 
-  return {
-    isDragging: isDragging && !disabled,
-    dropHandlers,
-    pasteFromClipboard,
-    /** Whether to offer a Paste control at all. */
-    canPaste: canReadClipboard(),
-  }
+  return { isDragging: isDragging && !disabled, dropHandlers }
 }

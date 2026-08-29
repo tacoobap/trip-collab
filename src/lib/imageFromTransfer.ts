@@ -11,13 +11,6 @@ export type DroppedImage =
   /** A remote image whose bytes we can't read (no CORS headers); linked as-is. */
   | { kind: 'url'; url: string }
 
-/** The outcome of reading the clipboard, with a note on what was found. */
-export interface ClipboardRead {
-  image: TransferredImage | null
-  /** Plain-language description of the clipboard's contents, for error copy. */
-  held: string
-}
-
 /** What a DataTransfer held, before we've tried to turn a link into bytes. */
 export type TransferredImage =
   | { kind: 'file'; file: File }
@@ -158,76 +151,6 @@ export async function resolveImageTransfer(
   if (fetched === 'not-an-image') return null
   if (fetched) return { kind: 'file', file: fetched }
   return found.vouched ? { kind: 'url', url: found.url } : null
-}
-
-/** Whether this browser lets a page read the clipboard on demand. */
-export function canReadClipboard(): boolean {
-  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function'
-}
-
-/**
- * Read an image straight off the system clipboard.
- *
- * This is the only paste that works on a phone: mobile browsers fire `paste`
- * only inside a focused text field, and iOS won't put image data into one, so
- * there is no keystroke or gesture for us to listen for. Reading on demand from
- * a button tap works instead — both iOS Safari and Android Chrome confirm it
- * with their own prompt first.
- *
- * Throws if the read is refused, so callers can tell "denied" from "no image".
- */
-export async function readClipboardImage(): Promise<ClipboardRead> {
-  if (!canReadClipboard()) return { image: null, held: 'nothing' }
-  const contents = await navigator.clipboard.read()
-
-  for (const item of contents) {
-    const type = item.types.find((t) => t.startsWith('image/'))
-    if (!type) continue
-    try {
-      const blob = await item.getType(type)
-      const ext = type.split('/')[1]?.split('+')[0] || 'png'
-      const file = new File([blob], `pasted-image.${ext}`, { type: blob.type })
-      return { image: { kind: 'file', file }, held: type }
-    } catch {
-      // Safari lists flavours it won't always hand over; fall through to the link
-    }
-  }
-
-  // No bytes. Copying an image from a page on a phone usually leaves only the
-  // markup around it, so read that the same way a drag would.
-  const text: Record<string, string> = {}
-  for (const item of contents) {
-    for (const type of item.types) {
-      if (!type.startsWith('text/') || text[type]) continue
-      try {
-        text[type] = await (await item.getType(type)).text()
-      } catch {
-        // same as above — an unreadable flavour just isn't a candidate
-      }
-    }
-  }
-
-  const image = linkFromText((type) => text[type] ?? '')
-  return { image, held: describeClipboard(contents, text) }
-}
-
-/**
- * A short, honest account of what was on the clipboard, so a paste that finds
- * no image can say why instead of just insisting there wasn't one.
- */
-function describeClipboard(
-  contents: readonly ClipboardItem[],
-  text: Record<string, string>
-): string {
-  const types = [...new Set(contents.flatMap((item) => item.types))]
-  if (types.length === 0) return 'nothing'
-
-  const body = text['text/plain']?.trim() || text['text/uri-list']?.trim()
-  if (body) {
-    const snippet = body.length > 60 ? `${body.slice(0, 60)}…` : body
-    return IMAGE_HREF.test(body) ? `a link (${snippet})` : `text ("${snippet}")`
-  }
-  return types.join(', ')
 }
 
 /**

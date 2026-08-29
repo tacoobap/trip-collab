@@ -16,7 +16,7 @@ import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
-import { useImageDrop, pasteResultMessage } from '@/hooks/useImageDrop'
+import { useImageDrop } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -106,11 +106,6 @@ export function ItineraryPage() {
     // unless the update-text modal has the page's attention.
     pasteOnWindow: !!isMember && !updateTextModalOpen,
   })
-
-  const handleHeroPaste = async () => {
-    const message = pasteResultMessage(await heroDrop.pasteFromClipboard())
-    if (message) addToast(message, { variant: 'error' })
-  }
 
   const handleGenerate = async () => {
     if (!trip || generating) return
@@ -420,8 +415,7 @@ export function ItineraryPage() {
             onGenerate={handleGenerate}
             onOpenUpdateModal={openUpdateTextModal}
             heroInputRef={heroInputRef}
-            canPasteHero={heroDrop.canPaste}
-            onHeroPaste={handleHeroPaste}
+            canPasteHero={!!isMember}
             exporting={exporting}
             onExport={exportPdf}
             tripId={trip.id}

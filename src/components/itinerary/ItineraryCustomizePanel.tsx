@@ -1,5 +1,6 @@
-import { Loader2, Camera, Sparkles, FileDown, ClipboardPaste } from 'lucide-react'
+import { Loader2, Camera, Sparkles, FileDown } from 'lucide-react'
 import { ShareLinkButton } from './ShareLinkButton'
+import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
 
 interface ItineraryCustomizePanelProps {
   /** Whether hero image is currently uploading. */
@@ -24,10 +25,8 @@ interface ItineraryCustomizePanelProps {
   onOpenUpdateModal: () => void
   /** Ref for the hidden file input. */
   heroInputRef: React.RefObject<HTMLInputElement | null>
-  /** Whether to offer a Paste control — the only way in on a phone. */
+  /** Whether the viewer can change the cover photo. */
   canPasteHero: boolean
-  /** Read the clipboard and use whatever image is on it. */
-  onHeroPaste: () => void
   /** Whether a PDF export is in progress. */
   exporting: boolean
   /** Run the export (opens the browser's print-to-PDF). */
@@ -53,7 +52,6 @@ export function ItineraryCustomizePanel({
   onOpenUpdateModal,
   heroInputRef,
   canPasteHero,
-  onHeroPaste,
   exporting,
   onExport,
   tripId,
@@ -101,16 +99,6 @@ export function ItineraryCustomizePanel({
               </>
             )}
           </button>
-          {canPasteHero && (
-            <button
-              onClick={onHeroPaste}
-              disabled={heroUploading}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 text-xs font-medium border border-border/60 transition-all disabled:opacity-50 touch-manipulation max-sm:min-h-[44px] max-sm:w-full"
-              title="Use the image on your clipboard as the cover photo"
-            >
-              <ClipboardPaste className="w-3.5 h-3.5" /> Paste Photo
-            </button>
-          )}
           <button
             onClick={handleGenerateOrUpdate}
             disabled={generating}
@@ -150,6 +138,12 @@ export function ItineraryCustomizePanel({
             getIdToken={getIdToken}
           />
         </div>
+        {canPasteHero && (
+          <ImagePasteBox
+            className="w-full max-w-sm text-xs"
+            label="Paste an image here to set the cover"
+          />
+        )}
         {generateError && (
           <p className="text-[10px] text-destructive/90 text-center">{generateError}</p>
         )}
