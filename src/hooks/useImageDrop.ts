@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  canReadClipboard,
   dragMayCarryImage,
+  readClipboardImage,
   readImageTransfer,
   resolveImageTransfer,
   type DroppedImage,
@@ -13,6 +15,9 @@ function isEditable(target: EventTarget | null): boolean {
   const tag = el.tagName.toLowerCase()
   return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable
 }
+
+/** Outcome of a tap on a Paste button, so callers can say what went wrong. */
+export type ClipboardPasteResult = 'ok' | 'empty' | 'denied' | 'unsupported'
 
 export interface UseImageDropOptions {
   /** Called once an image has been extracted from the drop or paste. */
@@ -59,6 +64,25 @@ export function useImageDrop({
     return () => window.removeEventListener('paste', onPaste)
   }, [disabled, pasteOnWindow, accept])
 
+  /**
+   * Pull an image off the clipboard on demand — the phone path, where there is
+   * no paste event to listen for. Safe to call from a button's onClick; both
+   * mobile browsers require that user gesture.
+   */
+  const pasteFromClipboard = useCallback(async (): Promise<ClipboardPasteResult> => {
+    if (disabled) return 'empty'
+    if (!canReadClipboard()) return 'unsupported'
+    let found: TransferredImage | null
+    try {
+      found = await readClipboardImage()
+    } catch {
+      return 'denied' // the browser's own prompt was dismissed, or permission refused
+    }
+    if (!found) return 'empty'
+    accept(found)
+    return 'ok'
+  }, [disabled, accept])
+
   const dropHandlers = {
     onDragEnter: (e: React.DragEvent) => {
       if (disabled || !dragMayCarryImage(e.dataTransfer)) return
@@ -86,5 +110,11 @@ export function useImageDrop({
     },
   }
 
-  return { isDragging: isDragging && !disabled, dropHandlers }
+  return {
+    isDragging: isDragging && !disabled,
+    dropHandlers,
+    pasteFromClipboard,
+    /** Whether to offer a Paste control at all. */
+    canPaste: canReadClipboard(),
+  }
 }

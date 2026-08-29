@@ -120,6 +120,46 @@ export async function resolveImageTransfer(
   return found.vouched ? { kind: 'url', url: found.url } : null
 }
 
+/** Whether this browser lets a page read the clipboard on demand. */
+export function canReadClipboard(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function'
+}
+
+/**
+ * Read an image straight off the system clipboard.
+ *
+ * This is the only paste that works on a phone: mobile browsers fire `paste`
+ * only inside a focused text field, and iOS won't put image data into one, so
+ * there is no keystroke or gesture for us to listen for. Reading on demand from
+ * a button tap works instead — both iOS Safari and Android Chrome confirm it
+ * with their own prompt first.
+ *
+ * Throws if the read is refused, so callers can tell "denied" from "no image".
+ */
+export async function readClipboardImage(): Promise<TransferredImage | null> {
+  if (!canReadClipboard()) return null
+  const contents = await navigator.clipboard.read()
+
+  for (const item of contents) {
+    const type = item.types.find((t) => t.startsWith('image/'))
+    if (!type) continue
+    const blob = await item.getType(type)
+    const ext = type.split('/')[1]?.split('+')[0] || 'png'
+    return { kind: 'file', file: new File([blob], `pasted-image.${ext}`, { type: blob.type }) }
+  }
+
+  // Nothing but text on the clipboard — it may still be a link to an image.
+  for (const item of contents) {
+    if (!item.types.includes('text/plain')) continue
+    const text = (await (await item.getType('text/plain')).text()).trim()
+    if (IMAGE_HREF.test(text)) {
+      return { kind: 'link', url: text, vouched: IMAGE_EXTENSION.test(text) }
+    }
+  }
+
+  return null
+}
+
 /**
  * Whether a drag looks like it's carrying an image — for the hover highlight.
  * Mid-drag the browser hides the payload, so `types` is all we get.

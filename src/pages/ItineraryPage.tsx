@@ -107,6 +107,13 @@ export function ItineraryPage() {
     pasteOnWindow: !!isMember && !updateTextModalOpen,
   })
 
+  const handleHeroPaste = async () => {
+    const result = await heroDrop.pasteFromClipboard()
+    if (result === 'empty') addToast('No image on the clipboard — copy one first.', { variant: 'error' })
+    if (result === 'denied') addToast('Clipboard access was declined.', { variant: 'error' })
+    if (result === 'unsupported') addToast("This browser won't let a page read the clipboard.", { variant: 'error' })
+  }
+
   const handleGenerate = async () => {
     if (!trip || generating) return
     setGenerating(true)
@@ -415,6 +422,8 @@ export function ItineraryPage() {
             onGenerate={handleGenerate}
             onOpenUpdateModal={openUpdateTextModal}
             heroInputRef={heroInputRef}
+            canPasteHero={heroDrop.canPaste}
+            onHeroPaste={handleHeroPaste}
             exporting={exporting}
             onExport={exportPdf}
             tripId={trip.id}

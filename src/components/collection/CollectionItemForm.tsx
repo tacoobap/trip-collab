@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, ImagePlus, X } from 'lucide-react'
+import { Loader2, ImagePlus, X, ClipboardPaste } from 'lucide-react'
 import {
   addCollectionItem,
   updateCollectionItem,
@@ -57,6 +57,7 @@ export function CollectionItemForm({
   const [loading, setLoading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [pasteError, setPasteError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoFieldRef = useRef<HTMLDivElement>(null)
   const revealPhotoRef = useRef(false)
@@ -130,11 +131,19 @@ export function CollectionItemForm({
 
   // The form lives in a dialog, so a paste anywhere in it means the photo —
   // except while typing, where a pasted link belongs to the field.
-  const { isDragging, dropHandlers } = useImageDrop({
+  const { isDragging, dropHandlers, pasteFromClipboard, canPaste } = useImageDrop({
     onImage: handleDroppedImage,
     disabled: loading,
     pasteOnWindow: true,
   })
+
+  const handlePasteClick = async () => {
+    setPasteError(null)
+    const result = await pasteFromClipboard()
+    if (result === 'empty') setPasteError('No image on the clipboard — copy one first.')
+    if (result === 'denied') setPasteError('Clipboard access was declined.')
+    if (result === 'unsupported') setPasteError("This browser won't let a page read the clipboard.")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -410,12 +419,33 @@ export function CollectionItemForm({
             <ImagePlus className="w-3.5 h-3.5" />
             {photoFile ? photoFile.name : isEdit ? 'Choose new image' : 'Choose image'}
           </Button>
+          {canPaste && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePasteClick}
+              disabled={loading}
+              className="gap-1.5"
+              title="Use the image on your clipboard"
+            >
+              <ClipboardPaste className="w-3.5 h-3.5" />
+              Paste image
+            </Button>
+          )}
           {loading && photoFile && (
             <span className="text-xs text-muted-foreground">Uploading… {uploadPct}%</span>
           )}
           <span className="text-xs text-muted-foreground basis-full">
-            {isDragging ? 'Drop it anywhere in this form' : 'or drag an image in, or paste one'}
+            {isDragging
+              ? 'Drop it anywhere in this form'
+              : canPaste
+                ? 'Drag an image in, or tap Paste image to use the one you copied'
+                : 'or drag an image in, or paste one'}
           </span>
+          {pasteError && (
+            <span className="text-xs text-destructive basis-full">{pasteError}</span>
+          )}
         </div>
       </div>
       {submitError && (

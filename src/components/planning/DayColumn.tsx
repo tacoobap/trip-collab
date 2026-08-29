@@ -9,7 +9,7 @@ import type { DroppedImage } from '@/lib/imageFromTransfer'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
 import { CityTag } from '@/components/shared/CityTag'
-import { Camera, Loader2, Plus, Check, X, Upload, Sparkles, Pencil } from 'lucide-react'
+import { Camera, Loader2, Plus, Check, X, Upload, Sparkles, Pencil, ClipboardPaste } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseTimeToMinutes, formatTimeLabel } from '@/lib/timeUtils'
 
@@ -80,12 +80,17 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
     if (file) void applyImage({ kind: 'file', file })
   }
 
-  const { isDragging, dropHandlers } = useImageDrop({
+  const { isDragging, dropHandlers, pasteFromClipboard, canPaste } = useImageDrop({
     onImage: applyImage,
     disabled: !canEdit || imageWorking,
     // Scope ⌘V to the day whose photo menu is open, so a paste has one target
     pasteOnWindow: photoMenuOpen,
   })
+
+  const handlePasteClick = async () => {
+    const result = await pasteFromClipboard()
+    if (result !== 'ok') setPhotoMenuOpen(false)
+  }
 
   const handleAutoImage = async () => {
     setPhotoMenuOpen(false)
@@ -271,6 +276,20 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
                         </span>
                       </span>
                     </button>
+                    {canPaste && (
+                      <button
+                        onClick={handlePasteClick}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
+                      >
+                        <ClipboardPaste className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span>
+                          Paste image
+                          <span className="block text-[11px] text-muted-foreground font-normal">
+                            uses the image you copied
+                          </span>
+                        </span>
+                      </button>
+                    )}
                     <button
                       onClick={handleAutoImage}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
