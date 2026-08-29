@@ -338,7 +338,7 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
                   if (e.key === 'Escape') cancelAddSlot()
                 }}
                 className={cn(
-                  'w-full text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0',
+                  'w-full text-base md:text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0',
                   addSlotError && 'placeholder:text-destructive/70'
                 )}
                 aria-label="Time"
@@ -353,7 +353,7 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Escape') cancelAddSlot() }}
-                  className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
+                  className="flex-1 text-base md:text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
                   aria-label="What's planned (optional)"
                 />
                 <button

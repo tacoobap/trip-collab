@@ -78,7 +78,7 @@ export function ProposalCard({
                 if (e.key === 'Enter') handleSaveEdit()
               }}
               placeholder="Idea title"
-              className="w-full text-sm bg-muted/50 border border-border/70 rounded-lg px-3 py-1.5 outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
+              className="w-full text-base md:text-sm bg-muted/50 border border-border/70 rounded-lg px-3 py-1.5 outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
             />
             <button
               onClick={cancelEdit}

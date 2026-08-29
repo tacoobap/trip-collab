@@ -40,7 +40,7 @@ export function AddProposalForm({ currentName, onSubmit, onCancel }: AddProposal
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
           disabled={loading}
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50 text-foreground min-w-0 disabled:opacity-50"
+          className="flex-1 bg-transparent text-base md:text-sm outline-none placeholder:text-muted-foreground/50 text-foreground min-w-0 disabled:opacity-50"
         />
         <button
           type="submit"

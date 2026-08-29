@@ -91,7 +91,7 @@ function PickerPanel({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search icons…"
           aria-label="Search icons"
-          className="flex-1 bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
+          className="flex-1 bg-transparent text-base md:text-sm outline-none text-foreground placeholder:text-muted-foreground/50 min-w-0"
         />
         {query && (
           <button

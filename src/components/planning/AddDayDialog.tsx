@@ -288,7 +288,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
                       onChange={(e) => updatePresetLabel(i, e.target.value)}
                       disabled={!preset.enabled}
                       placeholder="e.g. 9:00 AM"
-                      className="text-sm text-foreground w-24 shrink-0 bg-transparent border-b border-border focus:border-primary outline-none placeholder:text-muted-foreground/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="text-base md:text-sm text-foreground w-24 shrink-0 bg-transparent border-b border-border focus:border-primary outline-none placeholder:text-muted-foreground/40 disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                     {/* Emoji picker trigger */}
                     <div className="relative shrink-0">

@@ -33,7 +33,9 @@ export function ImagePasteBox({ className, label = 'Paste an image here' }: Imag
         e.currentTarget.textContent = ''
       }}
       className={cn(
-        'min-h-[44px] rounded-md border border-dashed px-3 py-2.5 text-sm outline-none transition-colors',
+        'min-h-[44px] rounded-md border border-dashed px-3 py-2.5 outline-none transition-colors',
+        // 16px on mobile or iOS zooms the page on focus, same as Input/Textarea
+        'text-base md:text-sm',
         'text-foreground border-border/70 focus:border-primary focus:bg-primary/5',
         'empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/70',
         className

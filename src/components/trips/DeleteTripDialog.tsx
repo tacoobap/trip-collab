@@ -94,7 +94,7 @@ export function DeleteTripDialog({
               onChange={(e) => setConfirmText(e.target.value)}
               disabled={loading}
               autoFocus
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-destructive/50 disabled:opacity-50"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-base md:text-sm outline-none focus:border-destructive/50 disabled:opacity-50"
               placeholder={trip.name}
             />
           </div>
