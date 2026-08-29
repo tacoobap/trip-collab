@@ -154,7 +154,7 @@ export function PlanningBoard({ trip, days, currentName, getToken, isMember, isO
         <div
           ref={scrollRef}
           className={cn(
-            'w-full min-w-0 overflow-x-auto pb-6 -mx-1 max-sm:pb-4 max-sm:mx-0',
+            'w-full min-w-0 overflow-x-auto pb-6 max-sm:pb-4',
             'max-sm:snap-x max-sm:snap-mandatory'
           )}
           style={{ WebkitOverflowScrolling: 'touch' }}
