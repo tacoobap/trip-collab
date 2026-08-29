@@ -5,6 +5,7 @@ import {
   readClipboardImage,
   readImageTransfer,
   resolveImageTransfer,
+  type ClipboardRead,
   type DroppedImage,
   type TransferredImage,
 } from '@/lib/imageFromTransfer'
@@ -17,7 +18,26 @@ function isEditable(target: EventTarget | null): boolean {
 }
 
 /** Outcome of a tap on a Paste button, so callers can say what went wrong. */
-export type ClipboardPasteResult = 'ok' | 'empty' | 'denied' | 'unsupported'
+export type ClipboardPasteResult =
+  | { status: 'ok' }
+  /** Nothing usable — `held` describes what was on the clipboard instead. */
+  | { status: 'empty'; held: string }
+  | { status: 'denied' }
+  | { status: 'unsupported' }
+
+/** The message to show when a Paste tap didn't produce an image. */
+export function pasteResultMessage(result: ClipboardPasteResult): string | null {
+  switch (result.status) {
+    case 'ok':
+      return null
+    case 'denied':
+      return 'Clipboard access was declined.'
+    case 'unsupported':
+      return "This browser won't let a page read the clipboard."
+    case 'empty':
+      return `Couldn't get an image from the clipboard — it held ${result.held}. Try copying the image itself rather than a link to the page it sits on.`
+  }
+}
 
 export interface UseImageDropOptions {
   /** Called once an image has been extracted from the drop or paste. */
@@ -42,11 +62,12 @@ export function useImageDrop({
     onImageRef.current = onImage
   })
 
-  const accept = useCallback((found: TransferredImage) => {
-    void (async () => {
-      const image = await resolveImageTransfer(found)
-      if (image) await onImageRef.current(image)
-    })()
+  /** Resolves to false when the candidate turned out not to be a usable image. */
+  const accept = useCallback(async (found: TransferredImage): Promise<boolean> => {
+    const image = await resolveImageTransfer(found)
+    if (!image) return false
+    await onImageRef.current(image)
+    return true
   }, [])
 
   useEffect(() => {
@@ -58,7 +79,7 @@ export function useImageDrop({
       const found = readImageTransfer(event.clipboardData, !editable)
       if (!found) return
       event.preventDefault()
-      accept(found)
+      void accept(found)
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
@@ -70,17 +91,19 @@ export function useImageDrop({
    * mobile browsers require that user gesture.
    */
   const pasteFromClipboard = useCallback(async (): Promise<ClipboardPasteResult> => {
-    if (disabled) return 'empty'
-    if (!canReadClipboard()) return 'unsupported'
-    let found: TransferredImage | null
+    if (disabled) return { status: 'empty', held: 'nothing' }
+    if (!canReadClipboard()) return { status: 'unsupported' }
+    let read: ClipboardRead
     try {
-      found = await readClipboardImage()
+      read = await readClipboardImage()
     } catch {
-      return 'denied' // the browser's own prompt was dismissed, or permission refused
+      return { status: 'denied' } // prompt dismissed, or permission refused
     }
-    if (!found) return 'empty'
-    accept(found)
-    return 'ok'
+    if (!read.image) return { status: 'empty', held: read.held }
+    // A link is only a candidate until we've actually fetched it — reporting
+    // success before that turns an unreachable image into a silent no-op.
+    const delivered = await accept(read.image)
+    return delivered ? { status: 'ok' } : { status: 'empty', held: read.held }
   }, [disabled, accept])
 
   const dropHandlers = {
@@ -106,7 +129,7 @@ export function useImageDrop({
       if (disabled) return
       e.preventDefault()
       const found = readImageTransfer(e.dataTransfer)
-      if (found) accept(found)
+      if (found) void accept(found)
     },
   }
 

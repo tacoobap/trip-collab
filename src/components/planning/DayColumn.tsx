@@ -4,7 +4,7 @@ import { db } from '@/lib/firebase'
 import { addSlot, addLockedSlot } from '@/services/planningService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
-import { useImageDrop } from '@/hooks/useImageDrop'
+import { useImageDrop, pasteResultMessage } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import type { DayWithSlots, SlotWithProposals } from '@/types/database'
 import { SlotCard } from './SlotCard'
@@ -40,6 +40,7 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
   const [uploadPct, setUploadPct] = useState(0)
   const [autoLoading, setAutoLoading] = useState(false)
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+  const [pasteError, setPasteError] = useState<string | null>(null)
 
   const [addingSlot, setAddingSlot] = useState(false)
   const [newLabel, setNewLabel] = useState('')
@@ -88,8 +89,9 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
   })
 
   const handlePasteClick = async () => {
-    const result = await pasteFromClipboard()
-    if (result !== 'ok') setPhotoMenuOpen(false)
+    const message = pasteResultMessage(await pasteFromClipboard())
+    setPasteError(message)
+    if (message) setPhotoMenuOpen(false)
   }
 
   const handleAutoImage = async () => {
@@ -307,6 +309,9 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
             )}
           </div>
         </div>
+        {pasteError && (
+          <p className="text-[11px] text-destructive mt-1.5">{pasteError}</p>
+        )}
         {day.date && (
           <p className="text-sm text-muted-foreground mt-1">
             {new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {

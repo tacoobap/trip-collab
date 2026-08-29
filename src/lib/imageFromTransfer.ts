@@ -11,6 +11,13 @@ export type DroppedImage =
   /** A remote image whose bytes we can't read (no CORS headers); linked as-is. */
   | { kind: 'url'; url: string }
 
+/** The outcome of reading the clipboard, with a note on what was found. */
+export interface ClipboardRead {
+  image: TransferredImage | null
+  /** Plain-language description of the clipboard's contents, for error copy. */
+  held: string
+}
+
 /** What a DataTransfer held, before we've tried to turn a link into bytes. */
 export type TransferredImage =
   | { kind: 'file'; file: File }
@@ -65,14 +72,37 @@ function linkFromText(get: (type: string) => string): TransferredImage | null {
   // uri-list, or the markup around a copied image: the source is telling us
   // this is an image, so take its word for it.
   const vouchedUrl = firstHref(get('text/uri-list')) ?? srcFromHtml(get('text/html'))
-  if (vouchedUrl) return { kind: 'link', url: vouchedUrl, vouched: true }
+  if (vouchedUrl) return { kind: 'link', url: unwrapImageUrl(vouchedUrl), vouched: true }
 
   // Loose text. An image extension is proof enough; anything else has to be
   // confirmed by fetching it, so pasting a Maps link doesn't become a photo.
   const plain = firstHref(get('text/plain'))
-  if (plain) return { kind: 'link', url: plain, vouched: IMAGE_EXTENSION.test(plain) }
+  if (plain) {
+    const url = unwrapImageUrl(plain)
+    // Unwrapping means the page told us which URL is the image
+    const vouched = url !== plain || IMAGE_EXTENSION.test(url)
+    return { kind: 'link', url, vouched }
+  }
 
   return null
+}
+
+/**
+ * Google image results copy as a link to Google's viewer, not to the picture:
+ * `google.com/imgres?imgurl=<the real one>&imgrefurl=…`. Same trick shows up
+ * on other search and proxy pages, so unwrap any of those parameters.
+ */
+function unwrapImageUrl(url: string): string {
+  try {
+    const params = new URL(url).searchParams
+    for (const key of ['imgurl', 'mediaurl', 'image_url', 'url']) {
+      const inner = params.get(key)
+      if (inner && IMAGE_HREF.test(inner)) return inner
+    }
+  } catch {
+    // not a parseable URL — leave it as it came
+  }
+  return url
 }
 
 function nameFromUrl(url: string): string {
@@ -146,8 +176,8 @@ export function canReadClipboard(): boolean {
  *
  * Throws if the read is refused, so callers can tell "denied" from "no image".
  */
-export async function readClipboardImage(): Promise<TransferredImage | null> {
-  if (!canReadClipboard()) return null
+export async function readClipboardImage(): Promise<ClipboardRead> {
+  if (!canReadClipboard()) return { image: null, held: 'nothing' }
   const contents = await navigator.clipboard.read()
 
   for (const item of contents) {
@@ -156,7 +186,8 @@ export async function readClipboardImage(): Promise<TransferredImage | null> {
     try {
       const blob = await item.getType(type)
       const ext = type.split('/')[1]?.split('+')[0] || 'png'
-      return { kind: 'file', file: new File([blob], `pasted-image.${ext}`, { type: blob.type }) }
+      const file = new File([blob], `pasted-image.${ext}`, { type: blob.type })
+      return { image: { kind: 'file', file }, held: type }
     } catch {
       // Safari lists flavours it won't always hand over; fall through to the link
     }
@@ -176,7 +207,27 @@ export async function readClipboardImage(): Promise<TransferredImage | null> {
     }
   }
 
-  return linkFromText((type) => text[type] ?? '')
+  const image = linkFromText((type) => text[type] ?? '')
+  return { image, held: describeClipboard(contents, text) }
+}
+
+/**
+ * A short, honest account of what was on the clipboard, so a paste that finds
+ * no image can say why instead of just insisting there wasn't one.
+ */
+function describeClipboard(
+  contents: readonly ClipboardItem[],
+  text: Record<string, string>
+): string {
+  const types = [...new Set(contents.flatMap((item) => item.types))]
+  if (types.length === 0) return 'nothing'
+
+  const body = text['text/plain']?.trim() || text['text/uri-list']?.trim()
+  if (body) {
+    const snippet = body.length > 60 ? `${body.slice(0, 60)}…` : body
+    return IMAGE_HREF.test(body) ? `a link (${snippet})` : `text ("${snippet}")`
+  }
+  return types.join(', ')
 }
 
 /**

@@ -16,7 +16,7 @@ import { useStays } from '@/hooks/useStays'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
-import { useImageDrop } from '@/hooks/useImageDrop'
+import { useImageDrop, pasteResultMessage } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -108,10 +108,8 @@ export function ItineraryPage() {
   })
 
   const handleHeroPaste = async () => {
-    const result = await heroDrop.pasteFromClipboard()
-    if (result === 'empty') addToast('No image on the clipboard — copy one first.', { variant: 'error' })
-    if (result === 'denied') addToast('Clipboard access was declined.', { variant: 'error' })
-    if (result === 'unsupported') addToast("This browser won't let a page read the clipboard.", { variant: 'error' })
+    const message = pasteResultMessage(await heroDrop.pasteFromClipboard())
+    if (message) addToast(message, { variant: 'error' })
   }
 
   const handleGenerate = async () => {

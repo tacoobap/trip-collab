@@ -6,7 +6,7 @@ import {
 } from '@/services/collectionService'
 import { uploadImage } from '@/lib/imageUpload'
 import { searchImage } from '@/lib/imageSearch'
-import { useImageDrop } from '@/hooks/useImageDrop'
+import { useImageDrop, pasteResultMessage } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
 import type { CollectionItem, CollectionItemCategory } from '@/types/database'
@@ -139,10 +139,7 @@ export function CollectionItemForm({
 
   const handlePasteClick = async () => {
     setPasteError(null)
-    const result = await pasteFromClipboard()
-    if (result === 'empty') setPasteError('No image on the clipboard — copy one first.')
-    if (result === 'denied') setPasteError('Clipboard access was declined.')
-    if (result === 'unsupported') setPasteError("This browser won't let a page read the clipboard.")
+    setPasteError(pasteResultMessage(await pasteFromClipboard()))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
