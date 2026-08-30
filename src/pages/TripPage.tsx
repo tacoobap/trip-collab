@@ -214,20 +214,11 @@ export function TripPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setTodosOpen(true)}
-              className="relative shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+              className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
               title="To-dos"
-              aria-label={
-                openTodos.length > 0
-                  ? `To-dos (${openTodos.length} open)`
-                  : 'To-dos'
-              }
+              aria-label="To-dos"
             >
               <ListChecks className="w-4 h-4" />
-              {openTodos.length > 0 && (
-                <span className="absolute top-0.5 right-0.5 max-sm:top-1.5 max-sm:right-1.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-[15px] text-center">
-                  {openTodos.length > 9 ? '9+' : openTodos.length}
-                </span>
-              )}
             </button>
             <button
               onClick={() => setStaysOpen(true)}
@@ -274,7 +265,7 @@ export function TripPage() {
         doneTodos={doneTodos}
         currentName={displayName ?? ''}
         travelers={travelers}
-        onAdd={(text) => addTodo(text, displayName ?? '')}
+        onAdd={(text, opts) => addTodo(text, displayName ?? '', opts)}
         onUpdate={updateTodo}
         onToggle={(todoId, done) => toggleTodo(todoId, done, displayName ?? '')}
         onDelete={deleteTodo}

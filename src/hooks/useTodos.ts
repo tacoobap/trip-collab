@@ -40,7 +40,11 @@ export function useTodos(tripId: string | undefined) {
   const doneTodos = useMemo(() => todos.filter((t) => t.done), [todos])
 
   const addTodo = useCallback(
-    async (text: string, createdBy: string) => {
+    async (
+      text: string,
+      createdBy: string,
+      opts?: { assigned_to?: string | null; due_date?: string | null }
+    ) => {
       if (!tripId || !text.trim()) return
       const maxSortOrder = todos.reduce(
         (max, t) => (t.sort_order > max ? t.sort_order : max),
@@ -50,6 +54,8 @@ export function useTodos(tripId: string | undefined) {
         trip_id: tripId,
         text,
         created_by: createdBy,
+        assigned_to: opts?.assigned_to ?? null,
+        due_date: opts?.due_date ?? null,
         after_sort_order: maxSortOrder,
       })
     },

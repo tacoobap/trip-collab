@@ -66,6 +66,98 @@ function TodoCheckbox({ done, disabled, onToggle, label }: CheckboxProps) {
   )
 }
 
+
+interface PersonChipsProps {
+  people: string[]
+  value: string | null
+  onChange: (name: string | null) => void
+  size?: 'sm' | 'xs'
+}
+
+/** Assignee picker. "Anyone" is the unassigned default, not a person. */
+function PersonChips({ people, value, onChange, size = 'sm' }: PersonChipsProps) {
+  const pad = size === 'xs' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'
+  const padWithAvatar = size === 'xs' ? 'pl-0.5 pr-2 py-0.5 text-[11px]' : 'pl-1 pr-2.5 py-1 text-xs'
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={cn(
+          'rounded-full font-medium border transition-all',
+          pad,
+          value === null
+            ? 'bg-primary text-primary-foreground border-primary'
+            : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
+        )}
+      >
+        Anyone
+      </button>
+      {people.map((name) => (
+        <button
+          key={name}
+          type="button"
+          onClick={() => onChange(name)}
+          className={cn(
+            'flex items-center gap-1.5 rounded-full font-medium border transition-all',
+            padWithAvatar,
+            value === name
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-background text-foreground border-border hover:border-primary/40'
+          )}
+        >
+          <ProposerAvatar name={name} size="xs" />
+          {name}
+        </button>
+      ))}
+    </>
+  )
+}
+
+interface DueDateFieldProps {
+  value: string
+  onChange: (v: string) => void
+  size?: 'sm' | 'xs'
+}
+
+/** Compact due-date pill that matches the chips beside it. */
+function DueDateField({ value, onChange, size = 'sm' }: DueDateFieldProps) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border bg-background transition-all',
+        size === 'xs' ? 'px-2 py-0.5' : 'px-2.5 py-1',
+        value ? 'border-border text-foreground' : 'border-dashed border-border text-muted-foreground'
+      )}
+    >
+      <span className={cn('shrink-0 font-medium', size === 'xs' ? 'text-[11px]' : 'text-xs')}>
+        Due
+      </span>
+      <input
+        type="date"
+        aria-label="Due date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'bg-transparent outline-none font-medium',
+          size === 'xs' ? 'text-[11px]' : 'text-xs',
+          !value && 'text-muted-foreground'
+        )}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Clear due date"
+          className="text-muted-foreground hover:text-foreground shrink-0"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+    </span>
+  )
+}
+
 interface TodoEditorProps {
   todo: TripTodo
   people: string[]
@@ -111,55 +203,9 @@ function TodoEditor({ todo, people, onSave, onDelete, onCancel }: TodoEditorProp
         className="text-sm"
       />
 
-      <div>
-        <p className="text-xs font-medium text-foreground mb-1.5">Assigned to</p>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setAssignee(null)}
-            className={cn(
-              'px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
-              assignee === null
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
-            )}
-          >
-            Anyone
-          </button>
-          {people.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setAssignee(name)}
-              className={cn(
-                'flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full text-xs font-medium border transition-all',
-                assignee === name
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-foreground border-border hover:border-primary/40'
-              )}
-            >
-              <ProposerAvatar name={name} size="xs" />
-              {name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs font-medium text-foreground mb-1.5">Due date</p>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-            className="text-sm flex-1"
-          />
-          {due && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => setDue('')}>
-              Clear
-            </Button>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <PersonChips people={people} value={assignee} onChange={setAssignee} />
+        <DueDateField value={due} onChange={setDue} />
       </div>
 
       <div className="flex items-center justify-between gap-2 pt-1">
@@ -283,7 +329,7 @@ interface TodosDrawerProps {
   currentName: string | null
   /** Names seen elsewhere on this trip, offered in the assignee picker. */
   travelers: string[]
-  onAdd: (text: string) => Promise<void>
+  onAdd: (text: string, opts: { assigned_to: string | null; due_date: string | null }) => Promise<void>
   onUpdate: (todoId: string, data: UpdateTodoInput) => Promise<void>
   onToggle: (todoId: string, done: boolean) => Promise<void>
   onDelete: (todoId: string) => Promise<void>
@@ -308,6 +354,8 @@ export function TodosDrawer({
   canEdit = true,
 }: TodosDrawerProps) {
   const [draft, setDraft] = useState('')
+  const [draftAssignee, setDraftAssignee] = useState<string | null>(null)
+  const [draftDue, setDraftDue] = useState('')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showDone, setShowDone] = useState(false)
@@ -344,8 +392,13 @@ export function TodosDrawer({
     if (!text || adding) return
     setAdding(true)
     try {
-      await onAdd(text)
+      await onAdd(text, {
+        assigned_to: draftAssignee,
+        due_date: draftDue || null,
+      })
       setDraft('')
+      setDraftAssignee(null)
+      setDraftDue('')
     } finally {
       setAdding(false)
     }
@@ -398,9 +451,10 @@ export function TodosDrawer({
               </button>
             </div>
 
-            {/* Quick add — one field, Enter to file it */}
+            {/* Add — text is the only required part; who and when are right
+                there so a to-do can be filed complete in one go. */}
             {canEdit && currentName && (
-              <div className="px-5 py-3 border-b border-border shrink-0">
+              <div className="px-5 py-3 border-b border-border shrink-0 space-y-2">
                 <div className="flex items-center gap-2">
                   <Input
                     value={draft}
@@ -422,6 +476,15 @@ export function TodosDrawer({
                   >
                     {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Add'}
                   </Button>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <PersonChips
+                    people={people}
+                    value={draftAssignee}
+                    onChange={setDraftAssignee}
+                    size="xs"
+                  />
+                  <DueDateField value={draftDue} onChange={setDraftDue} size="xs" />
                 </div>
               </div>
             )}
