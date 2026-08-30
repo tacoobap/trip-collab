@@ -3,16 +3,18 @@ import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
 import { StaysDrawer } from '@/components/stays/StaysDrawer'
+import { TodosDrawer } from '@/components/todos/TodosDrawer'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
+import { useTodos } from '@/hooks/useTodos'
 import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
 import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
-import { Loader2, BedDouble, Pencil } from 'lucide-react'
+import { Loader2, BedDouble, ListChecks, Pencil } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
 
 export function TripPage() {
@@ -20,9 +22,20 @@ export function TripPage() {
   const { displayName } = useDisplayName()
   const { user, loading: authLoading, getIdToken } = useAuth()
   const { addToast } = useToast()
-  const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
+  const { trip, days, travelers, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
+  const {
+    openTodos,
+    doneTodos,
+    addTodo,
+    updateTodo,
+    toggleTodo,
+    deleteTodo,
+    reorderTodos,
+    clearDone,
+  } = useTodos(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
+  const [todosOpen, setTodosOpen] = useState(false)
   const [editTripOpen, setEditTripOpen] = useState(false)
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -200,6 +213,23 @@ export function TripPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setTodosOpen(true)}
+              className="relative shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+              title="To-dos"
+              aria-label={
+                openTodos.length > 0
+                  ? `To-dos (${openTodos.length} open)`
+                  : 'To-dos'
+              }
+            >
+              <ListChecks className="w-4 h-4" />
+              {openTodos.length > 0 && (
+                <span className="absolute top-0.5 right-0.5 max-sm:top-1.5 max-sm:right-1.5 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-[15px] text-center">
+                  {openTodos.length > 9 ? '9+' : openTodos.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setStaysOpen(true)}
               className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
               title="Stays"
@@ -235,6 +265,22 @@ export function TripPage() {
         onOpenChange={setEditTripOpen}
         trip={trip}
         days={days}
+      />
+
+      <TodosDrawer
+        open={todosOpen}
+        onClose={() => setTodosOpen(false)}
+        openTodos={openTodos}
+        doneTodos={doneTodos}
+        currentName={displayName ?? ''}
+        travelers={travelers}
+        onAdd={(text) => addTodo(text, displayName ?? '')}
+        onUpdate={updateTodo}
+        onToggle={(todoId, done) => toggleTodo(todoId, done, displayName ?? '')}
+        onDelete={deleteTodo}
+        onReorder={reorderTodos}
+        onClearDone={clearDone}
+        canEdit={isMember ?? false}
       />
 
       <StaysDrawer

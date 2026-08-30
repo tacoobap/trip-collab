@@ -163,6 +163,21 @@ service cloud.firestore {
         && request.resource.data.category in ['food', 'activity', 'other'];
     }
 
+    // ── Trip to-dos ───────────────────────────────────────────────────────────
+    // A shared checklist: any member can tick off or remove anyone's item.
+    match /trip_todos/{todoId} {
+      allow read: if request.auth != null;
+      allow delete: if request.auth != null && tripMember(resource.data.trip_id);
+      allow create, update: if request.auth != null
+        && request.resource.data.trip_id is string
+        && tripMember(request.resource.data.trip_id)
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 500
+        && request.resource.data.done is bool
+        && request.resource.data.sort_order is number;
+    }
+
     // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

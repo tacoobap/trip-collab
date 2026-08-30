@@ -116,3 +116,18 @@ export type SlotWithProposals = Slot & {
 export type DayWithSlots = Day & {
   slots: SlotWithProposals[]
 }
+
+export type TripTodo = {
+  id: string
+  trip_id: string
+  text: string
+  done: boolean
+  /** Manual order within the open list. Lower sorts first; done items ignore it. */
+  sort_order: number
+  due_date: string | null      // 'YYYY-MM-DD'
+  assigned_to: string | null   // display name, matching proposer_name / created_by elsewhere
+  created_at: string
+  created_by: string
+  completed_at: string | null
+  completed_by: string | null
+}

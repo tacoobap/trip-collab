@@ -64,6 +64,7 @@ export const handler: Handler = async (event) => {
     collect('stays', 'trip_id', tripId),
     collect('collection_items', 'trip_id', tripId),
     collect('trip_notes', 'trip_id', tripId),
+    collect('trip_todos', 'trip_id', tripId),
   ])
 
   // Slots by day_id, matching how they're read: older docs predate trip_id
