@@ -327,7 +327,8 @@ interface TodosDrawerProps {
   openTodos: TripTodo[]
   doneTodos: TripTodo[]
   currentName: string | null
-  /** Names seen elsewhere on this trip, offered in the assignee picker. */
+  /** Candidate assignees: trip members, plus any name seen elsewhere on the
+   *  trip as a fallback for members whose profile couldn't be read. */
   travelers: string[]
   onAdd: (text: string, opts: { assigned_to: string | null; due_date: string | null }) => Promise<void>
   onUpdate: (todoId: string, data: UpdateTodoInput) => Promise<void>

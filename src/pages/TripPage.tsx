@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { useTodos } from '@/hooks/useTodos'
+import { useTripMembers } from '@/hooks/useTripMembers'
 import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
 import { formatTripDate } from '@/lib/utils'
@@ -36,6 +37,14 @@ export function TripPage() {
   } = useTodos(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
   const [todosOpen, setTodosOpen] = useState(false)
+  // Fetched only once the to-dos sheet is opened, since that's the only thing
+  // that needs a roster. `travelers` alone misses a member who hasn't proposed
+  // anything yet, which is most of them early in a trip.
+  const { memberNames } = useTripMembers(trip?.id, getIdToken, todosOpen)
+  const todoPeople = useMemo(
+    () => [...memberNames, ...travelers],
+    [memberNames, travelers]
+  )
   const [editTripOpen, setEditTripOpen] = useState(false)
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -264,7 +273,7 @@ export function TripPage() {
         openTodos={openTodos}
         doneTodos={doneTodos}
         currentName={displayName ?? ''}
-        travelers={travelers}
+        travelers={todoPeople}
         onAdd={(text, opts) => addTodo(text, displayName ?? '', opts)}
         onUpdate={updateTodo}
         onToggle={(todoId, done) => toggleTodo(todoId, done, displayName ?? '')}
