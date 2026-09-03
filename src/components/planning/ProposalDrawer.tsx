@@ -4,9 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   addProposal,
   updateProposal,
-  updateProposalExactTime,
-  updateSlotTimeLabel,
   updateSlotIcon,
+  updateSlotSchedule,
   setProposalVotes,
   lockSlot,
   unlockSlot,
@@ -22,34 +21,80 @@ import { ProposalCard } from './ProposalCard'
 import { AddProposalForm } from './AddProposalForm'
 import { PickFromCollectionModal } from './PickFromCollectionModal'
 import { Button } from '@/components/ui/button'
-import { formatTimeLabel } from '@/lib/timeUtils'
+import { formatTimeLabel, parseTimeToMinutes, minutesToTimeLabel } from '@/lib/timeUtils'
+import { slotStartMinutes, slotDurationMinutes, lockedProposalOf } from '@/lib/timeGrid'
 import { cn } from '@/lib/utils'
 
 const TIME_CHIPS = ['9:00 AM', '11:00 AM', '12:00 PM', '3:00 PM', '5:00 PM', '7:00 PM']
 
-// ── Inline slot label (editable time in drawer header) ──────────────────────
+// ── Inline time range (editable start–end in drawer header) ─────────────────
 
-function InlineSlotLabel({ slot, canEdit }: { slot: SlotWithProposals; canEdit: boolean }) {
-  const [editing, setEditing] = useState(false)
+function TimePartInput({
+  initial,
+  onCommit,
+  onCancel,
+  error,
+}: {
+  initial: string
+  onCommit: (value: string) => void
+  onCancel: () => void
+  error: string | null
+}) {
+  const [draft, setDraft] = useState(initial)
+  return (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(draft)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') onCancel()
+      }}
+      placeholder="e.g. 9:00 AM"
+      className={cn(
+        'text-sm font-semibold bg-transparent border-b outline-none text-foreground w-24 min-w-0',
+        error ? 'border-destructive' : 'border-primary'
+      )}
+      aria-invalid={!!error}
+    />
+  )
+}
+
+/**
+ * "10:30 AM – 12:00 PM" with either end editable. The grid snaps to 15
+ * minutes; here any exact minute can be typed. Writes go through
+ * `updateSlotSchedule`, which keeps `time_label` and the locked proposal's
+ * `exact_time` in step.
+ */
+function InlineTimeRange({ slot, canEdit }: { slot: SlotWithProposals; canEdit: boolean }) {
+  const [editing, setEditing] = useState<'start' | 'end' | null>(null)
   const [saving, setSaving] = useState(false)
   const [timeError, setTimeError] = useState<string | null>(null)
 
-  const lockedProposal = slot.status === 'locked'
-    ? slot.proposals.find((p) => p.id === slot.locked_proposal_id) ?? null
-    : null
+  const start = slotStartMinutes(slot)
+  const duration = slotDurationMinutes(slot)
+  const lockedProposal = lockedProposalOf(slot)
 
-  // Mirror the same priority as SlotCard / TimelineItem
-  const displayTime = lockedProposal
-    ? (lockedProposal.exact_time ?? lockedProposal.narrative_time ?? slot.time_label)
-    : slot.time_label
+  const save = async (nextStart: number, nextDuration: number) => {
+    setSaving(true)
+    try {
+      await updateSlotSchedule({
+        slotId: slot.id,
+        start_minutes: nextStart,
+        duration_minutes: nextDuration,
+        lockedProposalId: lockedProposal?.id ?? null,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
 
-  const [draft, setDraft] = useState(displayTime)
-
-  const commit = async () => {
-    const val = draft.trim()
-    if (!val || val === displayTime) {
+  const commit = (which: 'start' | 'end') => (value: string) => {
+    const val = value.trim()
+    if (!val) {
       setTimeError(null)
-      setEditing(false)
+      setEditing(null)
       return
     }
     const formatted = formatTimeLabel(val)
@@ -57,70 +102,87 @@ function InlineSlotLabel({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
       setTimeError('Use a time like 9:00 AM or 2:30 PM')
       return
     }
-    setTimeError(null)
-    setEditing(false)
-    setSaving(true)
-    try {
-      if (lockedProposal) {
-        await updateProposalExactTime(lockedProposal.id, formatted)
-      } else {
-        await updateSlotTimeLabel(slot.id, formatted)
-      }
-    } finally {
-      setSaving(false)
+    const minutes = parseTimeToMinutes(formatted)
+    if (which === 'start') {
+      setTimeError(null)
+      setEditing(null)
+      if (minutes !== start) void save(minutes, duration)
+      return
     }
+    // End time — midnight counts as end-of-day, otherwise it must follow start
+    const base = start ?? 0
+    const end = minutes === 0 ? 24 * 60 : minutes
+    if (end <= base) {
+      setTimeError('End must be after the start')
+      return
+    }
+    setTimeError(null)
+    setEditing(null)
+    if (end - base !== duration) void save(base, end - base)
   }
 
   const cancelEdit = () => {
-    setDraft(displayTime)
     setTimeError(null)
-    setEditing(false)
+    setEditing(null)
   }
 
-  if (editing) {
-    return (
-      <span className="inline-flex flex-col gap-0.5">
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value)
-            if (timeError) setTimeError(null)
-          }}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-            if (e.key === 'Escape') cancelEdit()
-          }}
-          placeholder="e.g. 9:00 AM"
-          className={cn(
-            'text-sm font-semibold bg-transparent border-b outline-none text-foreground w-28 min-w-0',
-            timeError ? 'border-destructive' : 'border-primary'
-          )}
-          aria-invalid={!!timeError}
-        />
-        {timeError && (
-          <span className="text-[10px] text-destructive leading-tight">{timeError}</span>
-        )}
-      </span>
-    )
-  }
-
-  return (
+  const partButton = (label: string, which: 'start' | 'end') => (
     <button
       type="button"
-      onClick={() => canEdit && setEditing(true)}
+      onClick={() => canEdit && setEditing(which)}
       disabled={!canEdit}
-      title={canEdit ? 'Change time' : undefined}
-      className="group flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors disabled:pointer-events-none disabled:hover:text-foreground"
+      title={canEdit ? (which === 'start' ? 'Change start time' : 'Change end time') : undefined}
+      className="hover:text-primary transition-colors disabled:pointer-events-none"
     >
-      <span>{displayTime}</span>
-      {canEdit && (saving ? (
-        <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />
-      ) : (
-        <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
-      ))}
+      {label}
     </button>
+  )
+
+  return (
+    <span className="inline-flex flex-col gap-0.5 min-w-0">
+      <span className="flex items-center gap-1 text-sm font-semibold text-foreground whitespace-nowrap">
+        {start === null && editing === null && (
+          <button
+            type="button"
+            onClick={() => canEdit && setEditing('start')}
+            disabled={!canEdit}
+            className="text-muted-foreground hover:text-primary transition-colors disabled:pointer-events-none font-medium"
+          >
+            Sometime that day{canEdit ? ' — set a time' : ''}
+          </button>
+        )}
+        {start !== null && editing !== 'start' && partButton(minutesToTimeLabel(start), 'start')}
+        {editing === 'start' && (
+          <TimePartInput
+            initial={start === null ? '' : minutesToTimeLabel(start)}
+            onCommit={commit('start')}
+            onCancel={cancelEdit}
+            error={timeError}
+          />
+        )}
+        {start !== null && (
+          <>
+            <span className="text-muted-foreground/50">–</span>
+            {editing !== 'end' && partButton(minutesToTimeLabel(start + duration), 'end')}
+            {editing === 'end' && (
+              <TimePartInput
+                initial={minutesToTimeLabel(start + duration)}
+                onCommit={commit('end')}
+                onCancel={cancelEdit}
+                error={timeError}
+              />
+            )}
+          </>
+        )}
+        {canEdit && saving && <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />}
+        {canEdit && !saving && editing === null && start !== null && (
+          <Pencil className="w-3 h-3 opacity-30 shrink-0" aria-hidden />
+        )}
+      </span>
+      {timeError && (
+        <span className="text-[10px] text-destructive leading-tight">{timeError}</span>
+      )}
+    </span>
   )
 }
 
@@ -157,15 +219,14 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
 
   const handleQuickLabel = async (label: string) => {
     if (!slot) return
-    const lockedProposal = slot.status === 'locked'
-      ? slot.proposals.find((p) => p.id === slot.locked_proposal_id)
-      : null
-    if (lockedProposal) {
-      await updateProposalExactTime(lockedProposal.id, label)
-    } else {
-      if (label === slot.time_label) return
-      await updateSlotTimeLabel(slot.id, label)
-    }
+    const minutes = parseTimeToMinutes(label)
+    if (minutes === Infinity || minutes === slotStartMinutes(slot)) return
+    await updateSlotSchedule({
+      slotId: slot.id,
+      start_minutes: minutes,
+      duration_minutes: slotDurationMinutes(slot),
+      lockedProposalId: lockedProposalOf(slot)?.id ?? null,
+    })
   }
 
   if (!slot) return null
@@ -309,7 +370,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                     ) : (
                       <span className="text-lg leading-none shrink-0">{currentIcon}</span>
                     )}
-                    <InlineSlotLabel slot={slot} canEdit={canEdit} />
+                    <InlineTimeRange slot={slot} canEdit={canEdit} />
                     <span className="text-xs text-muted-foreground/40 truncate">· {dayLabel}</span>
                     <SlotIconPicker
                       open={iconPickerOpen}
@@ -364,7 +425,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                       onClick={() => handleQuickLabel(t)}
                       className={cn(
                         'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
-                        slot.time_label === t
+                        slotStartMinutes(slot) === parseTimeToMinutes(t)
                           ? 'border-primary/50 bg-primary/10 text-primary'
                           : 'border-border/60 text-muted-foreground/60 hover:border-primary/30 hover:text-foreground'
                       )}

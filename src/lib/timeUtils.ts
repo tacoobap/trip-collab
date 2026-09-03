@@ -17,6 +17,14 @@ export function parseTimeToMinutes(time: string | null | undefined): number {
 }
 
 /**
+ * Converts minutes-from-midnight to a "H:MM AM/PM" label — the inverse of
+ * `parseTimeToMinutes` for the values the planning grid stores.
+ */
+export function minutesToTimeLabel(minutes: number): string {
+  return minutesToDisplay(minutes)
+}
+
+/**
  * Converts minutes-from-midnight to "H:MM AM/PM".
  */
 function minutesToDisplay(minutes: number): string {

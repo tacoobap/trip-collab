@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import type { Trip, Day } from '@/types/database'
 import { SlotIconPicker } from './SlotIconPicker'
+import { parseTimeToMinutes } from '@/lib/timeUtils'
 interface SlotPreset {
   time_label: string
   icon: string | null
@@ -139,6 +140,7 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
       const batch = writeBatch(db)
       enabledPresets.forEach((preset, i) => {
         const slotRef = doc(collection(db, 'slots'))
+        const startMinutes = parseTimeToMinutes(preset.time_label)
         batch.set(slotRef, {
           day_id: dayRef.id,
           trip_id: trip.id,
@@ -148,6 +150,9 @@ export function AddDayDialog({ open, onOpenChange, trip, existingDays }: AddDayD
           status: 'open',
           locked_proposal_id: null,
           sort_order: i,
+          // Grid schedule; unparseable custom labels land on the day shelf
+          start_minutes: startMinutes === Infinity ? null : startMinutes,
+          duration_minutes: 90,
         })
       })
       await batch.commit()

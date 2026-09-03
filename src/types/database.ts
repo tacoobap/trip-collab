@@ -42,6 +42,14 @@ export type Slot = {
   status: 'open' | 'proposed' | 'locked'
   locked_proposal_id: string | null
   sort_order: number
+  /**
+   * Canonical schedule for the time grid, minutes from midnight. `null` means
+   * deliberately unscheduled ("sometime this day" shelf). Absent on legacy
+   * slots — read through `slotStartMinutes`, which falls back to parsing the
+   * displayed time. `time_label` stays written as the derived display string.
+   */
+  start_minutes?: number | null
+  duration_minutes?: number | null
 }
 
 export type Proposal = {

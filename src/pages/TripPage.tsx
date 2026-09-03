@@ -163,10 +163,10 @@ export function TripPage() {
   const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-dvh flex flex-col bg-background">
       <PageHeader trip={trip} currentName={displayName ?? ''} />
       {user && isMember === false && (
-        <div className="border-b border-warning/30 bg-warning/10">
+        <div className="shrink-0 border-b border-warning/30 bg-warning/10">
           <div className="max-w-7xl mx-auto px-5 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-warning-foreground">
               You're viewing this trip as a guest. You can't edit the plan, add ideas, or change stays until you join.
@@ -195,7 +195,7 @@ export function TripPage() {
         </div>
       )}
 
-      <div className="border-b border-border bg-warm-white/50">
+      <div className="shrink-0 border-b border-border bg-warm-white/50">
         <div className="max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -248,7 +248,10 @@ export function TripPage() {
           </div>
         </div>
       </div>
-      <main className="pt-8 pb-10 px-5 sm:px-6 max-w-7xl mx-auto min-w-0 overflow-x-hidden max-sm:pt-5 max-sm:pb-8">
+      {/* The time grid owns its own two-axis scroll region, so the page
+          itself must not scroll: cap the column at the viewport and let the
+          board fill what's left. */}
+      <main className="flex-1 min-h-0 flex flex-col pt-5 px-5 sm:px-6 max-w-7xl mx-auto w-full min-w-0 max-sm:pt-3">
         <PlanningBoard
           trip={trip}
           days={days}

@@ -14,6 +14,7 @@ import { db } from '@/lib/firebase'
 import type { Day, Slot } from '@/types/database'
 import { enumerateDates, dayLabel } from '@/lib/dateRange'
 import { suggestEmoji } from '@/lib/slotEmojis'
+import { minutesToTimeLabel } from '@/lib/timeUtils'
 
 export type SlotCategory = Slot['category']
 
@@ -292,6 +293,9 @@ export type AddSlotInput = {
   time_label: string
   category?: SlotCategory
   sort_order: number
+  /** Grid schedule; null = unscheduled (day shelf). Omit on legacy paths. */
+  start_minutes?: number | null
+  duration_minutes?: number | null
 }
 
 /**
@@ -304,8 +308,10 @@ export async function addSlot(input: AddSlotInput): Promise<void> {
     time_label,
     sort_order,
     category = 'activity',
+    start_minutes,
+    duration_minutes,
   } = input
-  await addDoc(collection(db, 'slots'), {
+  const data: Record<string, unknown> = {
     day_id,
     trip_id,
     time_label,
@@ -314,7 +320,10 @@ export async function addSlot(input: AddSlotInput): Promise<void> {
     status: 'open',
     locked_proposal_id: null,
     sort_order,
-  })
+  }
+  if (start_minutes !== undefined) data.start_minutes = start_minutes
+  if (duration_minutes !== undefined) data.duration_minutes = duration_minutes
+  await addDoc(collection(db, 'slots'), data)
 }
 
 export type AddProposalInput = {
@@ -351,6 +360,9 @@ export type AddLockedSlotInput = {
   category?: SlotCategory
   proposer_name: string
   title: string
+  /** Grid schedule; null = unscheduled (day shelf). Omit on legacy paths. */
+  start_minutes?: number | null
+  duration_minutes?: number | null
 }
 
 /**
@@ -367,13 +379,15 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
     category = 'activity',
     proposer_name,
     title,
+    start_minutes,
+    duration_minutes,
   } = input
 
   const batch = writeBatch(db)
   const slotRef = doc(collection(db, 'slots'))
   const proposalRef = doc(collection(db, 'proposals'))
 
-  batch.set(slotRef, {
+  const slotData: Record<string, unknown> = {
     day_id,
     trip_id,
     time_label,
@@ -382,7 +396,10 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
     status: 'locked',
     locked_proposal_id: proposalRef.id,
     sort_order,
-  })
+  }
+  if (start_minutes !== undefined) slotData.start_minutes = start_minutes
+  if (duration_minutes !== undefined) slotData.duration_minutes = duration_minutes
+  batch.set(slotRef, slotData)
   batch.set(proposalRef, {
     slot_id: slotRef.id,
     trip_id,
@@ -452,6 +469,52 @@ export async function updateSlotTimeLabel(
   time_label: string
 ): Promise<void> {
   await updateDoc(doc(db, 'slots', slotId), { time_label })
+}
+
+export type UpdateSlotScheduleInput = {
+  slotId: string
+  /** Minutes from midnight; null parks the slot on the day shelf. */
+  start_minutes: number | null
+  duration_minutes: number
+  /** Pass to move the slot to another day. */
+  day_id?: string
+  /**
+   * The slot's locked proposal, if any. Its `exact_time` overrides the slot's
+   * label everywhere times display, so it must move in the same batch — and be
+   * cleared (with `narrative_time`) when the slot is unscheduled, or the old
+   * time would keep showing and re-parse back onto the grid.
+   */
+  lockedProposalId?: string | null
+}
+
+/**
+ * The one write path for scheduling: sets the canonical grid fields, derives
+ * `time_label`, and keeps a locked proposal's time in step.
+ */
+export async function updateSlotSchedule(
+  input: UpdateSlotScheduleInput
+): Promise<void> {
+  const { slotId, start_minutes, duration_minutes, day_id, lockedProposalId } = input
+  const label = start_minutes === null ? '' : minutesToTimeLabel(start_minutes)
+
+  const batch = writeBatch(db)
+  const slotData: Record<string, unknown> = {
+    start_minutes,
+    duration_minutes,
+    time_label: label,
+  }
+  if (day_id) slotData.day_id = day_id
+  batch.update(doc(db, 'slots', slotId), slotData)
+
+  if (lockedProposalId) {
+    batch.update(
+      doc(db, 'proposals', lockedProposalId),
+      start_minutes === null
+        ? { exact_time: null, narrative_time: null }
+        : { exact_time: label }
+    )
+  }
+  await batch.commit()
 }
 
 export async function updateSlotIcon(slotId: string, icon: string): Promise<void> {
