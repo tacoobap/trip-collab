@@ -6,17 +6,23 @@ import { parseTimeToMinutes, minutesToTimeLabel } from './timeUtils'
  * from midnight; all pixel values assume `HOUR_PX` pixels per hour.
  */
 
-export const HOUR_PX = 64
+export const HOUR_PX = 52
 export const SNAP_MIN = 15
 export const GRID_END_MIN = 24 * 60
-/** The grid renders from 6 AM by default; earlier hours appear on demand. */
+/** Where the grid renders from when the trip has nothing scheduled yet. */
 export const DEFAULT_GRID_START_MIN = 6 * 60
+/** However late the first event is, never open later than this. */
+export const MAX_AUTO_GRID_START_MIN = 9 * 60
 export const MIN_DURATION_MIN = 30
 export const DEFAULT_DURATION_MIN = 60
+/** Where the grid stops when the trip has nothing scheduled yet. */
+export const DEFAULT_GRID_END_MIN = 22 * 60
+/** However early the last event ends, never close earlier than this. */
+export const MIN_AUTO_GRID_END_MIN = 21 * 60
 /** Duration given to a shelf item when it's dragged onto the timeline. */
 export const SHELF_DROP_DURATION_MIN = 90
 /** Fixed day-header height — identical across columns so timelines align. */
-export const DAY_HEADER_PX = 168
+export const DAY_HEADER_PX = 116
 
 export function lockedProposalOf(slot: SlotWithProposals): Proposal | null {
   if (!slot.locked_proposal_id) return null
@@ -57,18 +63,51 @@ export function formatMinuteRange(start: number, duration: number): string {
 }
 
 /**
- * Where the grid starts for this trip: 6 AM, pulled earlier (to the hour)
- * when any slot already lives before it.
+ * Where the grid starts for this trip. Nothing scheduled yet: the 6 AM
+ * default. Otherwise the hour before the trip's earliest event, so the board
+ * doesn't open on a screenful of empty small hours — the common complaint
+ * when the first thing anyone plans is a 10 AM coffee.
+ *
+ * Capped at MAX_AUTO_GRID_START_MIN so a trip that currently only has evening
+ * plans still shows a morning to drop things into; the gutter toggle reveals
+ * everything back to midnight either way.
  */
 export function computeGridStartMin(days: DayWithSlots[]): number {
-  let start = DEFAULT_GRID_START_MIN
+  let earliest: number | null = null
   for (const day of days) {
     for (const slot of day.slots) {
       const s = slotStartMinutes(slot)
-      if (s !== null && s < start) start = Math.floor(s / 60) * 60
+      if (s !== null && (earliest === null || s < earliest)) earliest = s
     }
   }
-  return Math.max(0, start)
+  if (earliest === null) return DEFAULT_GRID_START_MIN
+  return clampMinutes(Math.floor(earliest / 60) * 60 - 60, 0, MAX_AUTO_GRID_START_MIN)
+}
+
+/**
+ * Where the grid stops for this trip: an hour past the last thing anyone has
+ * planned, so the board isn't mostly empty evening and a day takes fewer
+ * screens to read.
+ *
+ * Floored at MIN_AUTO_GRID_END_MIN so there is always an evening left to drop
+ * dinner into; the gutter toggle reveals everything to midnight either way.
+ */
+export function computeGridEndMin(days: DayWithSlots[]): number {
+  let latest: number | null = null
+  for (const day of days) {
+    for (const slot of day.slots) {
+      const s = slotStartMinutes(slot)
+      if (s === null) continue
+      const end = s + slotDurationMinutes(slot)
+      if (latest === null || end > latest) latest = end
+    }
+  }
+  if (latest === null) return DEFAULT_GRID_END_MIN
+  return clampMinutes(
+    Math.ceil(latest / 60) * 60 + 60,
+    MIN_AUTO_GRID_END_MIN,
+    GRID_END_MIN
+  )
 }
 
 export type GridPlacement = { col: number; cols: number }

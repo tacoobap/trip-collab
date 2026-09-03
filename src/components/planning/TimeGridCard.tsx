@@ -14,6 +14,8 @@ interface TimeGridCardProps {
   cols: number
   /** Mid-drag: elevated, no transitions. */
   held?: boolean
+  /** Lifted by a long press and waiting to be dragged. Touch only. */
+  armed?: boolean
   /** Mid-drag over a shelf: about to be unscheduled. */
   fading?: boolean
   canEdit?: boolean
@@ -32,6 +34,7 @@ export function TimeGridCard({
   col,
   cols,
   held = false,
+  armed = false,
   fading = false,
   canEdit = true,
 }: TimeGridCardProps) {
@@ -41,13 +44,19 @@ export function TimeGridCard({
   const isOpen = !isLocked && !hasProposals
   const isProposed = !isLocked && hasProposals
 
-  const slim = height <= 50
+  const slim = height <= 44
+  /** Below this the roomy padding and loose leading stop fitting. */
+  const tight = height <= 84
+  /** Under 90 minutes there's room for the time and one line of title. */
+  const oneLine = height <= 60
   const showMicro = isProposed && height >= 92
 
   const title = isLocked
     ? lockedProposal?.title ?? slot.time_label
     : slot.proposals.map((p) => p.title).join(' · ')
 
+  // `touch-action` below stays scrollable: on touch the board only takes the
+  // gesture once a long press has lifted the card (see LIFT_DELAY_MS).
   const placement =
     cols > 1
       ? {
@@ -63,22 +72,24 @@ export function TimeGridCard({
       role="button"
       aria-label={`${isOpen ? 'Open slot' : title}, ${formatMinuteRange(start, duration)}`}
       className={cn(
-        'group absolute overflow-hidden rounded-lg touch-none outline-none',
-        slim ? 'px-2.5 py-1' : 'px-3 py-2',
+        'group absolute overflow-hidden rounded-lg outline-none select-none',
+        '[-webkit-touch-callout:none]',
+        slim ? 'px-2.5 py-1' : tight ? 'px-3 py-1' : 'px-3 py-2',
         canEdit ? 'cursor-grab' : 'cursor-pointer',
         'focus-visible:ring-2 focus-visible:ring-primary',
-        !held && 'transition-[background-color,border-color,box-shadow,opacity] duration-150',
+        !held && 'transition-[background-color,border-color,box-shadow,opacity,transform] duration-150',
         isOpen && 'border border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40',
         isProposed && 'border border-border bg-muted/30 hover:border-border/80 hover:bg-muted/50',
         isLocked && 'border border-locked/40 bg-locked/5 hover:border-locked/60 hover:bg-locked/10',
+        armed && 'z-40 shadow-lg scale-[1.03] ring-2 ring-primary/50',
         held && 'z-40 shadow-lg cursor-grabbing',
         fading && 'opacity-40'
       )}
-      style={{ top, height, ...placement }}
+      style={{ top, height, ...placement, touchAction: 'pan-x pan-y' }}
     >
       {/* Icon + time; slim cards inline the title here too */}
       <div className="flex items-center gap-2 min-w-0">
-        <span className={cn('shrink-0 leading-none', slim ? 'text-sm' : 'text-base')}>
+        <span className={cn('shrink-0 leading-none', slim || tight ? 'text-sm' : 'text-base')}>
           {slot.icon ?? CATEGORY_ICONS[slot.category] ?? '📌'}
         </span>
         <span className="text-xs font-medium text-muted-foreground truncate tabular-nums">
@@ -95,7 +106,7 @@ export function TimeGridCard({
       </div>
 
       {!slim && (
-        <div className="mt-1">
+        <div className={tight ? 'mt-0.5 leading-tight' : 'mt-1'}>
           {isOpen && (
             <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground/50">
               <Plus className="w-3.5 h-3.5" />
@@ -103,7 +114,10 @@ export function TimeGridCard({
             </div>
           )}
           {isProposed && (
-            <p className="text-[13px] font-medium text-foreground line-clamp-2 break-words">
+            <p className={cn(
+              'text-[13px] font-medium text-foreground break-words',
+              oneLine ? 'line-clamp-1' : 'line-clamp-2'
+            )}>
               {slot.proposals.map((p, i) => (
                 <span key={p.id}>
                   {i > 0 && <span className="text-muted-foreground font-normal"> · </span>}
@@ -113,7 +127,10 @@ export function TimeGridCard({
             </p>
           )}
           {isLocked && (
-            <p className="text-[13px] font-medium text-foreground line-clamp-2 break-words">
+            <p className={cn(
+              'text-[13px] font-medium text-foreground break-words',
+              oneLine ? 'line-clamp-1' : 'line-clamp-2'
+            )}>
               {title}
             </p>
           )}
@@ -128,7 +145,7 @@ export function TimeGridCard({
 
       {/* Resize handle — stretch the bottom edge */}
       {canEdit && (
-        <div data-resize className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize touch-none">
+        <div data-resize className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize">
           <span
             aria-hidden
             className="absolute left-1/2 bottom-[3px] -translate-x-1/2 w-5 h-[3px] rounded-full bg-muted-foreground opacity-0 group-hover:opacity-40 transition-opacity"

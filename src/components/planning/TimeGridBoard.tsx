@@ -15,13 +15,21 @@ import {
   clampMinutes,
   formatMinuteRange,
   computeGridStartMin,
+  computeGridEndMin,
   layoutOverlaps,
 } from '@/lib/timeGrid'
 import { TimeGridCard } from './TimeGridCard'
 import { TimeGridDayHeader } from './TimeGridDayHeader'
 import { cn } from '@/lib/utils'
 
-const VISIBLE_PILLS_HINT_THRESHOLD = 5
+/**
+ * Touch only: how long a finger must rest on a card before it lifts for
+ * dragging. Below the threshold the browser keeps the gesture and scrolls the
+ * board, which is what a swipe across a card almost always means.
+ */
+const LIFT_DELAY_MS = 350
+/** Movement before the lift fires proves the finger meant to scroll. */
+const LIFT_TOLERANCE_PX = 8
 
 interface TimeGridBoardProps {
   trip: Trip
@@ -44,6 +52,11 @@ type Gesture = {
   slot?: SlotWithProposals
   dayIdx?: number
   dayIdx0?: number
+  /** Touch/pen, where a drag has to be earned with a long press first. */
+  touch: boolean
+  /** Whether the gesture may drag yet. Mouse: immediately. Touch: on lift. */
+  armed: boolean
+  liftTimer?: number
   x0: number
   y0: number
   anchor?: number
@@ -79,14 +92,19 @@ export function TimeGridBoard({
   const [preview, setPreview] = useState<Preview | null>(null)
   const [shelfTarget, setShelfTarget] = useState<number | null>(null)
   const [liftedChipId, setLiftedChipId] = useState<string | null>(null)
+  /** Card/chip a long press has lifted, ready to drag. Touch only. */
+  const [armedId, setArmedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<{ dayIdx: number; start: number; duration: number } | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [nightOpen, setNightOpen] = useState(false)
+  const [eveningOpen, setEveningOpen] = useState(false)
   const [activeDayIndex, setActiveDayIndex] = useState(0)
 
   const gridStartAuto = useMemo(() => computeGridStartMin(days), [days])
+  const gridEndAuto = useMemo(() => computeGridEndMin(days), [days])
   const gridStart = nightOpen ? 0 : gridStartAuto
-  const canvasH = ((GRID_END_MIN - gridStart) / 60) * HOUR_PX
+  const gridEnd = eveningOpen ? GRID_END_MIN : gridEndAuto
+  const canvasH = ((gridEnd - gridStart) / 60) * HOUR_PX
 
   // Window-level drag handlers live outside React's render cycle; feed them
   // the latest props/state through refs, synced after each commit.
@@ -95,6 +113,7 @@ export function TimeGridBoard({
   const currentNameRef = useRef(currentName)
   const canEditRef = useRef(canEdit)
   const gridStartRef = useRef(gridStart)
+  const gridEndRef = useRef(gridEnd)
   const onSlotClickRef = useRef(onSlotClick)
   const draftRef = useRef(draft)
   const draftTitleRef = useRef(draftTitle)
@@ -104,6 +123,7 @@ export function TimeGridBoard({
     currentNameRef.current = currentName
     canEditRef.current = canEdit
     gridStartRef.current = gridStart
+    gridEndRef.current = gridEnd
     onSlotClickRef.current = onSlotClick
     draftRef.current = draft
     draftTitleRef.current = draftTitle
@@ -212,15 +232,23 @@ export function TimeGridBoard({
       return null
     }
 
+    // A touch drag has to be earned with a long press; until then the browser
+    // owns the gesture so the board scrolls as it should.
+    const touch = e.pointerType !== 'mouse'
+
     if (cardEl) {
       const found = findSlot(cardEl.dataset.slotId ?? '')
       if (!found) return
       const start = slotStartMinutes(found.slot)
       if (start === null) return
       gesture.current = {
-        mode: target.closest('[data-resize]') ? 'resize' : 'move',
+        // The resize strip is 8px tall — a mouse affordance, not a touch one.
+        // On touch the whole card moves and the drawer edits exact times.
+        mode: !touch && target.closest('[data-resize]') ? 'resize' : 'move',
         slot: found.slot,
         dayIdx0: found.dayIdx,
+        touch,
+        armed: !touch,
         x0: e.clientX,
         y0: e.clientY,
         start0: start,
@@ -235,6 +263,8 @@ export function TimeGridBoard({
         mode: 'chip',
         slot: found.slot,
         dayIdx0: found.dayIdx,
+        touch,
+        armed: !touch,
         x0: e.clientX,
         y0: e.clientY,
         moved: false,
@@ -247,11 +277,13 @@ export function TimeGridBoard({
       const anchor = clampMinutes(
         snapMinutes(gridStartRef.current + ((y - rects.canvases[dayIdx].top) / HOUR_PX) * 60),
         gridStartRef.current,
-        GRID_END_MIN
+        gridEndRef.current
       )
       gesture.current = {
-        mode: e.pointerType === 'mouse' ? 'create' : 'tap',
+        mode: touch ? 'tap' : 'create',
         dayIdx,
+        touch,
+        armed: true,
         x0: e.clientX,
         y0: e.clientY,
         anchor,
@@ -259,6 +291,18 @@ export function TimeGridBoard({
         swallow: hadDraft,
         rects,
       }
+    }
+
+    // Hold still on a card or chip and it lifts, with a nudge of haptics where
+    // the device offers them, so the drag is something you feel you started.
+    const pending = gesture.current
+    if (pending && !pending.armed) {
+      pending.liftTimer = window.setTimeout(() => {
+        if (gesture.current !== pending) return
+        pending.armed = true
+        navigator.vibrate?.(8)
+        setArmedId(pending.slot?.id ?? null)
+      }, LIFT_DELAY_MS)
     }
 
     // Keep receiving events even if the pointer leaves the window; the board
@@ -280,7 +324,7 @@ export function TimeGridBoard({
           gridStartRef.current + ((y - rects.canvases[dayIdx].top) / HOUR_PX) * 60
         ),
         gridStartRef.current,
-        GRID_END_MIN
+        gridEndRef.current
       )
     const dayAt = (rects: Gesture['rects'], x: number) => {
       for (let i = 0; i < rects.canvases.length; i++) {
@@ -297,12 +341,27 @@ export function TimeGridBoard({
       return null
     }
 
+    const cancelLift = (p: Gesture) => {
+      if (p.liftTimer !== undefined) window.clearTimeout(p.liftTimer)
+      p.liftTimer = undefined
+    }
+
     const onMove = (e: PointerEvent) => {
       const p = gesture.current
       if (!p) return
       if (!canEditRef.current) return
       const dx = e.clientX - p.x0
       const dy = e.clientY - p.y0
+      if (!p.armed) {
+        // The finger moved before the card lifted, so this was a scroll all
+        // along: drop the gesture and leave the board to the browser.
+        if (Math.hypot(dx, dy) > LIFT_TOLERANCE_PX) {
+          cancelLift(p)
+          gesture.current = null
+          setArmedId(null)
+        }
+        return
+      }
       if (!p.moved && Math.hypot(dx, dy) < 4) return
       if (!p.moved) {
         p.moved = true
@@ -325,7 +384,7 @@ export function TimeGridBoard({
         const start = clampMinutes(
           snapMinutes(p.start0! + (dy / HOUR_PX) * 60),
           gridStartRef.current,
-          GRID_END_MIN - p.dur0!
+          gridEndRef.current - p.dur0!
         )
         p.lastStart = start
         p.lastDayIdx = dayIdx
@@ -334,7 +393,7 @@ export function TimeGridBoard({
         const duration = clampMinutes(
           snapMinutes(p.dur0! + (dy / HOUR_PX) * 60),
           MIN_DURATION_MIN,
-          GRID_END_MIN - p.start0!
+          gridEndRef.current - p.start0!
         )
         p.lastDur = duration
         setPreview({ kind: 'resize', slotId: p.slot!.id, duration })
@@ -346,7 +405,7 @@ export function TimeGridBoard({
           const start = clampMinutes(
             yToMin(p.rects, dayIdx!, e.clientY),
             gridStartRef.current,
-            GRID_END_MIN - duration
+            gridEndRef.current - duration
           )
           p.lastStart = start
           p.lastDayIdx = dayIdx!
@@ -362,10 +421,12 @@ export function TimeGridBoard({
     const onUp = () => {
       const p = gesture.current
       if (!p) return
+      cancelLift(p)
       gesture.current = null
       document.body.style.userSelect = ''
       setShelfTarget(null)
       setLiftedChipId(null)
+      setArmedId(null)
       const clearPreview = () => setPreview(null)
       const days = daysRef.current
       const dayLabelOf = (idx: number | undefined) =>
@@ -381,7 +442,7 @@ export function TimeGridBoard({
           const start = clampMinutes(
             p.anchor!,
             gridStartRef.current,
-            GRID_END_MIN - DEFAULT_DURATION_MIN
+            gridEndRef.current - DEFAULT_DURATION_MIN
           )
           setDraft({ dayIdx: p.dayIdx!, start, duration: DEFAULT_DURATION_MIN })
           setDraftTitle('')
@@ -450,41 +511,42 @@ export function TimeGridBoard({
     }
 
     const onCancel = () => {
-      if (!gesture.current) return
+      const p = gesture.current
+      if (!p) return
+      cancelLift(p)
       gesture.current = null
       document.body.style.userSelect = ''
       setPreview(null)
       setShelfTarget(null)
       setLiftedChipId(null)
+      setArmedId(null)
+    }
+
+    // Cards are scrollable until they lift, so the only way to take the
+    // gesture back from the browser mid-touch is to preventDefault here —
+    // which works because a lifted finger has, by definition, not moved yet.
+    const onTouchMove = (e: TouchEvent) => {
+      const p = gesture.current
+      if (p?.armed && p.touch && p.mode !== 'tap') e.preventDefault()
     }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
+      window.removeEventListener('touchmove', onTouchMove)
       document.body.style.userSelect = ''
     }
   }, [])
 
-  // ── Scroll: land near the morning, and stay put when the range grows ──
-  const didInitScroll = useRef(false)
-  useEffect(() => {
-    if (didInitScroll.current || !wrapRef.current) return
-    didInitScroll.current = true
-    let earliest = 8 * 60
-    for (const day of daysRef.current) {
-      for (const slot of day.slots) {
-        const s = slotStartMinutes(slot)
-        if (s !== null && s < earliest) earliest = s
-      }
-    }
-    const target = Math.max(gridStartRef.current, earliest - 15)
-    wrapRef.current.scrollTop = ((target - gridStartRef.current) / 60) * HOUR_PX
-  }, [])
-
+  // ── Scroll: stay put when the visible range grows ────────────────────
+  // Nothing scrolls the board on mount any more: computeGridStartMin already
+  // opens it an hour before the trip's first event. That also survives slots
+  // arriving after the days do, which a one-shot mount scroll did not.
   const prevGridStart = useRef<number | null>(null)
   useLayoutEffect(() => {
     if (prevGridStart.current !== null && wrapRef.current) {
@@ -500,9 +562,17 @@ export function TimeGridBoard({
     const root = boardRef.current
     if (!wrap || !root) return
     const cols = [...root.querySelectorAll<HTMLElement>('[data-day-col]')]
+    // A column comes to rest just right of the sticky hour gutter — which is
+    // where the first one already sits, and what `scroll-ml` restates in CSS.
+    const rest = cols[0]?.offsetLeft ?? 0
     let idx = 0
+    let nearest = Infinity
     for (let i = 0; i < cols.length; i++) {
-      if (cols[i].offsetLeft <= wrap.scrollLeft + 72) idx = i
+      const off = Math.abs(cols[i].offsetLeft - rest - wrap.scrollLeft)
+      if (off < nearest) {
+        nearest = off
+        idx = i
+      }
     }
     setActiveDayIndex(idx)
   }
@@ -511,21 +581,31 @@ export function TimeGridBoard({
     const wrap = wrapRef.current
     const root = boardRef.current
     if (!wrap || !root) return
-    const col = root.querySelectorAll<HTMLElement>('[data-day-col]')[index]
-    if (col) wrap.scrollTo({ left: Math.max(0, col.offsetLeft - 56), behavior: 'smooth' })
+    const cols = root.querySelectorAll<HTMLElement>('[data-day-col]')
+    const col = cols[index]
+    if (!col) return
+    const rest = cols[0]?.offsetLeft ?? 0
+    wrap.scrollTo({ left: Math.max(0, col.offsetLeft - rest), behavior: 'smooth' })
   }
 
   const hourLabels = useMemo(() => {
     const out: { top: number; text: string }[] = []
-    for (let h = gridStart / 60 + 1; h < 24; h++) {
+    for (let h = gridStart / 60 + 1; h < gridEnd / 60; h++) {
       out.push({
         top: ((h * 60 - gridStart) / 60) * HOUR_PX,
         text: h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
       })
     }
     return out
-  }, [gridStart])
+  }, [gridStart, gridEnd])
 
+  /**
+   * Phones show one day per screen and page between them: the wrapper snaps on
+   * x, and each column is the viewport less the page gutters (2×1.25rem), the
+   * hour gutter (3rem) and the column gap (1rem) — exactly full-bleed.
+   * `scroll-ml` matches the hour gutter + gap so a snapped day lands flush
+   * against it — `handleWrapScroll` reads that same offset back off column 0.
+   */
   const canvasStyle = {
     height: canvasH,
     backgroundImage:
@@ -561,7 +641,7 @@ export function TimeGridBoard({
                 type="button"
                 onClick={() => scrollToDay(i)}
                 className={cn(
-                  'shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation min-h-[40px]',
+                  'shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation min-h-[44px]',
                   activeDayIndex === i
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted/60 text-muted-foreground hover:bg-muted'
@@ -570,11 +650,6 @@ export function TimeGridBoard({
                 Day {day.day_number}
               </button>
             ))}
-            {days.length > VISIBLE_PILLS_HINT_THRESHOLD && (
-              <span className="shrink-0 self-center text-xs text-muted-foreground px-2 whitespace-nowrap">
-                +{days.length - VISIBLE_PILLS_HINT_THRESHOLD} more
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -582,7 +657,7 @@ export function TimeGridBoard({
       <div
         ref={wrapRef}
         onScroll={handleWrapScroll}
-        className="flex-1 min-h-0 overflow-auto overscroll-contain"
+        className="flex-1 min-h-0 overflow-auto overscroll-contain max-sm:snap-x max-sm:snap-mandatory"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div
@@ -641,6 +716,29 @@ export function TimeGridBoard({
                   {l.text}
                 </span>
               ))}
+
+              {/* Evening toggle — the mirror of the morning one up top */}
+              {gridEnd < GRID_END_MIN ? (
+                <button
+                  type="button"
+                  data-grid-ignore
+                  onClick={() => setEveningOpen(true)}
+                  className="absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  title={`Show ${minutesToTimeLabel(gridEnd).replace(':00 ', ' ')} – 12 AM`}
+                >
+                  ▾ 12 AM
+                </button>
+              ) : gridEndAuto < GRID_END_MIN ? (
+                <button
+                  type="button"
+                  data-grid-ignore
+                  onClick={() => setEveningOpen(false)}
+                  className="absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  title="Hide the empty late hours"
+                >
+                  ▴ hide
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -648,7 +746,11 @@ export function TimeGridBoard({
             <div
               key={day.id}
               data-day-col
-              className="w-[260px] max-sm:w-[240px] shrink-0 flex flex-col"
+              className={cn(
+                'shrink-0 flex flex-col snap-start',
+                'w-[260px] max-sm:w-[calc(100vw-6.5rem)]',
+                'scroll-ml-16 sm:scroll-ml-[4.5rem]'
+              )}
             >
               <TimeGridDayHeader
                 day={day}
@@ -659,6 +761,7 @@ export function TimeGridBoard({
                 onEditDay={onEditDay}
                 onAddUntimed={canEdit ? (title) => addUntimed(i, title) : undefined}
                 liftedChipId={liftedChipId}
+                armedChipId={armedId}
                 shelfHighlighted={shelfTarget === i}
               />
               <div
@@ -677,11 +780,12 @@ export function TimeGridBoard({
                       top={((item.start - gridStart) / 60) * HOUR_PX}
                       height={Math.max(
                         26,
-                        (Math.min(item.duration, GRID_END_MIN - item.start) / 60) * HOUR_PX - 3
+                        (Math.min(item.duration, gridEnd - item.start) / 60) * HOUR_PX - 3
                       )}
                       col={placement.col}
                       cols={placement.cols}
                       held={item.held}
+                      armed={armedId === item.slot.id}
                       fading={item.held && shelfTarget !== null}
                       canEdit={canEdit}
                     />

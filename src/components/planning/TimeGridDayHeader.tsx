@@ -24,6 +24,8 @@ interface TimeGridDayHeaderProps {
   onAddUntimed?: (title: string) => Promise<void>
   /** Chip currently being dragged out of a shelf — rendered faded. */
   liftedChipId?: string | null
+  /** Chip a long press has lifted, ready to drag. Touch only. */
+  armedChipId?: string | null
   /** True while a card drag hovers this shelf as its unschedule target. */
   shelfHighlighted?: boolean
 }
@@ -45,6 +47,7 @@ export function TimeGridDayHeader({
   onEditDay,
   onAddUntimed,
   liftedChipId,
+  armedChipId,
   shelfHighlighted = false,
 }: TimeGridDayHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -143,10 +146,18 @@ export function TimeGridDayHeader({
     }
   }
 
+  const dateText = day.date
+    ? new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
+    : null
+
   return (
     <div
       {...dropHandlers}
-      className="sticky top-0 z-20 bg-background border-b border-border flex flex-col pt-2.5"
+      className="sticky top-0 z-20 bg-background border-b border-border flex flex-col pt-2"
       style={{ height: DAY_HEADER_PX }}
     >
       {isDragging && (
@@ -160,7 +171,7 @@ export function TimeGridDayHeader({
       {/* Photo strip — fixed height, placeholder when unset, so timelines align */}
       <div
         className={cn(
-          'relative h-14 shrink-0 rounded-lg overflow-hidden',
+          'relative h-10 shrink-0 rounded-lg overflow-hidden',
           !day.image_url &&
             'border border-dashed border-border flex items-center justify-center'
         )}
@@ -185,11 +196,14 @@ export function TimeGridDayHeader({
         onChange={handleImageChange}
       />
 
-      <div className="flex items-center justify-between gap-2 mt-2">
+      <div className="flex items-center justify-between gap-2 mt-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <h3 className="font-serif font-semibold text-base text-foreground leading-tight shrink-0">
             Day {day.day_number}
           </h3>
+          {dateText && (
+            <span className="text-[11px] text-muted-foreground truncate">{dateText}</span>
+          )}
           {onEditDay && (
             <button
               type="button"
@@ -272,21 +286,11 @@ export function TimeGridDayHeader({
         </div>
       </div>
 
-      {day.date && (
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-          })}
-        </p>
-      )}
-
       {/* "Sometime this day" shelf — drop target for unscheduling */}
       <div
         data-shelf={day.id}
         className={cn(
-          'flex-1 min-h-0 mt-1.5 flex items-center gap-1.5 overflow-x-auto rounded-lg',
+          'flex-1 min-h-0 mt-1 flex items-center gap-1.5 overflow-x-auto rounded-lg',
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
           shelfHighlighted &&
             'outline-dashed outline-1 outline-primary outline-offset-2 bg-primary/5'
@@ -298,10 +302,13 @@ export function TimeGridDayHeader({
             data-chip-id={slot.id}
             type="button"
             title={chipTitle(slot)}
+            style={{ touchAction: 'pan-x pan-y' }}
             className={cn(
               'shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/80',
-              'pl-2 pr-2.5 py-1 text-[11px] font-medium text-foreground max-w-[190px] touch-none',
+              'pl-2 pr-2.5 py-1 text-[11px] font-medium text-foreground max-w-[190px] select-none',
+              '[-webkit-touch-callout:none] transition-transform',
               canEdit ? 'cursor-grab' : 'cursor-pointer',
+              armedChipId === slot.id && 'scale-110 ring-2 ring-primary/50 shadow-md',
               liftedChipId === slot.id && 'opacity-40'
             )}
           >
