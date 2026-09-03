@@ -59,7 +59,7 @@ function StayCard({ stay, onEdit, onDelete }: StayCardProps) {
           href={stay.google_maps_url}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1.5 text-sm text-primary hover:underline mt-2 min-w-0"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors mt-2 min-w-0"
         >
           <MapPin className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate">

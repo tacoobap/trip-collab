@@ -54,9 +54,24 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
 - Mobile gutter is `px-5`, desktop `sm:px-6`, on every page container — the page
   header, the trip bar, and each page's `<main>`. Keep them in sync; they were
   drifting at 8/12/16px before.
-- The planning board's mobile day column is `w-[calc(100vw-2.5rem)]`, coupled to
-  that `px-5`. Change both together.
+- The planning board is the time grid in `TimeGridBoard.tsx`. On phones it shows
+  one day per screen: the wrapper snaps on x and each column is
+  `calc(100vw-6.5rem)` — the viewport less the page gutters (2×`px-5`), the
+  `w-12` hour gutter and the column gap, so a day fills the width exactly. A
+  column's `scroll-ml` must equal hour gutter + gap, which is also column 0's
+  `offsetLeft`; `handleWrapScroll` reads it back from there. Desktop keeps the
+  free multi-column scroll at `w-[260px]`. `DAY_HEADER_PX` in
+  `src/lib/timeGrid.ts` must stay identical across columns or the timelines stop
+  lining up.
+  (`DayColumn.tsx` / `SlotCard.tsx` are the old stacked board — still in the tree,
+  no longer rendered. The `w-[calc(100vw-2.5rem)]` convention that used to live
+  here is theirs, not the grid's.)
+- Don't call `getComputedStyle` (or other unknown globals) in a component body:
+  the React Compiler eslint pass bails on the whole component and
+  `react-hooks/preserve-manual-memoization` fails the build.
 - Page content is capped at `max-w-7xl`.
+- Bottom sheets cap at `sm:max-w-3xl` with `mx-auto` — centred by auto margins,
+  never a translate, which framer-motion's own transform would overwrite.
 
 ## Firestore
 

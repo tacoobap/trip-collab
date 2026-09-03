@@ -118,6 +118,47 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 - **Done:** All collection writes (add/update/delete/like) live in `collectionService`; trip/days edit flows (EditTripModal, EditDayModal, add first day when no dates, destinations normalized); chunked slots in useTrip; toast system (`ToastProvider` + `useToast`) with user-facing feedback for hero upload, narrative generate/update, collection suggestions and add/delete; AI hooks `useNarrativeGeneration` and `useCollectionSuggestions` (ItineraryPage and CollectionPage).
 - **Next:** Schema docs & migrations; tests. See **Feb 28 Productionizing.md** for the full plan.
 
+## Future to-dos / enhancements
+
+### Image storage — move off the GitHub repo
+
+Every uploaded image (day photos, the itinerary hero, collection item photos) is
+compressed to JPEG in the browser by `src/lib/imageUpload.ts` and then
+**committed to a GitHub repo** through the Contents API — via
+`netlify/functions/upload-github-image.ts` in production (PAT stays server-side),
+or straight from the browser with `VITE_GITHUB_*` in local dev. What gets stored
+on the document is a `raw.githubusercontent.com` URL pinned to the commit SHA.
+
+It works, but it's a git repo doing a CDN's job:
+
+- Every upload *and every replacement* is a commit. History and repo size grow
+  without bound, and nothing is ever actually deleted.
+- Deleting a trip, day or collection item orphans its image — there's no GC.
+- No resizing, thumbnails, cache control or signed URLs; the client-side
+  `compressImage` step is the only sizing we get.
+- Access is all-or-nothing at the repo level. A public repo means trip photos
+  are public regardless of `member_uids`; a private repo means the raw URLs
+  won't render in an `<img>` at all.
+- Bounded by GitHub API rate limits, and the PAT carries write access to a whole
+  repo just to store a JPEG.
+
+Two options worth pricing out:
+
+1. **Firebase Storage** — the natural fit, since auth and Firestore already live
+   there. It wasn't an option when this was first built, so re-check what the
+   current plan allows. Storage rules could reuse the same `member_uids` check
+   as `firestore.rules`, which gets us per-trip access control for free, and
+   `upload-github-image` plus the GitHub PAT both disappear.
+2. **Supabase** — Postgres and Storage in one place. Previously blocked by the
+   free tier's project cap; pausing an unused project would free a slot. This is
+   a database migration, not just a storage swap, so it's only worth it if we
+   also want Postgres, row-level security or its realtime layer for other
+   reasons.
+
+Either way the work includes a **backfill** — `image_url` on `trips`, `days` and
+collection items holds absolute GitHub URLs today — and a **deletion path**, so
+removing a trip takes its images with it.
+
 ## Deploy
 
 The app is set up for **Netlify**: build command `npm run build`, publish directory `dist` (see `netlify.toml`).

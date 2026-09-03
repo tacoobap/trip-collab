@@ -4,7 +4,6 @@ import { addLockedSlot, updateSlotSchedule } from '@/services/planningService'
 import { minutesToTimeLabel } from '@/lib/timeUtils'
 import {
   HOUR_PX,
-  GRID_END_MIN,
   MIN_DURATION_MIN,
   DEFAULT_DURATION_MIN,
   SHELF_DROP_DURATION_MIN,
@@ -16,6 +15,10 @@ import {
   formatMinuteRange,
   computeGridStartMin,
   computeGridEndMin,
+  computeGridMaxEndMin,
+  hiddenBefore,
+  hiddenAfter,
+  type EdgeSummary,
   layoutOverlaps,
 } from '@/lib/timeGrid'
 import { TimeGridCard } from './TimeGridCard'
@@ -27,6 +30,24 @@ import { cn } from '@/lib/utils'
  * dragging. Below the threshold the browser keeps the gesture and scrolls the
  * board, which is what a swipe across a card almost always means.
  */
+/**
+ * What an edge toggle promises. When the trim has left real events outside the
+ * window it names the nearest one, so a collapsed evening never silently
+ * swallows the 11:30 PM flight it was collapsed to avoid showing.
+ */
+function edgeHint(
+  dir: 'up' | 'down',
+  hidden: EdgeSummary | null,
+  edge: number
+): string {
+  const at = (m: number) => minutesToTimeLabel(m).replace(':00 ', ' ')
+  if (hidden) {
+    const more = hidden.count > 1 ? ` (+${hidden.count - 1} more)` : ''
+    return `${at(hidden.minutes)} · ${hidden.title}${more} — tap to show`
+  }
+  return dir === 'up' ? `Show 12 AM – ${at(edge)}` : `Show ${at(edge)} – 12 AM`
+}
+
 const LIFT_DELAY_MS = 350
 /** Movement before the lift fires proves the finger meant to scroll. */
 const LIFT_TOLERANCE_PX = 8
@@ -102,8 +123,13 @@ export function TimeGridBoard({
 
   const gridStartAuto = useMemo(() => computeGridStartMin(days), [days])
   const gridEndAuto = useMemo(() => computeGridEndMin(days), [days])
+  const gridEndMax = useMemo(() => computeGridMaxEndMin(days), [days])
   const gridStart = nightOpen ? 0 : gridStartAuto
-  const gridEnd = eveningOpen ? GRID_END_MIN : gridEndAuto
+  const gridEnd = eveningOpen ? gridEndMax : gridEndAuto
+  // What the trimmed window is leaving out, so the toggles can name it rather
+  // than hide it behind a bare arrow.
+  const hiddenEarly = useMemo(() => hiddenBefore(days, gridStart), [days, gridStart])
+  const hiddenLate = useMemo(() => hiddenAfter(days, gridEnd), [days, gridEnd])
   const canvasH = ((gridEnd - gridStart) / 60) * HOUR_PX
 
   // Window-level drag handlers live outside React's render cycle; feed them
@@ -591,9 +617,11 @@ export function TimeGridBoard({
   const hourLabels = useMemo(() => {
     const out: { top: number; text: string }[] = []
     for (let h = gridStart / 60 + 1; h < gridEnd / 60; h++) {
+      // h can exceed 24 once a late event opens the small hours.
+      const hh = h % 24
       out.push({
         top: ((h * 60 - gridStart) / 60) * HOUR_PX,
-        text: h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
+        text: hh === 0 ? '12 AM' : hh < 12 ? `${hh} AM` : hh === 12 ? '12 PM' : `${hh - 12} PM`,
       })
     }
     return out
@@ -690,9 +718,16 @@ export function TimeGridBoard({
                   data-grid-ignore
                   onClick={() => setNightOpen(true)}
                   className="text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
-                  title={`Show 12 AM – ${minutesToTimeLabel(gridStart).replace(':00 ', ' ')}`}
+                  title={edgeHint('up', hiddenEarly, gridStart)}
+                  aria-label={edgeHint('up', hiddenEarly, gridStart)}
                 >
                   ▴ 12 AM
+                  {hiddenEarly && (
+                    <span
+                      aria-hidden
+                      className="ml-0.5 inline-block w-1 h-1 rounded-full bg-primary align-middle"
+                    />
+                  )}
                 </button>
               ) : gridStartAuto > 0 ? (
                 <button
@@ -709,7 +744,7 @@ export function TimeGridBoard({
             <div className="relative" style={{ height: canvasH }}>
               {hourLabels.map((l) => (
                 <span
-                  key={l.text}
+                  key={l.top}
                   className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap"
                   style={{ top: l.top }}
                 >
@@ -718,17 +753,24 @@ export function TimeGridBoard({
               ))}
 
               {/* Evening toggle — the mirror of the morning one up top */}
-              {gridEnd < GRID_END_MIN ? (
+              {gridEnd < gridEndMax ? (
                 <button
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(true)}
                   className="absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
-                  title={`Show ${minutesToTimeLabel(gridEnd).replace(':00 ', ' ')} – 12 AM`}
+                  title={edgeHint('down', hiddenLate, gridEnd)}
+                  aria-label={edgeHint('down', hiddenLate, gridEnd)}
                 >
                   ▾ 12 AM
+                  {hiddenLate && (
+                    <span
+                      aria-hidden
+                      className="ml-0.5 inline-block w-1 h-1 rounded-full bg-primary align-middle"
+                    />
+                  )}
                 </button>
-              ) : gridEndAuto < GRID_END_MIN ? (
+              ) : gridEndAuto < gridEndMax ? (
                 <button
                   type="button"
                   data-grid-ignore

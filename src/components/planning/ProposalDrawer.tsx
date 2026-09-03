@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, LockOpen, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { X, LockOpen, Loader2, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   addProposal,
@@ -126,13 +126,21 @@ function InlineTimeRange({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
     setEditing(null)
   }
 
+  // The dotted underline is the whole affordance: a decorative pencil sat here
+  // before and read as the button, so the first click always landed on nothing.
   const partButton = (label: string, which: 'start' | 'end') => (
     <button
       type="button"
       onClick={() => canEdit && setEditing(which)}
       disabled={!canEdit}
-      title={canEdit ? (which === 'start' ? 'Change start time' : 'Change end time') : undefined}
-      className="hover:text-primary transition-colors disabled:pointer-events-none"
+      aria-label={which === 'start' ? 'Change start time' : 'Change end time'}
+      className={cn(
+        'rounded px-1 py-0.5 -mx-0.5 transition-colors max-sm:py-1',
+        canEdit &&
+          'underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 ' +
+            'hover:bg-primary/5 hover:text-primary hover:decoration-primary',
+        'disabled:pointer-events-none disabled:no-underline'
+      )}
     >
       {label}
     </button>
@@ -175,9 +183,6 @@ function InlineTimeRange({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
           </>
         )}
         {canEdit && saving && <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />}
-        {canEdit && !saving && editing === null && start !== null && (
-          <Pencil className="w-3 h-3 opacity-30 shrink-0" aria-hidden />
-        )}
       </span>
       {timeError && (
         <span className="text-[10px] text-destructive leading-tight">{timeError}</span>
@@ -348,7 +353,9 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl h-[85vh] max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
+              // Centred with auto margins rather than a translate, which
+              // framer-motion's own transform would overwrite.
+              className="fixed bottom-0 left-0 right-0 mx-auto sm:max-w-3xl z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl h-[85vh] max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
             >
               {/* Drag handle (mobile) — hidden on sm and up */}
               <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">

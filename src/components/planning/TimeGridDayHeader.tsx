@@ -171,7 +171,7 @@ export function TimeGridDayHeader({
       {/* Photo strip — fixed height, placeholder when unset, so timelines align */}
       <div
         className={cn(
-          'relative h-10 shrink-0 rounded-lg overflow-hidden',
+          'relative h-20 shrink-0 rounded-lg overflow-hidden',
           !day.image_url &&
             'border border-dashed border-border flex items-center justify-center'
         )}
