@@ -12,9 +12,11 @@ import {
   setSlotProposed,
   deleteProposal,
   deleteSlot,
+  restoreSlot,
 } from '@/services/planningService'
 import type { DayWithSlots, Proposal, SlotWithProposals } from '@/types/database'
 import type { Trip } from '@/types/database'
+import { usePlanningHistory } from '@/hooks/usePlanningHistory'
 import { SlotIconPicker } from './SlotIconPicker'
 import { CATEGORY_ICONS } from '@/lib/slotEmojis'
 import { ProposalCard } from './ProposalCard'
@@ -22,7 +24,7 @@ import { AddProposalForm } from './AddProposalForm'
 import { PickFromCollectionModal } from './PickFromCollectionModal'
 import { Button } from '@/components/ui/button'
 import { formatTimeLabel, parseTimeToMinutes, minutesToTimeLabel } from '@/lib/timeUtils'
-import { slotStartMinutes, slotDurationMinutes, lockedProposalOf } from '@/lib/timeGrid'
+import { slotStartMinutes, slotDurationMinutes, lockedProposalOf, slotTitle } from '@/lib/timeGrid'
 import { cn } from '@/lib/utils'
 
 const TIME_CHIPS = ['9:00 AM', '11:00 AM', '12:00 PM', '3:00 PM', '5:00 PM', '7:00 PM']
@@ -284,7 +286,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const [pickFromCollectionOpen, setPickFromCollectionOpen] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
-  const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false)
+  const history = usePlanningHistory()
   const [deletingSlot, setDeletingSlot] = useState(false)
 
   const currentIcon = slot?.icon ?? CATEGORY_ICONS[slot?.category ?? ''] ?? '📌'
@@ -313,6 +315,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const otherIdeas = lockedProposal
     ? slot.proposals.filter((p) => p.id !== lockedProposal.id)
     : slot.proposals
+  /** A decided event with nothing more to say: no body, and only one rule. */
+  const bodyEmpty = Boolean(
+    isLocked && lockedProposal && !lockedProposal.note && !lockedProposal.url && !otherIdeas.length
+  )
 
   const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
     await addProposal({
@@ -382,9 +388,13 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
 
   const handleDeleteSlot = async () => {
     if (!slot) return
+    // No confirm step: undo is the safety net, and it holds the whole slot —
+    // proposals, votes and all — so restoring is exact rather than a rebuild.
+    const deleted = slot
     setDeletingSlot(true)
     try {
-      await deleteSlot(slot.id)
+      await deleteSlot(deleted.id)
+      history.record(slotTitle(deleted), () => restoreSlot(deleted, trip.id))
       onClose()
       onSlotDeleted?.()
     } finally {
@@ -482,31 +492,17 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    {canDeleteSlot && (confirmDeleteSlot ? (
-                      <>
-                        <button
-                          onClick={handleDeleteSlot}
-                          disabled={deletingSlot}
-                          className="text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
-                        >
-                          {deletingSlot ? 'Deleting…' : 'Delete slot'}
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteSlot(false)}
-                          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                        <button
-                          onClick={() => setConfirmDeleteSlot(true)}
-                          className="rounded-full w-8 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-destructive/70 hover:bg-destructive/10 transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px]"
-                          title="Delete this slot"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    ))}
+                    {canDeleteSlot && (
+                      <button
+                        onClick={handleDeleteSlot}
+                        disabled={deletingSlot}
+                        className="rounded-full w-8 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-destructive/70 hover:bg-destructive/10 transition-colors disabled:opacity-50 max-sm:min-h-[44px] max-sm:min-w-[44px]"
+                        title="Delete this event — undo puts it back"
+                        aria-label="Delete this event"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button
                       onClick={onClose}
                       className="rounded-full w-8 h-8 flex items-center justify-center hover:bg-muted transition-colors max-sm:min-h-[44px] max-sm:min-w-[44px]"
@@ -540,7 +536,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                 )}
               </div>
 
-              {/* Body — flex-1 + min-h-0 so it gets bounded height and scrolls */}
+              {/* Body — flex-1 + min-h-0 so it gets bounded height and scrolls.
+                  Skipped entirely when a decided event has nothing more to say,
+                  and the footer drops its own rule so one line is left. */}
+              {!bodyEmpty && (
               <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 flex flex-col">
                 {/* Decided: just the thing itself, with the ideas it beat folded
                     away as history. The ballot only comes back when unlocked. */}
@@ -651,10 +650,11 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                 </>
                 )}
               </div>
+              )}
 
               {/* Footer — only when locked and member can edit */}
               {canEdit && isLocked && (
-                <div className="px-5 py-3 border-t border-border shrink-0">
+                <div className={cn('px-5 py-3 shrink-0', !bodyEmpty && 'border-t border-border')}>
                   <button
                     type="button"
                     onClick={handleReopenWithIdea}

@@ -1,12 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { updateSlotSchedule } from '@/services/planningService'
-import {
-  PlanningHistoryContext,
-  type PlanningHistoryValue,
-  type ScheduleSnapshot,
-} from '@/hooks/usePlanningHistory'
+import { PlanningHistoryContext, type PlanningHistoryValue } from '@/hooks/usePlanningHistory'
 
-type Entry = { label: string; before: ScheduleSnapshot }
+type Entry = { label: string; revert: () => Promise<void> }
 
 const MAX_HISTORY = 25
 
@@ -15,8 +10,8 @@ export function PlanningHistoryProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<Entry[]>([])
   const [undoing, setUndoing] = useState(false)
 
-  const record = (label: string, before: ScheduleSnapshot) => {
-    setStack((prev) => [...prev.slice(-(MAX_HISTORY - 1)), { label, before }])
+  const record = (label: string, revert: () => Promise<void>) => {
+    setStack((prev) => [...prev.slice(-(MAX_HISTORY - 1)), { label, revert }])
   }
 
   const undo = async () => {
@@ -24,13 +19,7 @@ export function PlanningHistoryProvider({ children }: { children: ReactNode }) {
     if (!entry || undoing) return
     setUndoing(true)
     try {
-      await updateSlotSchedule({
-        slotId: entry.before.slotId,
-        start_minutes: entry.before.start_minutes,
-        duration_minutes: entry.before.duration_minutes,
-        day_id: entry.before.day_id,
-        lockedProposalId: entry.before.lockedProposalId,
-      })
+      await entry.revert()
       // Only drop it once the write lands, so a failed undo stays available.
       setStack((prev) => prev.slice(0, -1))
     } catch (err) {

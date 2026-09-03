@@ -7,9 +7,9 @@ import { createContext, useContext } from 'react'
  * instead: a snapshot of where the slot was before each write, replayed
  * through the same `updateSlotSchedule` that moved it.
  *
- * Scope is deliberately narrow: schedule changes only (move, resize,
- * schedule-from-shelf). Creating and deleting slots are not undoable, since
- * putting a deleted slot and its proposals back means re-minting documents.
+ * Covers schedule changes (move, resize, schedule-from-shelf) and deleting a
+ * slot, which re-mints the documents at their original ids. Creating a slot is
+ * not undoable — delete it.
  *
  * On a shared trip this is last-write-wins, like every other edit here: if
  * someone else has moved the same slot since, undo overwrites them rather
@@ -19,18 +19,13 @@ import { createContext, useContext } from 'react'
  * neither file exports a component alongside a hook.
  */
 
-/** Everything needed to put one slot back where it was. */
-export type ScheduleSnapshot = {
-  slotId: string
-  day_id: string
-  start_minutes: number | null
-  duration_minutes: number
-  lockedProposalId: string | null
-}
-
 export type PlanningHistoryValue = {
-  /** Call with the slot's state *before* a schedule write goes out. */
-  record: (label: string, before: ScheduleSnapshot) => void
+  /**
+   * Record how to reverse a change, before making it. `revert` closes over
+   * the pre-change state, so capture it at call time rather than reading it
+   * back later.
+   */
+  record: (label: string, revert: () => Promise<void>) => void
   undo: () => Promise<void>
   canUndo: boolean
   /** What the next undo would put back, so the button can name it. */

@@ -460,15 +460,17 @@ export function TimeGridBoard({
       setArmedId(null)
       const clearPreview = () => setPreview(null)
       const days = daysRef.current
-      // Where it was, captured before the write — see PlanningHistoryContext.
-      const recordUndo = (slot: SlotWithProposals) =>
-        historyRef.current.record(slotTitle(slot), {
+      // Where it was, captured before the write — see usePlanningHistory.
+      const recordUndo = (slot: SlotWithProposals) => {
+        const before = {
           slotId: slot.id,
           day_id: slot.day_id,
           start_minutes: slotStartMinutes(slot),
           duration_minutes: slotDurationMinutes(slot),
           lockedProposalId: slot.locked_proposal_id,
-        })
+        }
+        historyRef.current.record(slotTitle(slot), () => updateSlotSchedule(before))
+      }
       const dayLabelOf = (idx: number | undefined) =>
         `Day ${idx !== undefined ? days[idx]?.day_number ?? '' : ''}`
 
@@ -875,9 +877,13 @@ export function TimeGridBoard({
                   <div
                     data-draft
                     className="absolute left-0 right-1 z-40 rounded-lg border border-dashed border-primary/60 bg-background shadow-lg px-3 py-2 overflow-visible"
+                    // minHeight, not height: a 30-minute draft is 23px tall at
+                    // 52px/hour, and the time label plus the input need more
+                    // than that — sized by duration, the text spilled out of
+                    // its own dashed box.
                     style={{
                       top: ((draft.start - gridStart) / 60) * HOUR_PX,
-                      height: Math.max(26, (draft.duration / 60) * HOUR_PX - 3),
+                      minHeight: Math.max(26, (draft.duration / 60) * HOUR_PX - 3),
                     }}
                   >
                     <div aria-hidden className="absolute inset-0 rounded-[inherit] bg-primary/5 pointer-events-none" />

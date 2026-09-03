@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Day, Slot } from '@/types/database'
+import type { Day, Slot, SlotWithProposals } from '@/types/database'
 import { enumerateDates, dayLabel } from '@/lib/dateRange'
 import { suggestEmoji } from '@/lib/slotEmojis'
 import { minutesToTimeLabel } from '@/lib/timeUtils'
@@ -577,6 +577,34 @@ export async function deleteProposal(
 /**
  * Delete all proposals for the slot, then the slot.
  */
+/**
+ * Puts a deleted slot and its proposals back, ids and all, from the copy the
+ * client was already holding. Firestore has no soft delete, so undo has to
+ * re-mint the documents — writing them at their original ids keeps
+ * `locked_proposal_id` and anything else pointing at them valid.
+ */
+export async function restoreSlot(
+  slot: SlotWithProposals,
+  /** Backfills `trip_id` on legacy documents, which the create rules require. */
+  tripId: string
+): Promise<void> {
+  // Firestore rejects undefined, which optional legacy fields are full of.
+  const defined = (o: object) =>
+    Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined))
+
+  const batch = writeBatch(db)
+  const { id, proposals, ...slotData } = slot
+  batch.set(doc(db, 'slots', id), { ...defined(slotData), trip_id: slot.trip_id ?? tripId })
+  for (const proposal of proposals) {
+    const { id: proposalId, ...proposalData } = proposal
+    batch.set(doc(db, 'proposals', proposalId), {
+      ...defined(proposalData),
+      trip_id: proposal.trip_id ?? tripId,
+    })
+  }
+  await batch.commit()
+}
+
 export async function deleteSlot(slotId: string): Promise<void> {
   const proposalsSnap = await getDocs(
     query(collection(db, 'proposals'), where('slot_id', '==', slotId))
