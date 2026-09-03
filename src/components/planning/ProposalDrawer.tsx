@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, LockOpen, Loader2, Trash2 } from 'lucide-react'
+import { X, LockOpen, Loader2, Trash2, ExternalLink } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   addProposal,
@@ -13,7 +13,7 @@ import {
   deleteProposal,
   deleteSlot,
 } from '@/services/planningService'
-import type { DayWithSlots, SlotWithProposals } from '@/types/database'
+import type { DayWithSlots, Proposal, SlotWithProposals } from '@/types/database'
 import type { Trip } from '@/types/database'
 import { SlotIconPicker } from './SlotIconPicker'
 import { CATEGORY_ICONS } from '@/lib/slotEmojis'
@@ -191,6 +191,79 @@ function InlineTimeRange({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
   )
 }
 
+/**
+ * The event's name, edited where you read it. A locked slot's identity *is* its
+ * locked proposal, so this writes straight through — renaming used to mean
+ * card → drawer → find the row → its pencil.
+ */
+function InlineTitle({ proposal, canEdit }: { proposal: Proposal; canEdit: boolean }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(proposal.title)
+  const [saving, setSaving] = useState(false)
+
+  const commit = async () => {
+    const title = draft.trim()
+    setEditing(false)
+    if (!title || title === proposal.title) return
+    setSaving(true)
+    try {
+      await updateProposal(proposal.id, {
+        title,
+        note: proposal.note ?? null,
+        url: proposal.url ?? null,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+          if (e.key === 'Escape') {
+            setDraft(proposal.title)
+            setEditing(false)
+          }
+        }}
+        aria-label="Event name"
+        className="w-full min-w-0 bg-transparent border-b border-primary outline-none font-serif text-lg font-semibold text-foreground"
+      />
+    )
+  }
+
+  const startEditing = () => {
+    if (!canEdit) return
+    setDraft(proposal.title)
+    setEditing(true)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEditing}
+      disabled={!canEdit}
+      aria-label="Rename this event"
+      className={cn(
+        'block max-w-full truncate text-left font-serif text-lg font-semibold text-foreground',
+        'rounded px-1 -mx-1 py-0.5 transition-colors',
+        canEdit &&
+          'underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 ' +
+            'hover:bg-primary/5 hover:decoration-primary',
+        'disabled:pointer-events-none disabled:no-underline'
+      )}
+    >
+      {proposal.title}
+      {saving && <Loader2 className="inline w-3 h-3 ml-1.5 animate-spin opacity-50" />}
+    </button>
+  )
+}
+
 // ── Main drawer ─────────────────────────────────────────────────────────────
 
 interface ProposalDrawerProps {
@@ -209,7 +282,6 @@ interface ProposalDrawerProps {
 export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted, canEdit = true, canDeleteSlot = false }: ProposalDrawerProps) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [pickFromCollectionOpen, setPickFromCollectionOpen] = useState(false)
-  const [_lockLoading, setLockLoading] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState(false)
@@ -237,6 +309,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   if (!slot) return null
 
   const isLocked = slot.status === 'locked'
+  const lockedProposal = isLocked ? lockedProposalOf(slot) : null
+  const otherIdeas = lockedProposal
+    ? slot.proposals.filter((p) => p.id !== lockedProposal.id)
+    : slot.proposals
 
   const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
     await addProposal({
@@ -277,10 +353,17 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
     onUpdate()
   }
 
-  const handleUnlock = async () => {
+  /**
+   * Adding an idea to a decided event only means something if the decision is
+   * open again, so this reopens and drops you straight into the add form. The
+   * itinerary degrades honestly meanwhile — TimelineItem renders an unlocked
+   * slot as "Still deciding…" rather than dropping it.
+   */
+  const handleReopenWithIdea = async () => {
     setUnlockLoading(true)
     try {
       await unlockSlot(slot.id)
+      setShowAddForm(true)
     } finally {
       setUnlockLoading(false)
     }
@@ -322,15 +405,14 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   }
 
   const handleLock = async (proposalId: string) => {
-    setLockLoading(true)
     try {
       // Only derive an icon if the user hasn't picked one themselves
       const title = slot.proposals.find((p) => p.id === proposalId)?.title
       await lockSlot(slot.id, proposalId, slot.icon ? null : title)
       onUpdate()
       onClose()
-    } finally {
-      setLockLoading(false)
+    } catch (err) {
+      console.error('Failed to lock idea', err)
     }
   }
 
@@ -355,7 +437,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               // Centred with auto margins rather than a translate, which
               // framer-motion's own transform would overwrite.
-              className="fixed bottom-0 left-0 right-0 mx-auto sm:max-w-3xl z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl h-[85vh] max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
+              className="fixed bottom-0 left-0 right-0 mx-auto sm:max-w-3xl z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
             >
               {/* Drag handle (mobile) — hidden on sm and up */}
               <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">
@@ -363,8 +445,8 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               </div>
               {/* Header */}
               <div className="px-5 pt-2 sm:pt-4 pb-3 border-b border-border shrink-0">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="relative flex items-center gap-2 min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="relative flex items-start gap-2 min-w-0 flex-1">
                     {canEdit ? (
                       <button
                         type="button"
@@ -377,8 +459,17 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                     ) : (
                       <span className="text-lg leading-none shrink-0">{currentIcon}</span>
                     )}
-                    <InlineTimeRange slot={slot} canEdit={canEdit} />
-                    <span className="text-xs text-muted-foreground/40 truncate">· {dayLabel}</span>
+                    <div className="min-w-0 flex-1">
+                      {/* Decided: the name leads and the clock reads as a subhead.
+                          Still deciding: there is no one name, so time leads. */}
+                      {lockedProposal && (
+                        <InlineTitle proposal={lockedProposal} canEdit={canEdit} />
+                      )}
+                      <div className={cn('flex items-center gap-1 min-w-0', lockedProposal && 'mt-0.5')}>
+                        <InlineTimeRange slot={slot} canEdit={canEdit} />
+                        <span className="text-xs text-muted-foreground/40 truncate">· {dayLabel}</span>
+                      </div>
+                    </div>
                     <SlotIconPicker
                       open={iconPickerOpen}
                       current={currentIcon}
@@ -422,8 +513,9 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   </div>
                 </div>
 
-                {/* Time quick-picks — only for members */}
-                {canEdit && (
+                {/* Time quick-picks — only worth a row when no time is set yet;
+                    once there is one, the header's time range edits it. */}
+                {canEdit && slotStartMinutes(slot) === null && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
                   {TIME_CHIPS.map((t) => (
                     <button
@@ -445,8 +537,47 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                 )}
               </div>
 
-              {/* Ideas collection — flex-1 + min-h-0 so it gets bounded height and scrolls */}
+              {/* Body — flex-1 + min-h-0 so it gets bounded height and scrolls */}
               <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 flex flex-col">
+                {/* Decided: just the thing itself, with the ideas it beat folded
+                    away as history. The ballot only comes back when unlocked. */}
+                {isLocked && lockedProposal ? (
+                  <div className="py-3">
+                    {lockedProposal.note && (
+                      <p className="text-sm text-muted-foreground">{lockedProposal.note}</p>
+                    )}
+                    {lockedProposal.url && (
+                      <a
+                        href={lockedProposal.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Open link</span>
+                      </a>
+                    )}
+                    {otherIdeas.length > 0 && (
+                      <details className="mt-3 group/other">
+                        <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                          {otherIdeas.length} idea{otherIdeas.length === 1 ? '' : 's'} you didn't pick
+                        </summary>
+                        <div className="mt-2 divide-y divide-border/50 rounded-xl border border-border/50 bg-muted/20 overflow-hidden px-3">
+                          {otherIdeas.map((proposal) => (
+                            <ProposalCard
+                              key={proposal.id}
+                              proposal={proposal}
+                              currentName={currentName}
+                              onDelete={canEdit ? handleDeleteProposal : undefined}
+                              onEdit={canEdit ? handleEditProposal : undefined}
+                            />
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                <>
                 <div className="pt-3 pb-2 shrink-0">
                   <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
                     {slot.proposals.length === 0
@@ -514,20 +645,22 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                     </div>
                   </div>
                 )}
+                </>
+                )}
               </div>
 
               {/* Footer — only when locked and member can edit */}
               {canEdit && isLocked && (
-                <div className="px-5 py-4 border-t border-border shrink-0">
-                  <Button
-                    onClick={handleUnlock}
+                <div className="px-5 py-3 border-t border-border shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleReopenWithIdea}
                     disabled={unlockLoading}
-                    variant="outline"
-                    className="w-full text-muted-foreground hover:text-foreground"
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 max-sm:min-h-[44px]"
                   >
-                    <LockOpen className="w-3.5 h-3.5 mr-1.5" />
-                    {unlockLoading ? 'Unlocking…' : 'Unlock — reopen for planning'}
-                  </Button>
+                    <LockOpen className="w-3.5 h-3.5 shrink-0" />
+                    {unlockLoading ? 'Reopening…' : 'Add another idea — reopens this for the group'}
+                  </button>
                 </div>
               )}
             </motion.div>
