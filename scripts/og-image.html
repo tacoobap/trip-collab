@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Trup — share image</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body { margin: 0; padding: 24px; background: #2a2a2a; color: #ddd;
+             font: 13px/1.5 system-ui, sans-serif; }
+      figure { margin: 0 0 22px; }
+      canvas { width: 600px; height: 315px; display: block; border-radius: 6px; }
+      figcaption { padding: 6px 0 0; }
+      a { color: #cc8533; }
+      p { max-width: 620px; }
+    </style>
+  </head>
+  <body>
+    <p>
+      Source for <code>public/og-image.png</code> (Open Graph / iMessage / Slack
+      link previews). Open this file in a browser, then use the save link under
+      whichever variant you want and replace <code>public/og-image.png</code>.
+      1200&times;630 is the <code>summary_large_image</code> aspect — keep it, and
+      keep the file well under a few hundred KB or scrapers time out.
+    </p>
+
+    <figure>
+      <canvas id="a" width="1200" height="630"></canvas>
+      <figcaption>A — wordmark <a id="dl-a" download="og-image.png">save PNG</a> (in use)</figcaption>
+    </figure>
+    <figure>
+      <canvas id="b" width="1200" height="630"></canvas>
+      <figcaption>B — compass <a id="dl-b" download="og-image.jpg">save JPEG</a></figcaption>
+    </figure>
+    <figure>
+      <canvas id="c" width="1200" height="630"></canvas>
+      <figcaption>C — the board <a id="dl-c" download="og-image.png">save PNG</a></figcaption>
+    </figure>
+
+    <script>
+      // Palette lifted from src/index.css so the card matches the app.
+      const SAND = '#f7f2e9'
+      const WARM_WHITE = '#fbf8f2'
+      const NAVY = '#1d2433'
+      const GOLD = '#cc8533'
+      const MUTED = '#666f80'
+      const BORDER = '#e3dcd0'
+      const TAGLINE = 'PLAN A TRIP TOGETHER'
+
+      const W = 1200
+      const H = 630
+
+      function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.arcTo(x + w, y, x + w, y + h, r)
+        ctx.arcTo(x + w, y + h, x, y + h, r)
+        ctx.arcTo(x, y + h, x, y, r)
+        ctx.arcTo(x, y, x + w, y, r)
+        ctx.closePath()
+      }
+
+      /** Eight-pointed compass rose, long points on the cardinals. */
+      function compass(ctx, cx, cy, r) {
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.strokeStyle = GOLD
+        ctx.lineWidth = 6
+        ctx.beginPath()
+        ctx.arc(0, 0, r * 0.92, 0, Math.PI * 2)
+        ctx.stroke()
+        for (let i = 0; i < 8; i++) {
+          const long = i % 2 === 0
+          const reach = long ? r : r * 0.58
+          const a = (i * Math.PI) / 4 - Math.PI / 2
+          const waist = long ? r * 0.16 : r * 0.1
+          ctx.beginPath()
+          ctx.moveTo(Math.cos(a) * reach, Math.sin(a) * reach)
+          ctx.lineTo(Math.cos(a + Math.PI / 2) * waist, Math.sin(a + Math.PI / 2) * waist)
+          ctx.lineTo(Math.cos(a + Math.PI) * waist * 0.6, Math.sin(a + Math.PI) * waist * 0.6)
+          ctx.lineTo(Math.cos(a - Math.PI / 2) * waist, Math.sin(a - Math.PI / 2) * waist)
+          ctx.closePath()
+          ctx.fillStyle = long ? WARM_WHITE : GOLD
+          ctx.fill()
+        }
+        ctx.beginPath()
+        ctx.arc(0, 0, r * 0.07, 0, Math.PI * 2)
+        ctx.fillStyle = GOLD
+        ctx.fill()
+        ctx.restore()
+      }
+
+      /** Letter-spaced small caps, the app's hero-byline treatment. */
+      function byline(ctx, text, x, y, color, size) {
+        ctx.font = `300 ${size}px "DM Sans", system-ui, sans-serif`
+        ctx.fillStyle = color
+        ctx.fillText(text.split('').join(' '), x, y)
+      }
+
+      function drawA(ctx) {
+        ctx.fillStyle = SAND
+        ctx.fillRect(0, 0, W, H)
+        ctx.strokeStyle = BORDER
+        ctx.lineWidth = 2
+        roundRect(ctx, 40, 40, W - 80, H - 80, 18)
+        ctx.stroke()
+        ctx.textAlign = 'center'
+        ctx.font = '700 168px "Playfair Display", Georgia, serif'
+        ctx.fillStyle = NAVY
+        ctx.fillText('Trup', W / 2, 340)
+        ctx.strokeStyle = GOLD
+        ctx.lineWidth = 4
+        ctx.beginPath()
+        ctx.moveTo(W / 2 - 70, 386)
+        ctx.lineTo(W / 2 + 70, 386)
+        ctx.stroke()
+        byline(ctx, TAGLINE, W / 2, 452, MUTED, 27)
+      }
+
+      function drawB(ctx) {
+        const g = ctx.createLinearGradient(0, 0, W, H)
+        g.addColorStop(0, '#93ab99')
+        g.addColorStop(1, '#6f8a7c')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, W, H)
+        compass(ctx, 340, H / 2, 168)
+        ctx.textAlign = 'left'
+        ctx.font = '700 150px "Playfair Display", Georgia, serif'
+        ctx.fillStyle = WARM_WHITE
+        ctx.fillText('Trup', 610, 330)
+        byline(ctx, TAGLINE, 616, 396, 'rgba(251,248,242,0.82)', 25)
+      }
+
+      function drawC(ctx) {
+        ctx.fillStyle = SAND
+        ctx.fillRect(0, 0, W, H)
+        ctx.strokeStyle = BORDER
+        ctx.lineWidth = 2
+        ctx.font = '400 20px "DM Sans", system-ui, sans-serif'
+        ctx.fillStyle = '#a9a094'
+        ctx.textAlign = 'right'
+        ;['9 AM', '10 AM', '11 AM', '12 PM', '1 PM'].forEach((t, i) => {
+          const y = 130 + i * 100
+          ctx.beginPath()
+          ctx.moveTo(610, y)
+          ctx.lineTo(W - 70, y)
+          ctx.stroke()
+          ctx.fillText(t, 596, y + 7)
+        })
+        ;[
+          { y: 138, h: 84, label: 'Pastéis de Belém', tone: 'gold' },
+          { y: 246, h: 150, label: 'Jerónimos Monastery', tone: 'navy' },
+          { y: 420, h: 84, label: 'Time Out Market', tone: 'plain' },
+        ].forEach((c) => {
+          const x = 640
+          const w = W - 70 - x
+          ctx.fillStyle =
+            c.tone === 'gold' ? 'rgba(204,133,51,0.13)'
+            : c.tone === 'navy' ? 'rgba(45,74,120,0.10)'
+            : 'rgba(120,120,120,0.07)'
+          roundRect(ctx, x, c.y, w, c.h, 12)
+          ctx.fill()
+          ctx.strokeStyle =
+            c.tone === 'gold' ? 'rgba(204,133,51,0.5)'
+            : c.tone === 'navy' ? 'rgba(45,74,120,0.38)'
+            : BORDER
+          ctx.lineWidth = 2
+          roundRect(ctx, x, c.y, w, c.h, 12)
+          ctx.stroke()
+          ctx.textAlign = 'left'
+          ctx.font = '500 25px "DM Sans", system-ui, sans-serif'
+          ctx.fillStyle = NAVY
+          ctx.fillText(c.label, x + 22, c.y + 50)
+        })
+        ctx.textAlign = 'left'
+        ctx.font = '700 122px "Playfair Display", Georgia, serif'
+        ctx.fillStyle = NAVY
+        ctx.fillText('Trup', 78, 318)
+        ctx.strokeStyle = GOLD
+        ctx.lineWidth = 4
+        ctx.beginPath()
+        ctx.moveTo(84, 362)
+        ctx.lineTo(214, 362)
+        ctx.stroke()
+        byline(ctx, TAGLINE, 84, 418, MUTED, 20)
+      }
+
+      window.renderAll = async () => {
+        await document.fonts.ready
+        drawA(document.getElementById('a').getContext('2d'))
+        drawB(document.getElementById('b').getContext('2d'))
+        drawC(document.getElementById('c').getContext('2d'))
+        document.getElementById('dl-a').href = document.getElementById('a').toDataURL('image/png')
+        document.getElementById('dl-b').href = document.getElementById('b').toDataURL('image/jpeg', 0.9)
+        document.getElementById('dl-c').href = document.getElementById('c').toDataURL('image/png')
+        return 'ok'
+      }
+      window.renderAll()
+    </script>
+  </body>
+</html>
