@@ -139,7 +139,7 @@ export function TimeGridCard({
 
       {showMicro && (
         <p className="mt-0.5 text-[11px] text-muted-foreground/70 truncate">
-          Not locked in yet — tap to decide together.
+          {slot.proposals.length} ideas — tap to pick one
         </p>
       )}
 

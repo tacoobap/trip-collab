@@ -10,6 +10,7 @@ import {
   DAY_HEADER_PX,
   slotStartMinutes,
   slotDurationMinutes,
+  slotTitle,
   snapMinutes,
   clampMinutes,
   formatMinuteRange,
@@ -21,6 +22,7 @@ import {
   type EdgeSummary,
   layoutOverlaps,
 } from '@/lib/timeGrid'
+import { usePlanningHistory } from '@/hooks/usePlanningHistory'
 import { TimeGridCard } from './TimeGridCard'
 import { TimeGridDayHeader } from './TimeGridDayHeader'
 import { cn } from '@/lib/utils'
@@ -106,6 +108,7 @@ export function TimeGridBoard({
   onSlotClick,
   onEditDay,
 }: TimeGridBoardProps) {
+  const history = usePlanningHistory()
   const wrapRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const gesture = useRef<Gesture | null>(null)
@@ -143,6 +146,7 @@ export function TimeGridBoard({
   const onSlotClickRef = useRef(onSlotClick)
   const draftRef = useRef(draft)
   const draftTitleRef = useRef(draftTitle)
+  const historyRef = useRef(history)
   useEffect(() => {
     daysRef.current = days
     tripRef.current = trip
@@ -153,6 +157,7 @@ export function TimeGridBoard({
     onSlotClickRef.current = onSlotClick
     draftRef.current = draft
     draftTitleRef.current = draftTitle
+    historyRef.current = history
   })
 
   // ── Per-day layout, with the in-flight drag applied on top ─────────────
@@ -455,6 +460,15 @@ export function TimeGridBoard({
       setArmedId(null)
       const clearPreview = () => setPreview(null)
       const days = daysRef.current
+      // Where it was, captured before the write — see PlanningHistoryContext.
+      const recordUndo = (slot: SlotWithProposals) =>
+        historyRef.current.record(slotTitle(slot), {
+          slotId: slot.id,
+          day_id: slot.day_id,
+          start_minutes: slotStartMinutes(slot),
+          duration_minutes: slotDurationMinutes(slot),
+          lockedProposalId: slot.locked_proposal_id,
+        })
       const dayLabelOf = (idx: number | undefined) =>
         `Day ${idx !== undefined ? days[idx]?.day_number ?? '' : ''}`
 
@@ -485,6 +499,7 @@ export function TimeGridBoard({
         }
         if (p.mode === 'move' && p.toShelf != null) {
           const target = days[p.toShelf]
+          recordUndo(slot)
           void updateSlotSchedule({
             slotId: slot.id,
             start_minutes: null,
@@ -494,6 +509,7 @@ export function TimeGridBoard({
           }).finally(clearPreview)
         } else if (p.mode === 'move' && p.lastStart !== undefined) {
           const target = days[p.lastDayIdx!]
+          recordUndo(slot)
           void updateSlotSchedule({
             slotId: slot.id,
             start_minutes: p.lastStart,
@@ -502,6 +518,7 @@ export function TimeGridBoard({
             lockedProposalId: slot.locked_proposal_id,
           }).finally(clearPreview)
         } else if (p.mode === 'resize' && p.lastDur !== undefined) {
+          recordUndo(slot)
           void updateSlotSchedule({
             slotId: slot.id,
             start_minutes: slotStartMinutes(slot),
@@ -523,6 +540,7 @@ export function TimeGridBoard({
         }
         if (p.lastStart !== undefined && p.lastDayIdx !== undefined) {
           const target = days[p.lastDayIdx]
+          recordUndo(chip)
           void updateSlotSchedule({
             slotId: chip.id,
             start_minutes: p.lastStart,
@@ -717,7 +735,7 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setNightOpen(true)}
-                  className="text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title={edgeHint('up', hiddenEarly, gridStart)}
                   aria-label={edgeHint('up', hiddenEarly, gridStart)}
                 >
@@ -734,7 +752,7 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setNightOpen(false)}
-                  className="text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title="Hide the empty early morning"
                 >
                   ▾ hide
@@ -758,7 +776,7 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(true)}
-                  className="absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title={edgeHint('down', hiddenLate, gridEnd)}
                   aria-label={edgeHint('down', hiddenLate, gridEnd)}
                 >
@@ -775,7 +793,7 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(false)}
-                  className="absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title="Hide the empty late hours"
                 >
                   ▴ hide

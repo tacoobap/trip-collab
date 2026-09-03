@@ -435,9 +435,12 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              // Centred with auto margins rather than a translate, which
-              // framer-motion's own transform would overwrite.
-              className="fixed bottom-0 left-0 right-0 mx-auto sm:max-w-3xl z-50 bg-background rounded-t-2xl border-t border-border shadow-2xl max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
+              // Centred with auto margins on both axes rather than a translate,
+              // which framer-motion's own transform would overwrite. A sheet
+              // rising from the bottom edge on phones; a dialog in the middle
+              // of the screen from sm up, where a 160px strip pinned to the
+              // bottom of a large monitor read as an afterthought.
+              className="fixed bottom-0 left-0 right-0 mx-auto sm:inset-y-0 sm:my-auto sm:h-fit sm:max-w-2xl z-50 bg-background rounded-t-2xl sm:rounded-2xl border-t sm:border border-border shadow-2xl max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
             >
               {/* Drag handle (mobile) — hidden on sm and up */}
               <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">

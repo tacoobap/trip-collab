@@ -17,6 +17,8 @@ import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
 import { Loader2, BedDouble, ListChecks, Pencil } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
+import { PlanningHistoryProvider } from '@/contexts/PlanningHistoryProvider'
+import { UndoButton } from '@/components/planning/UndoButton'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -161,8 +163,13 @@ export function TripPage() {
   const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric', year: 'numeric' })
   const endFmt = formatTripDate(trip.end_date, { month: 'long', day: 'numeric', year: 'numeric' })
   const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
+  const startShort = formatTripDate(trip.start_date, { month: 'short', day: 'numeric' })
+  const endShort = formatTripDate(trip.end_date, { month: 'short', day: 'numeric' })
+  const dateRangeShort =
+    startShort && endShort ? `${startShort} – ${endShort}` : startShort ?? endShort ?? null
 
   return (
+    <PlanningHistoryProvider>
     <div className="h-dvh flex flex-col bg-background">
       <PageHeader trip={trip} currentName={displayName ?? ''} />
       {user && isMember === false && (
@@ -215,12 +222,14 @@ export function TripPage() {
               )}
             </div>
             {dateRange && (
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {dateRange}
+              <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                <span className="sm:hidden">{dateRangeShort}</span>
+                <span className="hidden sm:inline">{dateRange}</span>
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-sm:gap-0.5 shrink-0">
+            <UndoButton />
             <button
               onClick={() => setTodosOpen(true)}
               className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
@@ -243,7 +252,8 @@ export function TripPage() {
               onClick={handleCopyInviteLink}
               className="max-sm:min-h-[40px]"
             >
-              {copied ? 'Link copied' : 'Invite link'}
+              <span className="sm:hidden">{copied ? 'Copied' : 'Invite'}</span>
+              <span className="hidden sm:inline">{copied ? 'Link copied' : 'Invite link'}</span>
             </Button>
           </div>
         </div>
@@ -299,6 +309,7 @@ export function TripPage() {
         canEdit={isMember ?? false}
       />
     </div>
+    </PlanningHistoryProvider>
   )
 }
 

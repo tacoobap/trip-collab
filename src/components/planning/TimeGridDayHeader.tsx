@@ -209,7 +209,7 @@ export function TimeGridDayHeader({
               type="button"
               data-grid-ignore
               onClick={() => onEditDay(day)}
-              className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-manipulation p-0.5 rounded"
+              className="touch-target shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-manipulation p-0.5 rounded"
               title="Edit day"
               aria-label="Edit day"
             >
@@ -227,7 +227,7 @@ export function TimeGridDayHeader({
                 data-grid-ignore
                 onClick={() => setPhotoMenuOpen((v) => !v)}
                 disabled={imageWorking}
-                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40 touch-manipulation p-0.5"
+                className="touch-target text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40 touch-manipulation p-0.5"
                 title={day.image_url ? 'Change day photo' : 'Add day photo'}
                 aria-label={day.image_url ? 'Change day photo' : 'Add day photo'}
               >
@@ -305,7 +305,7 @@ export function TimeGridDayHeader({
             style={{ touchAction: 'pan-x pan-y' }}
             className={cn(
               'shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/80',
-              'pl-2 pr-2.5 py-1 text-[11px] font-medium text-foreground max-w-[190px] select-none',
+              'pl-2 pr-2.5 py-1.5 text-[11px] font-medium text-foreground max-w-[190px] select-none',
               '[-webkit-touch-callout:none] transition-transform',
               canEdit ? 'cursor-grab' : 'cursor-pointer',
               armedChipId === slot.id && 'scale-110 ring-2 ring-primary/50 shadow-md',
@@ -346,7 +346,7 @@ export function TimeGridDayHeader({
               onClick={() => setAddingChip(true)}
               className={cn(
                 'shrink-0 inline-flex items-center gap-1 rounded-full border border-dashed border-border',
-                'px-2.5 py-1 text-[11px] text-muted-foreground/50 hover:text-primary hover:border-primary/50 transition-colors'
+                'px-2.5 py-1.5 text-[11px] text-muted-foreground/50 hover:text-primary hover:border-primary/50 transition-colors'
               )}
               title="Park something on this day without a time yet"
             >

@@ -126,6 +126,18 @@
   .font-sans {
     font-family: 'DM Sans', sans-serif;
   }
+  /* Expands a small control's tap area to ~44px without changing how it
+     looks or how it sits in a row. Only for controls with clear space
+     around them — overlapping hit areas steal each other's taps. */
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::after {
+    content: '';
+    position: absolute;
+    inset: -0.875rem;
+  }
+
   /* Charleston-style hero byline: light sans, uppercase, letter-spacing */
   .hero-byline {
     font-family: 'DM Sans', sans-serif;
