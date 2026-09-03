@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Trup">
+  <rect width="64" height="64" rx="14" fill="#cc8533"/>
+  <!-- Four-point compass star: simple enough to still read at 16px -->
+  <path d="M32 10 36.2 27.8 54 32 36.2 36.2 32 54 27.8 36.2 10 32 27.8 27.8Z" fill="#fbf8f2"/>
+  <circle cx="32" cy="32" r="3.1" fill="#cc8533"/>
+</svg>
