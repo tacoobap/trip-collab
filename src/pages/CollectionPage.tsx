@@ -15,6 +15,7 @@ import { useDisplayName } from '@/hooks/useDisplayName'
 import { useTrip } from '@/hooks/useTrip'
 import { useCollectionItems } from '@/hooks/useCollectionItems'
 import { useCollectionSuggestions } from '@/hooks/useCollectionSuggestions'
+import { useStays } from '@/hooks/useStays'
 import {
   addCollectionItem,
   deleteCollectionItem,
@@ -34,6 +35,7 @@ export function CollectionPage() {
   const { displayName } = useDisplayName()
   const { trip, days, loading: tripLoading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { items, loading: itemsLoading } = useCollectionItems(trip?.id)
+  const { stays } = useStays(trip?.id)
   const {
     suggestions,
     getSuggestions,
@@ -184,6 +186,7 @@ export function CollectionPage() {
         <CollectionList
           itemsLoading={itemsLoading}
           items={items}
+          stays={stays}
           destinationOrder={destinationOrder}
           displayName={displayName ?? ''}
           isMember={isMemberBool}

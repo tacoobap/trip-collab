@@ -82,6 +82,12 @@ export type Stay = {
   check_out: string
   proposed_by: string
   created_at: string
+  // Where the stay is, when a Google Maps link was pasted. Optional: stays
+  // created before they could be pinned don't carry these.
+  google_maps_url?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  place_name?: string | null
   // legacy fields — may exist on older documents
   url?: string | null
   notes?: string | null

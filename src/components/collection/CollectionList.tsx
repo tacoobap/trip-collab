@@ -3,11 +3,33 @@ import { LayoutGrid, Loader2, Map as MapIcon, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CollectionItemCard } from '@/components/collection/CollectionItemCard'
 import { CollectionMapPanel } from '@/components/collection/CollectionMapPanel'
-import { countUnmappable, hasCoordinates } from '@/lib/mapPoints'
+import {
+  countUnmappable,
+  hasCoordinates,
+  hasStayCoordinates,
+  type MappableStay,
+} from '@/lib/mapPoints'
 import { cn } from '@/lib/utils'
-import type { CollectionItem } from '@/types/database'
+import type { CollectionItem, Stay } from '@/types/database'
 
 const OTHER_LABEL = 'Other'
+
+type CollectionView = 'list' | 'map'
+
+/**
+ * The view survives leaving the page — planning and back shouldn't drop you
+ * out of the map. Reads can throw outright in private browsing, so every
+ * access is guarded and the default simply wins.
+ */
+const VIEW_STORAGE_KEY = 'trup:collection-view'
+
+function readStoredView(): CollectionView {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === 'map' ? 'map' : 'list'
+  } catch {
+    return 'list'
+  }
+}
 
 function groupByDestination(
   items: CollectionItem[],
@@ -41,9 +63,33 @@ function groupByDestination(
     )
 }
 
+function sameCity(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+/**
+ * Which stays belong on a section's map. A stay carries a city, so it lines up
+ * with the destination sections; one in a city that isn't a destination joins
+ * the same catch-all its places would. On a single-destination trip every
+ * section is the same city, so every stay belongs.
+ */
+function staysForSection(
+  stays: Stay[],
+  label: string,
+  destinationOrder: string[]
+): MappableStay[] {
+  const pinned = stays.filter(hasStayCoordinates)
+  if (destinationOrder.length <= 1) return pinned
+  if (label === OTHER_LABEL) {
+    return pinned.filter((s) => !destinationOrder.some((d) => sameCity(d, s.city)))
+  }
+  return pinned.filter((s) => sameCity(s.city, label))
+}
+
 interface CollectionListProps {
   itemsLoading: boolean
   items: CollectionItem[]
+  stays: Stay[]
   destinationOrder: string[]
   displayName: string
   isMember: boolean
@@ -57,6 +103,7 @@ interface CollectionListProps {
 export function CollectionList({
   itemsLoading,
   items,
+  stays,
   destinationOrder,
   displayName,
   isMember,
@@ -66,7 +113,16 @@ export function CollectionList({
   onDelete,
   onAddClick,
 }: CollectionListProps) {
-  const [view, setView] = useState<'list' | 'map'>('list')
+  const [view, setView] = useState<CollectionView>(readStoredView)
+
+  const chooseView = (next: CollectionView) => {
+    setView(next)
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next)
+    } catch {
+      // Not worth failing a click over — it just won't be remembered.
+    }
+  }
 
   if (itemsLoading) {
     return (
@@ -96,6 +152,8 @@ export function CollectionList({
   const sections = groupByDestination(items, destinationOrder)
   const singleDestination = sections.length === 1
   const anyMappable = items.some(hasCoordinates)
+  // Nothing to show on a map, and no toggle to escape with, so fall back.
+  const effectiveView = anyMappable ? view : 'list'
 
   return (
     <div>
@@ -115,7 +173,7 @@ export function CollectionList({
               <button
                 key={value}
                 type="button"
-                onClick={() => setView(value)}
+                onClick={() => chooseView(value)}
                 aria-pressed={view === value}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
@@ -136,15 +194,17 @@ export function CollectionList({
         {sections.map(({ label, items: list }) => {
           const mappable = list.filter(hasCoordinates)
           const unmappable = countUnmappable(list)
+          const sectionStays = staysForSection(stays, label, destinationOrder)
           return (
             <section key={label}>
               <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4 max-sm:mb-3">
                 {singleDestination ? 'Ideas' : label}
               </h2>
-              {view === 'map' ? (
+              {effectiveView === 'map' ? (
                 mappable.length > 0 ? (
                   <CollectionMapPanel
                     items={mappable}
+                    stays={sectionStays}
                     unmappable={unmappable}
                     currentName={displayName}
                     onLike={isMember ? onLike : undefined}

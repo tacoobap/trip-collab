@@ -295,6 +295,7 @@ export function TripPage() {
         onAdd={addStay}
         onUpdate={updateStay}
         onDelete={deleteStay}
+        getToken={getIdToken}
         canEdit={isMember ?? false}
       />
     </div>

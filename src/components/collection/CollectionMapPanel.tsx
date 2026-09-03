@@ -1,12 +1,14 @@
 import { Suspense, lazy } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { MappableItem } from '@/lib/mapPoints'
+import type { MappableItem, MappableStay } from '@/lib/mapPoints'
 
 // Leaflet and its CSS only ship to browsers that actually open the map view.
 const CollectionMap = lazy(() => import('./CollectionMap'))
 
 interface CollectionMapPanelProps {
   items: MappableItem[]
+  /** The stays in this city that can be pinned, drawn as their own kind of pin. */
+  stays: MappableStay[]
   /** Why places in this city are missing from the map, if any are. */
   unmappable: { shortLinks: number; linksWithoutPosition: number; total: number }
   currentName: string
@@ -19,6 +21,7 @@ function plural(n: number) {
 
 export function CollectionMapPanel({
   items,
+  stays,
   unmappable,
   currentName,
   onLike,
@@ -35,6 +38,7 @@ export function CollectionMapPanel({
         >
           <CollectionMap
             items={items}
+            stays={stays}
             currentName={currentName}
             onLike={onLike}
             className="h-full w-full"

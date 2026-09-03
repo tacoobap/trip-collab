@@ -2,15 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './collectionMap.css'
-import { ChevronLeft, ChevronRight, Heart, Maximize2, MapPin, X } from 'lucide-react'
+import { BedDouble, ChevronLeft, ChevronRight, Heart, Maximize2, MapPin, X } from 'lucide-react'
 import {
   clusterProjectedPoints,
   projectToWorld,
   unprojectFromWorld,
   type MappableItem,
+  type MappableStay,
   type PointCluster,
 } from '@/lib/mapPoints'
 import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
+import { formatStayRange, stayAddress, stayNights } from '@/lib/stayDisplay'
 import { cn } from '@/lib/utils'
 import type { CollectionItemCategory } from '@/types/database'
 
@@ -26,6 +28,18 @@ const CATEGORY_LABELS: Record<CollectionItemCategory, string> = {
   activity: 'Activity',
   other: 'Other',
 }
+
+/**
+ * Stays sit outside the category palette on purpose: the place you're sleeping
+ * should never read as one more idea on the list.
+ */
+const STAY_COLOR = '#7c3aed'
+
+/** A stable empty default, so an unset `stays` prop doesn't churn the effects. */
+const NO_STAYS: MappableStay[] = []
+
+/** What the detail card is showing — one selection across both kinds of pin. */
+type Selection = { kind: 'item'; id: string } | { kind: 'stay'; id: string }
 
 // OpenFreeMap serves OSM vector tiles with no API key and no signup.
 //
@@ -53,10 +67,14 @@ function fitOptions(placeCount: number) {
   return { padding: 56, maxZoom: placeCount <= 1 ? 13.5 : 14 }
 }
 
-function mapsHref(item: MappableItem): string {
+function mapsHref(place: {
+  google_maps_url?: string | null
+  latitude: number
+  longitude: number
+}): string {
   return (
-    item.google_maps_url?.trim() ||
-    `https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`
+    place.google_maps_url?.trim() ||
+    `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`
   )
 }
 
@@ -110,9 +128,59 @@ function buildPinFallback(name: string): HTMLElement {
   return fallback
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+/**
+ * Build one stay: a bed on a violet square rather than a round photo disc, so
+ * it reads as home base at a glance without covering the places around it. The
+ * name lives on the card that opens when it's clicked.
+ */
+function buildStayPin(stay: MappableStay): HTMLElement {
+  const root = document.createElement('div')
+  root.className = 'tc-stay'
+  root.style.setProperty('--stay', STAY_COLOR)
+
+  const body = document.createElement('div')
+  body.className = 'tc-stay__body'
+
+  const icon = document.createElementNS(SVG_NS, 'svg')
+  icon.setAttribute('class', 'tc-stay__icon')
+  icon.setAttribute('viewBox', '0 0 24 24')
+  icon.setAttribute('fill', 'none')
+  icon.setAttribute('stroke', 'currentColor')
+  icon.setAttribute('stroke-width', '2')
+  icon.setAttribute('stroke-linecap', 'round')
+  icon.setAttribute('stroke-linejoin', 'round')
+  icon.setAttribute('aria-hidden', 'true')
+  // lucide's `bed-double`, drawn out because markers are built by hand here.
+  for (const d of [
+    'M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8',
+    'M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4',
+    'M12 4v6',
+    'M2 18h20',
+  ]) {
+    const path = document.createElementNS(SVG_NS, 'path')
+    path.setAttribute('d', d)
+    icon.appendChild(path)
+  }
+
+  const stem = document.createElement('span')
+  stem.className = 'tc-stay__stem'
+
+  // The name isn't drawn on the map, so give the pin one for screen readers.
+  root.setAttribute('role', 'button')
+  root.setAttribute('aria-label', stay.name)
+
+  body.appendChild(icon)
+  root.append(body, stem)
+  return root
+}
+
 export interface CollectionMapProps {
   /** Already filtered to items that parsed to coordinates. */
   items: MappableItem[]
+  /** The stays in this city that parsed to coordinates. */
+  stays?: MappableStay[]
   currentName: string
   onLike?: (itemId: string) => void
   className?: string
@@ -120,6 +188,7 @@ export interface CollectionMapProps {
 
 export function CollectionMap({
   items,
+  stays = NO_STAYS,
   currentName,
   onLike,
   className,
@@ -128,13 +197,17 @@ export function CollectionMap({
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef(new Map<string, maplibregl.Marker>())
   const pinElementsRef = useRef(new Map<string, HTMLElement>())
+  const stayMarkersRef = useRef(new Map<string, maplibregl.Marker>())
+  const stayElementsRef = useRef(new Map<string, HTMLElement>())
   // Read by the mount-once effect to frame the city on the very first paint.
   const itemsRef = useRef(items)
   itemsRef.current = items
+  const staysRef = useRef(stays)
+  staysRef.current = stays
 
   const [ready, setReady] = useState(false)
   const [zoom, setZoom] = useState<number | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Selection | null>(null)
   const [styleFailed, setStyleFailed] = useState(false)
 
   // ── Map lifecycle ────────────────────────────────────────────────────────
@@ -146,6 +219,8 @@ export function CollectionMap({
     // a flash of low-zoom relief before the real map arrives.
     const initialBounds = new maplibregl.LngLatBounds()
     for (const item of itemsRef.current) initialBounds.extend([item.longitude, item.latitude])
+    for (const stay of staysRef.current) initialBounds.extend([stay.longitude, stay.latitude])
+    const initialCount = itemsRef.current.length + staysRef.current.length
 
     const map = new maplibregl.Map({
       container: el,
@@ -153,7 +228,7 @@ export function CollectionMap({
         ? STYLE_URL.dark
         : STYLE_URL.light,
       bounds: initialBounds.isEmpty() ? undefined : initialBounds,
-      fitBoundsOptions: fitOptions(itemsRef.current.length),
+      fitBoundsOptions: fitOptions(initialCount),
       center: initialBounds.isEmpty() ? [0, 20] : undefined,
       zoom: initialBounds.isEmpty() ? 1 : undefined,
       // The map sits in a scrolling page: plain wheel and one-finger drag stay
@@ -172,7 +247,7 @@ export function CollectionMap({
 
     const syncZoom = () => setZoom(map.getZoom())
     map.on('moveend', syncZoom)
-    map.on('click', () => setSelectedId(null))
+    map.on('click', () => setSelected(null))
     map.on('load', () => {
       setZoom(map.getZoom())
       setReady(true)
@@ -191,12 +266,17 @@ export function CollectionMap({
 
     const markers = markersRef.current
     const pinElements = pinElementsRef.current
+    const stayMarkers = stayMarkersRef.current
+    const stayElements = stayElementsRef.current
     return () => {
       clearTimeout(styleTimeout)
       observer.disconnect()
       for (const marker of markers.values()) marker.remove()
       markers.clear()
       pinElements.clear()
+      for (const marker of stayMarkers.values()) marker.remove()
+      stayMarkers.clear()
+      stayElements.clear()
       map.remove()
       mapRef.current = null
       setReady(false)
@@ -207,16 +287,20 @@ export function CollectionMap({
   // ── Framing ──────────────────────────────────────────────────────────────
   const fitAll = useCallback(() => {
     const map = mapRef.current
-    if (!map || items.length === 0) return
+    if (!map || items.length + stays.length === 0) return
     const bounds = new maplibregl.LngLatBounds()
     for (const item of items) bounds.extend([item.longitude, item.latitude])
+    // The stay is the anchor you want in frame, so it counts towards the fit.
+    for (const stay of stays) bounds.extend([stay.longitude, stay.latitude])
     map.resize()
-    map.fitBounds(bounds, { ...fitOptions(items.length), animate: false })
-  }, [items])
+    map.fitBounds(bounds, { ...fitOptions(items.length + stays.length), animate: false })
+  }, [items, stays])
 
   // Refit only when the set of coordinates actually changes, not on every
   // unrelated edit (a like, a renamed note) that produces a new array.
-  const coordinateKey = items.map((i) => `${i.latitude},${i.longitude}`).join(';')
+  const coordinateKey = [...items, ...stays]
+    .map((p) => `${p.latitude},${p.longitude}`)
+    .join(';')
   useEffect(() => {
     if (ready) fitAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,12 +331,17 @@ export function CollectionMap({
       element.addEventListener('click', (e) => {
         // Keep the map's own click from clearing the selection we just made.
         e.stopPropagation()
-        setSelectedId((current) => {
-          const index = cluster.items.findIndex((i) => i.id === current)
+        setSelected((current) => {
+          const currentId = current?.kind === 'item' ? current.id : null
+          const index = cluster.items.findIndex((i) => i.id === currentId)
           // Re-clicking a group steps through it rather than resetting.
-          return index >= 0
-            ? cluster.items[(index + 1) % cluster.items.length].id
-            : cluster.items[0].id
+          return {
+            kind: 'item',
+            id:
+              index >= 0
+                ? cluster.items[(index + 1) % cluster.items.length].id
+                : cluster.items[0].id,
+          }
         })
       })
       const marker = new maplibregl.Marker({ element, anchor: 'bottom' })
@@ -263,27 +352,65 @@ export function CollectionMap({
     }
   }, [clusters, ready, zoom])
 
+  // ── Stay markers ─────────────────────────────────────────────────────────
+  // Their own layer: a stay never joins a cluster, so it doesn't need
+  // rebuilding when the zoom regroups the place pins.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+
+    for (const marker of stayMarkersRef.current.values()) marker.remove()
+    stayMarkersRef.current.clear()
+    stayElementsRef.current.clear()
+
+    for (const stay of stays) {
+      const element = buildStayPin(stay)
+      element.addEventListener('click', (e) => {
+        e.stopPropagation()
+        setSelected({ kind: 'stay', id: stay.id })
+      })
+      const marker = new maplibregl.Marker({ element, anchor: 'bottom' })
+        .setLngLat([stay.longitude, stay.latitude])
+        .addTo(map)
+      stayMarkersRef.current.set(stay.id, marker)
+      stayElementsRef.current.set(stay.id, element)
+    }
+  }, [stays, ready])
+
+  const selectedItemId = selected?.kind === 'item' ? selected.id : null
+
   // Highlight without rebuilding the markers, so pin images don't flicker.
   useEffect(() => {
-    const activeKey = clusters.find((c) => c.items.some((i) => i.id === selectedId))?.key
+    const activeKey = clusters.find((c) => c.items.some((i) => i.id === selectedItemId))?.key
     for (const [key, element] of pinElementsRef.current) {
       element.classList.toggle('tc-pin--active', key === activeKey)
     }
-  }, [clusters, selectedId])
+    for (const [id, element] of stayElementsRef.current) {
+      element.classList.toggle(
+        'tc-stay--active',
+        selected?.kind === 'stay' && selected.id === id
+      )
+    }
+    // `stays` is a dependency because a rebuilt plaque starts out unhighlighted.
+  }, [clusters, selected, selectedItemId, stays])
 
-  const activeCluster = clusters.find((c) => c.items.some((i) => i.id === selectedId)) ?? null
+  const activeCluster =
+    clusters.find((c) => c.items.some((i) => i.id === selectedItemId)) ?? null
   const activeIndex = activeCluster
-    ? activeCluster.items.findIndex((i) => i.id === selectedId)
+    ? activeCluster.items.findIndex((i) => i.id === selectedItemId)
     : -1
   const activeItem = activeIndex >= 0 ? activeCluster!.items[activeIndex] : null
+  const activeStay =
+    selected?.kind === 'stay' ? (stays.find((s) => s.id === selected.id) ?? null) : null
 
   // Keep the selected pin clear of the detail card, nudging only when it would
   // otherwise sit underneath it.
+  const activePoint = activeItem ?? activeStay
   useEffect(() => {
     const map = mapRef.current
     const el = containerRef.current
-    if (!map || !el || !activeItem) return
-    const point = map.project([activeItem.longitude, activeItem.latitude])
+    if (!map || !el || !activePoint) return
+    const point = map.project([activePoint.longitude, activePoint.latitude])
     const inset = { top: 56, right: 24, bottom: 230, left: 24 }
     const dx =
       point.x < inset.left
@@ -299,31 +426,34 @@ export function CollectionMap({
           : 0
     if (dx !== 0 || dy !== 0) map.panBy([dx, dy], { duration: 300 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeItem?.id])
+  }, [activePoint?.id])
 
   const step = useCallback(
     (delta: number) => {
       if (!activeCluster || activeIndex < 0) return
       const { items: group } = activeCluster
-      setSelectedId(group[(activeIndex + delta + group.length) % group.length].id)
+      setSelected({
+        kind: 'item',
+        id: group[(activeIndex + delta + group.length) % group.length].id,
+      })
     },
     [activeCluster, activeIndex]
   )
 
   useEffect(() => {
-    if (!activeItem) return
+    if (!selected) return
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       if (target?.closest('input, textarea, [contenteditable="true"]')) return
-      if (e.key === 'Escape') setSelectedId(null)
-      else if (e.key === 'ArrowRight') step(1)
-      else if (e.key === 'ArrowLeft') step(-1)
+      if (e.key === 'Escape') setSelected(null)
+      else if (activeItem && e.key === 'ArrowRight') step(1)
+      else if (activeItem && e.key === 'ArrowLeft') step(-1)
       else return
       e.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeItem, step])
+  }, [selected, activeItem, step])
 
   const groupSize = activeCluster?.items.length ?? 0
 
@@ -380,7 +510,7 @@ export function CollectionMap({
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(null)}
+                    onClick={() => setSelected(null)}
                     className="-mr-1 -mt-1 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
                     aria-label="Close"
                   >
@@ -488,7 +618,7 @@ export function CollectionMap({
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setSelectedId(item.id)}
+                      onClick={() => setSelected({ kind: 'item', id: item.id })}
                       className={cn(
                         'h-1.5 rounded-full transition-all',
                         index === activeIndex
@@ -513,6 +643,70 @@ export function CollectionMap({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeStay && (
+        <div className="absolute inset-x-2 bottom-10 z-[1100] sm:inset-x-3">
+          <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md">
+            <div className="flex gap-3 p-3">
+              <div
+                className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-lg text-white"
+                style={{ backgroundColor: STAY_COLOR }}
+              >
+                <BedDouble className="h-7 w-7" strokeWidth={1.5} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-2">
+                  <h3 className="min-w-0 flex-1 truncate font-medium text-foreground">
+                    {activeStay.name}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    className="-mr-1 -mt-1 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Close"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: STAY_COLOR }}
+                  >
+                    Stay
+                  </span>
+                  <span className="text-xs text-muted-foreground">{activeStay.city}</span>
+                </div>
+
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatStayRange(activeStay.check_in, activeStay.check_out)}
+                  <span className="mx-1.5 text-border">·</span>
+                  {stayNights(activeStay.check_in, activeStay.check_out)}
+                </p>
+
+                {stayAddress(activeStay) && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {stayAddress(activeStay)}
+                  </p>
+                )}
+
+                <div className="mt-1.5">
+                  <a
+                    href={mapsHref(activeStay)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    Open in Google Maps
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

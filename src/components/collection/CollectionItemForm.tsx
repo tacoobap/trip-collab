@@ -9,7 +9,8 @@ import { searchImage } from '@/lib/imageSearch'
 import { useImageDrop } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
-import { resolvePlaceLocation, type ResolvedPlace } from '@/lib/resolveMapsLink'
+import { useMapsLinkLocation } from '@/hooks/useMapsLinkLocation'
+import { MapsLinkStatus } from '@/components/shared/MapsLinkStatus'
 import type { CollectionItem, CollectionItemCategory } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,67 +64,23 @@ export function CollectionItemForm({
   const photoFieldRef = useRef<HTMLDivElement>(null)
   const revealPhotoRef = useRef(false)
 
-  // Some Maps links carry no position: a shortened one is only an id, and a
-  // `cid=` or name-only link never had coordinates. Both are worked out
-  // server-side. Results are tagged with the URL they were fetched for, so a
-  // stale answer for a link the user has since edited is simply ignored.
-  const [resolved, setResolved] = useState<{ forUrl: string; place: ResolvedPlace } | null>(null)
-  const [resolveError, setResolveError] = useState<{ forUrl: string; message: string } | null>(null)
+  const location = useMapsLinkLocation({
+    url: mapsUrl,
+    getToken,
+    lookupQuery: [name.trim(), destination?.trim()].filter(Boolean).join(', '),
+    lookupKey: destination,
+    // An expanded link is often the first thing that knows the name.
+    onLinkName: isEdit
+      ? undefined
+      : (placeName) => setName((current) => current.trim() || placeName),
+  })
 
-  const trimmedMapsUrl = mapsUrl.trim()
-  const urlParsed = trimmedMapsUrl ? parseGoogleMapsUrl(trimmedMapsUrl) : null
-  // Only worth asking the server when the link itself doesn't say where it is.
-  const needsResolving = !!trimmedMapsUrl && !urlParsed
-  const resolvedForThisUrl = resolved?.forUrl === trimmedMapsUrl ? resolved.place : null
-  const resolving =
-    needsResolving &&
-    resolved?.forUrl !== trimmedMapsUrl &&
-    resolveError?.forUrl !== trimmedMapsUrl
-
-  useEffect(() => {
-    if (!needsResolving) return
-    let cancelled = false
-    const lookup = [name.trim(), destination?.trim()].filter(Boolean).join(', ')
-    resolvePlaceLocation(
-      { url: trimmedMapsUrl, query: lookup || null },
-      getToken
-    )
-      .then((place) => {
-        if (cancelled) return
-        setResolved({ forUrl: trimmedMapsUrl, place })
-        // An expanded link is often the first thing that knows the name.
-        if (place.source === 'link' && place.placeName && !isEdit) {
-          setName((current) => current.trim() || place.placeName!)
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        setResolveError({
-          forUrl: trimmedMapsUrl,
-          message: err instanceof Error ? err.message : 'Could not locate that place',
-        })
-      })
-    return () => {
-      cancelled = true
-    }
-    // `name` is read for the lookup but must not retrigger it on every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trimmedMapsUrl, needsResolving, isEdit, getToken, destination])
-
-  const effectiveMapsUrl = resolvedForThisUrl?.url ?? trimmedMapsUrl
-  const parsed =
-    urlParsed ??
-    (resolvedForThisUrl
-      ? {
-          latitude: resolvedForThisUrl.latitude,
-          longitude: resolvedForThisUrl.longitude,
-          placeName: resolvedForThisUrl.placeName,
-        }
-      : null)
+  const effectiveMapsUrl = location.effectiveUrl
+  const parsed = location.position
   // A geocoded `placeName` is a postal address ("Vidyarthi Bhavan, 32, Gandhi
   // Bazaar Main Road, …"), which finds no photo. Use what the user called it.
   const searchQuery = parsed
-    ? resolvedForThisUrl?.source === 'search'
+    ? location.source === 'search'
       ? name.trim() || null
       : parsed.placeName?.trim() || name.trim() || null
     : null
@@ -282,30 +239,7 @@ export function CollectionItemForm({
           type="url"
           className="w-full min-w-0"
         />
-        {resolving && (
-          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            This link doesn’t include a location — looking it up…
-          </p>
-        )}
-        {parsed && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Location: {parsed.latitude.toFixed(4)}, {parsed.longitude.toFixed(4)}
-            {parsed.placeName && ` · ${parsed.placeName}`}
-          </p>
-        )}
-        {resolvedForThisUrl?.source === 'search' && (
-          <p className="text-xs text-warning-foreground/80 mt-1">
-            Found by searching the name, not from the link — worth a glance to
-            check it’s the right place.
-          </p>
-        )}
-        {!resolving && !parsed && resolveError?.forUrl === trimmedMapsUrl && (
-          <p className="text-xs text-muted-foreground mt-1">
-            {resolveError.message}. It’s still saved as a link — it just won’t
-            show on the map.
-          </p>
-        )}
+        <MapsLinkStatus location={location} />
         {fetchImageLoading && (
           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
             <Loader2 className="w-3 h-3 animate-spin" />

@@ -1,16 +1,29 @@
 import { isShortMapsUrl } from '@/lib/parseGoogleMapsUrl'
-import type { CollectionItem } from '@/types/database'
+import type { CollectionItem, Stay } from '@/types/database'
 
 /** A collection item that parsed to real coordinates, so it can be pinned. */
 export type MappableItem = CollectionItem & { latitude: number; longitude: number }
 
-export function hasCoordinates(item: CollectionItem): item is MappableItem {
+/** A stay that parsed to real coordinates, so it can be pinned. */
+export type MappableStay = Stay & { latitude: number; longitude: number }
+
+function hasFinitePosition<T extends { latitude?: number | null; longitude?: number | null }>(
+  value: T
+): value is T & { latitude: number; longitude: number } {
   return (
-    typeof item.latitude === 'number' &&
-    typeof item.longitude === 'number' &&
-    Number.isFinite(item.latitude) &&
-    Number.isFinite(item.longitude)
+    typeof value.latitude === 'number' &&
+    typeof value.longitude === 'number' &&
+    Number.isFinite(value.latitude) &&
+    Number.isFinite(value.longitude)
   )
+}
+
+export function hasCoordinates(item: CollectionItem): item is MappableItem {
+  return hasFinitePosition(item)
+}
+
+export function hasStayCoordinates(stay: Stay): stay is MappableStay {
+  return hasFinitePosition(stay)
 }
 
 /** An item that links to a place but has no coordinates, so it can't be pinned. */

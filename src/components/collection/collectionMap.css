@@ -176,3 +176,71 @@
 .tc-pin--active .tc-pin__stem {
   transform: translateY(2px) scale(1.15);
 }
+
+/* ── Stay pins ─────────────────────────────────────────────────────────────
+   A stay isn't one more idea, so it isn't a round photo disc: it's a bed on a
+   violet square, never folded into a cluster and stacked above the pins. Its
+   name is on the card that opens when it's clicked, not on the map, so it
+   never covers the places around it. */
+
+.tc-stay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  /* Above the place pins, below an opened one (`.tc-pin--active`). */
+  z-index: 6;
+}
+
+.tc-stay__body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--stay);
+  color: #fff;
+  box-shadow:
+    0 0 0 2.5px hsl(var(--card)),
+    0 2px 6px rgb(0 0 0 / 0.3);
+  transition: transform 140ms ease;
+}
+
+.tc-stay__icon {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+
+.tc-stay__stem {
+  width: 0;
+  height: 0;
+  margin-top: 2px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 7px solid var(--stay);
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+  transition: transform 140ms ease;
+  transform-origin: top center;
+}
+
+.tc-stay:hover .tc-stay__body {
+  transform: scale(1.08);
+}
+
+.tc-stay--active {
+  z-index: 1001;
+}
+
+.tc-stay--active .tc-stay__body {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 0 2.5px var(--stay),
+    0 0 0 6px hsl(var(--card)),
+    0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+.tc-stay--active .tc-stay__stem {
+  transform: translateY(2px) scale(1.15);
+}
