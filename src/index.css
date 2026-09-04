@@ -119,16 +119,15 @@
   }
 }
 
-@layer utilities {
-  .font-serif {
-    font-family: 'Playfair Display', serif;
-  }
-  .font-sans {
-    font-family: 'DM Sans', sans-serif;
-  }
+@layer components {
   /* Expands a small control's tap area to ~44px without changing how it
      looks or how it sits in a row. Only for controls with clear space
-     around them — overlapping hit areas steal each other's taps. */
+     around them — overlapping hit areas steal each other's taps.
+     Lives in `components`, not `utilities`: the `position: relative` is only a
+     default for a static control, and from the utilities layer it silently beat
+     an `absolute` sitting alongside it in the same class list — which dropped
+     the grid's evening toggle out of its corner and into the top of the
+     gutter, where it read as a stray, clickable hour label. */
   .touch-target {
     position: relative;
   }
@@ -136,6 +135,15 @@
     content: '';
     position: absolute;
     inset: -0.875rem;
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: 'Playfair Display', serif;
+  }
+  .font-sans {
+    font-family: 'DM Sans', sans-serif;
   }
 
   /* Charleston-style hero byline: light sans, uppercase, letter-spacing */

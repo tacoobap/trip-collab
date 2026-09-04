@@ -642,13 +642,18 @@ export function TimeGridBoard({
   }
 
   const hourLabels = useMemo(() => {
-    const out: { top: number; text: string }[] = []
-    for (let h = gridStart / 60 + 1; h < gridEnd / 60; h++) {
+    const out: { top: number; text: string; first: boolean }[] = []
+    for (let h = gridStart / 60; h < gridEnd / 60; h++) {
       // h can exceed 24 once a late event opens the small hours.
       const hh = h % 24
       out.push({
         top: ((h * 60 - gridStart) / 60) * HOUR_PX,
         text: hh === 0 ? '12 AM' : hh < 12 ? `${hh} AM` : hh === 12 ? '12 PM' : `${hh - 12} PM`,
+        // The opening hour is named too — without it the top line was the one
+        // line on the board you had to infer. It hangs below its line rather
+        // than straddling it, since the sticky day header would eat the half
+        // that sits above.
+        first: h === gridStart / 60,
       })
     }
     return out
@@ -740,7 +745,7 @@ export function TimeGridBoard({
           {/* Hour gutter — sticky against horizontal scroll */}
           <div className="w-9 sm:w-12 shrink-0 sticky left-0 z-[25] bg-background">
             <div
-              className="sticky top-0 z-[5] bg-background flex items-end justify-end pb-1.5 pr-1"
+              className="sticky top-0 z-[5] bg-background flex items-end justify-end pb-3 pr-1"
               style={{ height: DAY_HEADER_PX }}
             >
               {gridStart > 0 ? (
@@ -748,25 +753,24 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setNightOpen(true)}
-                  className="touch-target text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className={cn(
+                    'touch-target rounded-full px-0.5 sm:px-1 py-0.5 text-[10px] leading-none whitespace-nowrap tabular-nums transition-colors',
+                    hiddenEarly
+                      ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                      : 'bg-muted/70 text-muted-foreground/50 hover:text-muted-foreground'
+                  )}
                   title={edgeHint('up', hiddenEarly, gridStart)}
                   aria-label={edgeHint('up', hiddenEarly, gridStart)}
                 >
                   <span className="sm:hidden">▴ 12a</span>
                   <span className="hidden sm:inline">▴ 12 AM</span>
-                  {hiddenEarly && (
-                    <span
-                      aria-hidden
-                      className="ml-0.5 inline-block w-1 h-1 rounded-full bg-primary align-middle"
-                    />
-                  )}
                 </button>
               ) : gridStartAuto > 0 ? (
                 <button
                   type="button"
                   data-grid-ignore
                   onClick={() => setNightOpen(false)}
-                  className="touch-target text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target rounded-full bg-muted/70 px-0.5 sm:px-1 py-0.5 text-[10px] leading-none whitespace-nowrap text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title="Hide the empty early morning"
                 >
                   ▾ hide
@@ -777,43 +781,49 @@ export function TimeGridBoard({
               {hourLabels.map((l) => (
                 <span
                   key={l.top}
-                  className="absolute right-1.5 sm:right-2 -translate-y-1/2 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap"
+                  className={cn(
+                    'absolute right-1.5 sm:right-2 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap',
+                    l.first ? 'pt-0.5' : '-translate-y-1/2'
+                  )}
                   style={{ top: l.top }}
                 >
                   {l.text}
                 </span>
               ))}
 
-              {/* Evening toggle — the mirror of the morning one up top */}
+              {/* Evening toggle — the mirror of the morning one up top, and
+                  right-aligned by the same flex row so it can't outgrow the
+                  gutter on a phone. */}
+              <div className="absolute inset-x-0 bottom-1 flex justify-end pr-1">
               {gridEnd < gridEndMax ? (
                 <button
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(true)}
-                  className="touch-target absolute right-1.5 sm:right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className={cn(
+                    'touch-target rounded-full px-0.5 sm:px-1 py-0.5 text-[10px] leading-none whitespace-nowrap tabular-nums transition-colors',
+                    hiddenLate
+                      ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                      : 'bg-muted/70 text-muted-foreground/50 hover:text-muted-foreground'
+                  )}
                   title={edgeHint('down', hiddenLate, gridEnd)}
                   aria-label={edgeHint('down', hiddenLate, gridEnd)}
                 >
                   <span className="sm:hidden">▾ 12a</span>
                   <span className="hidden sm:inline">▾ 12 AM</span>
-                  {hiddenLate && (
-                    <span
-                      aria-hidden
-                      className="ml-0.5 inline-block w-1 h-1 rounded-full bg-primary align-middle"
-                    />
-                  )}
                 </button>
               ) : gridEndAuto < gridEndMax ? (
                 <button
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(false)}
-                  className="touch-target absolute right-1.5 sm:right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target rounded-full bg-muted/70 px-0.5 sm:px-1 py-0.5 text-[10px] leading-none whitespace-nowrap text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title="Hide the empty late hours"
                 >
                   ▴ hide
                 </button>
               ) : null}
+              </div>
             </div>
           </div>
 
