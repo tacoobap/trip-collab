@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { X, LockOpen, Loader2, Trash2, ExternalLink } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { X, LockOpen, Loader2, Trash2, ExternalLink, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   addProposal,
   updateProposal,
   updateSlotIcon,
   updateSlotSchedule,
+  updateSlotStretchesGrid,
   setProposalVotes,
   lockSlot,
   unlockSlot,
@@ -24,7 +25,13 @@ import { AddProposalForm } from './AddProposalForm'
 import { PickFromCollectionModal } from './PickFromCollectionModal'
 import { Button } from '@/components/ui/button'
 import { formatTimeLabel, parseTimeToMinutes, minutesToTimeLabel } from '@/lib/timeUtils'
-import { slotStartMinutes, slotDurationMinutes, lockedProposalOf, slotTitle } from '@/lib/timeGrid'
+import {
+  slotStartMinutes,
+  slotDurationMinutes,
+  lockedProposalOf,
+  slotTitle,
+  gridStretchCost,
+} from '@/lib/timeGrid'
 import { cn } from '@/lib/utils'
 
 const TIME_CHIPS = ['9:00 AM', '11:00 AM', '12:00 PM', '3:00 PM', '5:00 PM', '7:00 PM']
@@ -190,6 +197,76 @@ function InlineTimeRange({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
         <span className="text-[10px] text-destructive leading-tight">{timeError}</span>
       )}
     </span>
+  )
+}
+
+/**
+ * Per-event opt-out from widening the board's hours.
+ *
+ * The board opens on every event, however lonely — a 6 AM airport run pulls
+ * all seven days down to 5 AM. That is usually right and occasionally awful,
+ * and the grid can't tell which from the times alone. So the call lives here,
+ * on the event that costs the hours, and only surfaces when there are hours to
+ * save: `gridStretchCost` is zero whenever the rest of the trip already
+ * reaches this far, and the row stays out of the way entirely.
+ */
+function GridStretchToggle({
+  slot,
+  days,
+  canEdit,
+}: {
+  slot: SlotWithProposals
+  days: DayWithSlots[]
+  canEdit: boolean
+}) {
+  const [saving, setSaving] = useState(false)
+  const cost = useMemo(() => gridStretchCost(days, slot.id), [days, slot.id])
+  const off = slot.stretches_grid === false
+
+  // Nothing to offer: this event sits inside the hours the trip already shows.
+  if (!canEdit || slotStartMinutes(slot) === null || (cost <= 0 && !off)) return null
+
+  const hours = Math.round((cost / 60) * 10) / 10
+  const savings = hours >= 1 ? `${hours % 1 === 0 ? hours : hours.toFixed(1)}h` : `${cost}min`
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setSaving(true)
+        void updateSlotStretchesGrid(slot.id, off).finally(() => setSaving(false))
+      }}
+      disabled={saving}
+      role="switch"
+      aria-checked={off}
+      title={
+        off
+          ? 'The board keeps the hours the rest of the trip needs; this event sits behind the 12 AM toggle.'
+          : `This event widens the board by ${savings} on every day. Turn on to keep the usual hours and leave it behind the 12 AM toggle.`
+      }
+      className={cn(
+        'inline-flex items-center gap-1.5 mt-2.5 text-[11px] rounded-full border px-2 py-1 transition-colors max-sm:min-h-[36px]',
+        off
+          ? 'border-primary/50 bg-primary/10 text-primary'
+          : 'border-border/60 text-muted-foreground/60 hover:border-primary/30 hover:text-foreground',
+        'disabled:opacity-50'
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'flex items-center justify-center w-3 h-3 rounded-[3px] border shrink-0',
+          off ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'
+        )}
+      >
+        {off && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+      </span>
+      Don’t widen the board for this
+      {!off && cost > 0 && (
+        <span className="text-muted-foreground/40 tabular-nums">saves {savings}</span>
+      )}
+      {saving && <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />}
+    </button>
   )
 }
 
@@ -534,6 +611,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   <span className="text-[11px] text-muted-foreground/30">or type above ↑</span>
                 </div>
                 )}
+
+                {/* Quiet by design: only an event that actually costs the board
+                    hours gets to mention it. */}
+                <GridStretchToggle slot={slot} days={days} canEdit={canEdit} />
               </div>
 
               {/* Body — flex-1 + min-h-0 so it gets bounded height and scrolls.

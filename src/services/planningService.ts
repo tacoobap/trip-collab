@@ -521,6 +521,18 @@ export async function updateSlotIcon(slotId: string, icon: string): Promise<void
   await updateDoc(doc(db, 'slots', slotId), { icon })
 }
 
+/**
+ * Opt one event in or out of stretching the board's visible hours. Written as
+ * an explicit boolean rather than deleting the field, so the drawer can show
+ * the setting as deliberately off rather than merely absent.
+ */
+export async function updateSlotStretchesGrid(
+  slotId: string,
+  stretches: boolean
+): Promise<void> {
+  await updateDoc(doc(db, 'slots', slotId), { stretches_grid: stretches })
+}
+
 export async function lockSlot(
   slotId: string,
   locked_proposal_id: string,

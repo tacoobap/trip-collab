@@ -179,14 +179,22 @@ export function TimeGridBoard({
           duration = preview.duration
           held = true
         }
-        if (start === null) untimedByDay[i].push(slot)
-        else timedByDay[dayIdx]?.push({ slot, start, duration, held })
+        if (start === null) {
+          untimedByDay[i].push(slot)
+          continue
+        }
+        // Wholly outside the visible window: dropped rather than drawn at an
+        // offset past either end, where it used to slide under the sticky day
+        // header as a headless sliver. The edge toggles name it instead. One
+        // that merely straddles an edge stays, clipped to the window below.
+        if (start + duration <= gridStart || start >= gridEnd) continue
+        timedByDay[dayIdx]?.push({ slot, start, duration, held })
       }
     })
 
     const placements = timedByDay.map((items) => layoutOverlaps(items))
     return { timedByDay, untimedByDay, placements }
-  }, [days, preview])
+  }, [days, preview, gridStart, gridEnd])
 
   // ── Draft (inline "what's planned?" card) ──────────────────────────────
   const commitDraft = useCallback(async () => {
@@ -838,17 +846,20 @@ export function TimeGridBoard({
               >
                 {timedByDay[i].map((item) => {
                   const placement = placements[i].get(item) ?? { col: 0, cols: 1 }
+                  // Geometry is clipped to the window at both ends; the card
+                  // still labels itself with its real range, so an event
+                  // running from 7 AM into a 9 AM window reads "7:00 – 10:00 AM"
+                  // at the very top rather than lying about when it starts.
+                  const visStart = Math.max(item.start, gridStart)
+                  const visEnd = Math.min(item.start + item.duration, gridEnd)
                   return (
                     <TimeGridCard
                       key={item.slot.id}
                       slot={item.slot}
                       start={item.start}
                       duration={item.duration}
-                      top={((item.start - gridStart) / 60) * HOUR_PX}
-                      height={Math.max(
-                        26,
-                        (Math.min(item.duration, gridEnd - item.start) / 60) * HOUR_PX - 3
-                      )}
+                      top={((visStart - gridStart) / 60) * HOUR_PX}
+                      height={Math.max(26, ((visEnd - visStart) / 60) * HOUR_PX - 3)}
                       col={placement.col}
                       cols={placement.cols}
                       held={item.held}

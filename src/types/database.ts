@@ -50,6 +50,13 @@ export type Slot = {
    */
   start_minutes?: number | null
   duration_minutes?: number | null
+  /**
+   * Whether this event's time may stretch the board's visible hours. Absent or
+   * true: it does, however lonely it is. False: the board keeps the window the
+   * rest of the trip needs and this sits behind the 12 AM edge toggle — for the
+   * 6 AM airport run that would otherwise cost every day three empty hours.
+   */
+  stretches_grid?: boolean
 }
 
 export type Proposal = {
