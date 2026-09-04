@@ -21,13 +21,6 @@ export const DEFAULT_GRID_END_MIN = 22 * 60
 export const MIN_AUTO_GRID_END_MIN = 21 * 60
 /** Duration given to a shelf item when it's dragged onto the timeline. */
 export const SHELF_DROP_DURATION_MIN = 90
-/**
- * How far one day's extreme has to sit beyond every other day's before the
- * grid stops stretching to reach it. A single 11:30 PM flight shouldn't cost
- * all seven days three empty evening hours — it goes behind the edge toggle,
- * which names it, instead.
- */
-export const EDGE_OUTLIER_GAP_MIN = 2 * 60
 /** Fixed day-header height — identical across columns so timelines align. */
 export const DAY_HEADER_PX = 156
 
@@ -75,46 +68,30 @@ export function formatMinuteRange(start: number, duration: number): string {
   return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)} – ${b}` : `${a} – ${b}`
 }
 
-/** Each day's own first start and last end, for the outlier test per edge. */
-function perDayExtremes(days: DayWithSlots[]): { starts: number[]; ends: number[] } {
-  const starts: number[] = []
-  const ends: number[] = []
+/**
+ * Whether this event's time may stretch the board's visible hours. Every event
+ * does by default; `stretches_grid: false` is the per-event opt-out for the
+ * 6 AM airport run that would otherwise cost every day three empty small hours.
+ */
+export function slotStretchesGrid(slot: SlotWithProposals): boolean {
+  return slot.stretches_grid !== false
+}
+
+/** The trip's earliest start and latest end, opted-out events left out. */
+function stretchExtremes(days: DayWithSlots[]): { first: number | null; last: number | null } {
+  let first: number | null = null
+  let last: number | null = null
   for (const day of days) {
-    let first: number | null = null
-    let last: number | null = null
     for (const slot of day.slots) {
+      if (!slotStretchesGrid(slot)) continue
       const s = slotStartMinutes(slot)
       if (s === null) continue
       const end = s + slotDurationMinutes(slot)
       if (first === null || s < first) first = s
       if (last === null || end > last) last = end
     }
-    if (first !== null) starts.push(first)
-    if (last !== null) ends.push(last)
   }
-  return { starts, ends }
-}
-
-/**
- * The extreme actually worth stretching the shared scale to reach.
- *
- * The scale is shared by every day column, so the plain min/max lets one day
- * tax all the others: a single 11:30 PM landing, with nothing else past 8 PM,
- * costs all seven days three empty evening hours. When the outermost day sits
- * EDGE_OUTLIER_GAP_MIN or more beyond the next one, it's left out of the
- * window and the edge toggle names it instead — two such days aren't an
- * outlier any more, and the window grows to cover them.
- */
-function bulkExtreme(values: number[], dir: 'min' | 'max'): number | null {
-  if (values.length === 0) return null
-  const sorted = [...values].sort((a, b) => a - b)
-  if (sorted.length === 1) return sorted[0]
-  if (dir === 'max') {
-    const top = sorted[sorted.length - 1]
-    const next = sorted[sorted.length - 2]
-    return top - next >= EDGE_OUTLIER_GAP_MIN ? next : top
-  }
-  return sorted[1] - sorted[0] >= EDGE_OUTLIER_GAP_MIN ? sorted[1] : sorted[0]
+  return { first, last }
 }
 
 /**
@@ -123,12 +100,16 @@ function bulkExtreme(values: number[], dir: 'min' | 'max'): number | null {
  * doesn't open on a screenful of empty small hours — the common complaint
  * when the first thing anyone plans is a 10 AM coffee.
  *
+ * Every event counts, however lonely: one 6 AM flight opens the board at 5 AM
+ * for the whole trip. When that isn't worth it, the fix is to say so on the
+ * event itself (`stretches_grid: false`) rather than to have the grid guess.
+ *
  * Capped at MAX_AUTO_GRID_START_MIN so a trip that currently only has evening
  * plans still shows a morning to drop things into; the gutter toggle reveals
  * everything back to midnight either way.
  */
 export function computeGridStartMin(days: DayWithSlots[]): number {
-  const earliest = bulkExtreme(perDayExtremes(days).starts, 'min')
+  const earliest = stretchExtremes(days).first
   if (earliest === null) return DEFAULT_GRID_START_MIN
   return clampMinutes(Math.floor(earliest / 60) * 60 - 60, 0, MAX_AUTO_GRID_START_MIN)
 }
@@ -142,7 +123,7 @@ export function computeGridStartMin(days: DayWithSlots[]): number {
  * dinner into; the gutter toggle reveals everything to midnight either way.
  */
 export function computeGridEndMin(days: DayWithSlots[]): number {
-  const latest = bulkExtreme(perDayExtremes(days).ends, 'max')
+  const latest = stretchExtremes(days).last
   if (latest === null) return DEFAULT_GRID_END_MIN
   return clampMinutes(
     Math.ceil(latest / 60) * 60 + 60,
@@ -169,16 +150,42 @@ export function computeGridMaxEndMin(days: DayWithSlots[]): number {
   return latest
 }
 
+/**
+ * How many minutes of the board's window exist only because of this one event
+ * — hours added at the top edge plus hours added at the bottom. Zero when the
+ * rest of the trip already reaches as far, which is exactly when the per-event
+ * "don't widen the board" control has nothing to offer and stays out of sight.
+ *
+ * Measured against the event counted in, so an event already opted out still
+ * reports what turning it back on would cost.
+ */
+export function gridStretchCost(days: DayWithSlots[], slotId: string): number {
+  const without = days.map((d) => ({ ...d, slots: d.slots.filter((s) => s.id !== slotId) }))
+  const included = days.map((d) => ({
+    ...d,
+    slots: d.slots.map((s) => (s.id === slotId ? { ...s, stretches_grid: true } : s)),
+  }))
+  return (
+    computeGridStartMin(without) -
+    computeGridStartMin(included) +
+    (computeGridEndMin(included) - computeGridEndMin(without))
+  )
+}
+
 export type EdgeSummary = { count: number; minutes: number; title: string }
 
-/** The events above the visible window, for the morning toggle to name. */
+/**
+ * The events above the visible window, for the morning toggle to name. Only
+ * the ones with nothing left to draw inside it — an event that straddles the
+ * edge is clipped, not hidden, so counting it here would double-report it.
+ */
 export function hiddenBefore(days: DayWithSlots[], gridStart: number): EdgeSummary | null {
   let count = 0
   let best: { at: number; slot: SlotWithProposals } | null = null
   for (const day of days) {
     for (const slot of day.slots) {
       const s = slotStartMinutes(slot)
-      if (s === null || s >= gridStart) continue
+      if (s === null || s + slotDurationMinutes(slot) > gridStart) continue
       count++
       if (best === null || s < best.at) best = { at: s, slot }
     }
