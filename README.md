@@ -39,6 +39,16 @@ Trip settings (profile menu → **Trip settings**) can mint a public link at `/i
 
 Turn a link off in Trip settings. That takes effect immediately, and creating a new one later issues a different address. The shared page sets `noindex` so a forwarded link stays out of search results.
 
+### Link previews
+
+Paste either link — the invite at `/trip/:slug` or the public itinerary at `/i/:token` — into a chat and the preview shows that trip's cover photo with the `Trup` lockup above its name, rather than the generic card every URL used to return.
+
+Both addresses are redirected (in `netlify.toml`, **above** the SPA catch-all) to the `link-preview` function, which rewrites the `og:` and `twitter:` tags before serving the same `index.html`. Only crawlers pay for that: a browser's request never touches Firestore, and `firebase-admin` is imported lazily so it isn't even initialised on that path. `og:title` is deliberately the wordmark on every link; the trip's own name rides in `og:description` and on the card.
+
+The card itself comes from `og-image`, which lays it out with satori and rasterises it with resvg — the cover photo is cropped to 1200×630 through Netlify's image CDN first, so the hosts `image_url` can point at have to stay listed under `[images] remote_images`. Its fonts and resvg's wasm live in `public/og/` and are fetched from the CDN at runtime rather than bundled. A trip with no cover photo gets the same card over the app's navy-to-golden wash.
+
+Note that this makes a trip's name, cover photo and dates readable by anyone holding the URL, without signing in — which is what a link preview is. The slug's random suffix is still the only thing gating an invite link, exactly as before.
+
 ## Scripts
 
 | Command   | Description        |
@@ -110,6 +120,8 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
   - `share-link` — mint or revoke a trip's public share token (members only).
   - `shared-trip` — public, unauthenticated read of a shared itinerary by token.
   - `delete-trip` — owner-only cascading delete of a trip and its documents.
+  - `link-preview` — serves `/trip/:slug` and `/i/:token` with per-trip meta tags.
+  - `og-image` — draws the 1200×630 card those tags point at.
 
   Note: `netlify/functions` isn't covered by `tsconfig.app.json` (which includes only `src`), so `npm run build` does **not** type-check it — esbuild strips types at deploy time without checking them. Type-check functions separately if you change them.
 

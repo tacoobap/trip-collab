@@ -82,6 +82,26 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
 - Bottom sheets cap at `sm:max-w-3xl` with `mx-auto` — centred by auto margins,
   never a translate, which framer-motion's own transform would overwrite.
 
+## Link previews
+
+`/trip/:slug` and `/i/:token` are redirected to the `link-preview` function in
+`netlify.toml`. Those two rules **must stay above the `/*` catch-all** — Netlify
+takes the first match, so moving them below it silently restores the old generic
+card with nothing failing.
+
+- The card is drawn by `og-image` with satori, then rasterised by resvg. Its
+  three fonts and resvg's `.wasm` live in `public/og/` and are **fetched from the
+  CDN at runtime**, not bundled — `included_files` paths differ between local dev
+  and Lambda, and this sidesteps that. Deleting anything in `public/og/` breaks
+  the card, not the build.
+- Satori collapses the space in `", 2026"` — it reads a comma followed by digits
+  as one numeric token — so `metaText` in `ogCard.ts` swaps in a non-breaking
+  space. Check any new text on the card at full size before trusting it.
+- `og:title` is the wordmark on every link on purpose, not an oversight. The trip
+  name lives in `og:description` and on the card itself.
+- Verify with a crawler UA, since a normal request is served the plain shell:
+  `curl -sA facebookexternalhit/1.1 <url> | grep 'og:'`
+
 ## Firestore
 
 - `day_number` is **derived from date order**, never stored independently. Anything

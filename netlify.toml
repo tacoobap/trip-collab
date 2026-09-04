@@ -1,8 +1,6 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  # Skip the build when a commit touches nothing that reaches dist/ (see script).
-  ignore = "bash scripts/netlify-ignore.sh"
 
 # Allow auth popup to close (Google sign-in); COOP block would otherwise prevent window.close()
 [[headers]]
@@ -13,6 +11,28 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+# `og-image` resizes a trip's cover photo through Netlify's image CDN before
+# drawing the card. Remote hosts have to be listed here or it refuses them —
+# these are the two places `image_url` can point at.
+[images]
+  remote_images = [
+    "https://raw\\.githubusercontent\\.com/.*",
+    "https://images\\.unsplash\\.com/.*",
+  ]
+
+# The two links people paste into a chat are served with meta tags describing
+# that trip. Both must stay above the catch-all, which would otherwise hand them
+# the same generic shell every other route gets.
+[[redirects]]
+  from = "/trip/:slug"
+  to = "/.netlify/functions/link-preview?kind=trip&id=:slug"
+  status = 200
+
+[[redirects]]
+  from = "/i/:token"
+  to = "/.netlify/functions/link-preview?kind=share&id=:token"
+  status = 200
 
 [[redirects]]
   from = "/*"
