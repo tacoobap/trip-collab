@@ -15,11 +15,10 @@ import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
 import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
-import { Loader2 } from 'lucide-react'
+import { Loader2, BedDouble, ListChecks, Pencil } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
-import { TripIdentity } from '@/components/trips/TripIdentity'
-import { TripActions } from '@/components/trips/TripActions'
 import { PlanningHistoryProvider } from '@/contexts/PlanningHistoryProvider'
+import { UndoButton } from '@/components/planning/UndoButton'
 
 export function TripPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -169,33 +168,10 @@ export function TripPage() {
   const dateRangeShort =
     startShort && endShort ? `${startShort} – ${endShort}` : startShort ?? endShort ?? null
 
-  // Rendered twice: folded into the page header from `lg` up, and in the trip
-  // bar below that. Same nodes, so the two can't drift apart.
-  const tripActions = (
-    <TripActions
-      onOpenTodos={() => setTodosOpen(true)}
-      onOpenStays={() => setStaysOpen(true)}
-      onCopyInviteLink={handleCopyInviteLink}
-      copied={copied}
-    />
-  )
-  const identityProps = {
-    name: trip.name,
-    dateRange,
-    dateRangeShort,
-    canEdit: isMember ?? false,
-    onEdit: () => setEditTripOpen(true),
-  }
-
   return (
     <PlanningHistoryProvider>
     <div className="h-dvh flex flex-col bg-background">
-      <PageHeader
-        trip={trip}
-        currentName={displayName ?? ''}
-        title={<TripIdentity {...identityProps} dense />}
-        actions={tripActions}
-      />
+      <PageHeader trip={trip} currentName={displayName ?? ''} />
       {user && isMember === false && (
         <div className="shrink-0 border-b border-warning/30 bg-warning/10">
           <div className="max-w-7xl mx-auto px-5 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -226,18 +202,66 @@ export function TripPage() {
         </div>
       )}
 
-      {/* Trip bar — only below `lg`, where the header has no room for the trip
-          name beside the nav. From `lg` up this is folded into the header. */}
-      <div className="shrink-0 border-b border-border bg-warm-white/50 lg:hidden">
+      <div className="shrink-0 border-b border-border bg-warm-white/50">
         <div className="max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
-          <TripIdentity {...identityProps} />
-          <div className="flex items-center gap-2 max-sm:gap-0.5 shrink-0">{tripActions}</div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
+                {trip.name}
+              </h2>
+              {(isMember ?? false) && (
+                <button
+                  type="button"
+                  onClick={() => setEditTripOpen(true)}
+                  className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  title="Edit trip"
+                  aria-label="Edit trip"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {dateRange && (
+              <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                <span className="sm:hidden">{dateRangeShort}</span>
+                <span className="hidden sm:inline">{dateRange}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 max-sm:gap-0.5 shrink-0">
+            <UndoButton />
+            <button
+              onClick={() => setTodosOpen(true)}
+              className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+              title="To-dos"
+              aria-label="To-dos"
+            >
+              <ListChecks className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setStaysOpen(true)}
+              className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+              title="Stays"
+              aria-label="Stays"
+            >
+              <BedDouble className="w-4 h-4" />
+            </button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCopyInviteLink}
+              className="max-sm:min-h-[40px]"
+            >
+              <span className="sm:hidden">{copied ? 'Copied' : 'Invite'}</span>
+              <span className="hidden sm:inline">{copied ? 'Link copied' : 'Invite link'}</span>
+            </Button>
+          </div>
         </div>
       </div>
       {/* The time grid owns its own two-axis scroll region, so the page
           itself must not scroll: cap the column at the viewport and let the
           board fill what's left. */}
-      <main className="flex-1 min-h-0 flex flex-col pt-5 px-5 sm:px-6 max-w-7xl mx-auto w-full min-w-0 max-sm:pt-3 lg:pt-3">
+      <main className="flex-1 min-h-0 flex flex-col pt-5 px-5 sm:px-6 max-w-7xl mx-auto w-full min-w-0 max-sm:pt-3">
         <PlanningBoard
           trip={trip}
           days={days}

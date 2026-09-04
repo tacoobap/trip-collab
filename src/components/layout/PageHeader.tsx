@@ -9,23 +9,12 @@ interface PageHeaderProps {
   currentName?: string | null
   /** When true (e.g. itinerary over full-screen hero), use dark transparent overlay; otherwise light bar */
   overHero?: boolean
-  /**
-   * The page's own identity — trip name and dates — folded into this bar from
-   * `lg` up, where there is room for it beside the centred nav. Below `lg` this
-   * stays hidden and the page renders its own bar underneath, as it always has.
-   * Merging saves the planning board 75px of permanent chrome on a laptop.
-   */
-  title?: React.ReactNode
-  /** The page's own controls, folded in beside the user menu from `lg` up. */
-  actions?: React.ReactNode
 }
 
 export function PageHeader({
   trip,
   currentName,
   overHero = false,
-  title,
-  actions,
 }: PageHeaderProps) {
   const location = useLocation()
   const isItinerary = location.pathname.endsWith('/itinerary')
@@ -34,7 +23,6 @@ export function PageHeader({
   const isDark = overHero
   const linkActive = isDark ? 'text-white bg-white/15' : 'border-primary text-foreground'
   const linkInactive = isDark ? 'text-white/70 hover:text-white' : 'border-transparent text-muted-foreground hover:text-foreground'
-  const merged = Boolean(title || actions)
 
   return (
     <header
@@ -46,46 +34,21 @@ export function PageHeader({
           : 'sticky top-0 bg-warm-white/80 backdrop-blur-sm border-border'
       )}
     >
-      <div
-        className={cn(
-          'relative max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3',
-          // The folded-in title is two lines tall, so the row can afford less
-          // padding and still clear the 44px it needs.
-          merged && 'lg:py-1.5'
-        )}
-      >
-        {/* Left: Trup, then the page's own title once it folds in. The cap keeps
-            a long trip name short of the centred nav — it lives here rather than
-            on the title itself, where a percentage would resolve against a
-            shrink-to-fit parent and collapse the name to nothing. */}
-        <div
+      <div className="relative max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3">
+        {/* Left: Trup */}
+        <Link
+          to="/home"
           className={cn(
-            'flex items-center gap-2 min-w-0 z-10',
-            merged && 'lg:max-w-[calc(50%-9rem)]'
+            'flex items-center gap-1.5 shrink-0 transition-colors z-10',
+            isDark ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
           )}
+          title="Trup home"
         >
-          <Link
-            to="/home"
-            className={cn(
-              'flex items-center gap-1.5 shrink-0 transition-colors',
-              isDark ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
-            )}
-            title="Trup home"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span
-              className={cn(
-                'hidden sm:block text-xs font-semibold tracking-wide uppercase',
-                // The trip name takes this spot once it folds in; the mark stays
-                // as the link home.
-                merged && 'lg:hidden'
-              )}
-            >
-              Trup
-            </span>
-          </Link>
-          {title && <div className="hidden lg:block min-w-0">{title}</div>}
-        </div>
+          <Sparkles className="w-4 h-4" />
+          <span className="hidden sm:block text-xs font-semibold tracking-wide uppercase">
+            Trup
+          </span>
+        </Link>
 
         {/* Center: nav items */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 max-sm:gap-0">
@@ -118,11 +81,8 @@ export function PageHeader({
           </Link>
         </nav>
 
-        {/* Right: the page's own controls, then user avatar + dropdown menu */}
-        <div className="flex items-center gap-2 shrink-0 z-10">
-          {actions && <div className="hidden lg:flex items-center gap-2">{actions}</div>}
-          {currentName && <UserMenu isDark={isDark} tripSlug={trip.slug} />}
-        </div>
+        {/* Right: user avatar + dropdown menu */}
+        {currentName && <UserMenu isDark={isDark} tripSlug={trip.slug} />}
       </div>
     </header>
   )
