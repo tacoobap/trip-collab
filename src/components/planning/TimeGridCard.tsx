@@ -44,9 +44,19 @@ export function TimeGridCard({
   const isOpen = !isLocked && !hasProposals
   const isProposed = !isLocked && hasProposals
 
-  const slim = height <= 44
+  /**
+   * One inline row, time and title sharing a line. Driven by duration, not
+   * height: an hour-long event puts its name *under* the time, which reads
+   * better than eliding it into the time row, and it should keep doing that
+   * whatever `HOUR_PX` is. Anything under an hour goes inline. The height floor
+   * catches an event clipped to a stub by the window edge, where two rows would
+   * not fit whatever its duration says.
+   */
+  const slim = duration < 60 || height <= 34
   /** Below this the roomy padding and loose leading stop fitting. */
   const tight = height <= 84
+  /** Tighter again: an hour is 43px at 46px/hour, and two rows only just fit. */
+  const cramped = !slim && height <= 56
   /** Under 90 minutes there's room for the time and one line of title. */
   const oneLine = height <= 60
   const showMicro = isProposed && height >= 92
@@ -74,7 +84,7 @@ export function TimeGridCard({
       className={cn(
         'group absolute overflow-hidden rounded-lg outline-none select-none',
         '[-webkit-touch-callout:none]',
-        slim ? 'px-2.5 py-1' : tight ? 'px-3 py-1' : 'px-3 py-2',
+        slim ? 'px-2.5 py-1' : cramped ? 'px-3 py-0.5' : tight ? 'px-3 py-1' : 'px-3 py-2',
         canEdit ? 'cursor-grab' : 'cursor-pointer',
         'focus-visible:ring-2 focus-visible:ring-primary',
         !held && 'transition-[background-color,border-color,box-shadow,opacity,transform] duration-150',
@@ -92,7 +102,10 @@ export function TimeGridCard({
         <span className={cn('shrink-0 leading-none', slim || tight ? 'text-sm' : 'text-base')}>
           {slot.icon ?? CATEGORY_ICONS[slot.category] ?? '📌'}
         </span>
-        <span className="text-xs font-medium text-muted-foreground truncate tabular-nums">
+        {/* Never truncated. On a slim card the title shares this row, and both
+            shrinking left the time reading "12:30 – 1:…", which is worse than
+            no title at all — the time is the one thing the card must say. */}
+        <span className="shrink-0 whitespace-nowrap text-xs font-medium text-muted-foreground tabular-nums">
           {formatMinuteRange(start, duration)}
         </span>
         {slim && !isOpen && (
@@ -106,7 +119,7 @@ export function TimeGridCard({
       </div>
 
       {!slim && (
-        <div className={tight ? 'mt-0.5 leading-tight' : 'mt-1'}>
+        <div className={cramped ? 'leading-tight' : tight ? 'mt-0.5 leading-tight' : 'mt-1'}>
           {isOpen && (
             <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground/50">
               <Plus className="w-3.5 h-3.5" />

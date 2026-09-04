@@ -10,7 +10,7 @@ import { CityTag } from '@/components/shared/CityTag'
 import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
 import { CATEGORY_ICONS } from '@/lib/slotEmojis'
 import { DAY_HEADER_PX, lockedProposalOf } from '@/lib/timeGrid'
-import { Camera, Loader2, Upload, Sparkles, Pencil } from 'lucide-react'
+import { Camera, Loader2, Upload, Sparkles, Pencil, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TimeGridDayHeaderProps {
@@ -273,8 +273,11 @@ export function TimeGridDayHeader({
                 type="button"
                 onClick={() => setAddingChip(true)}
                 className={cn(
-                  'shrink-0 inline-flex items-center gap-1 rounded-full border border-dashed',
-                  'px-2.5 py-1.5 text-[11px] transition-colors',
+                  'shrink-0 inline-flex items-center justify-center rounded-full border border-dashed',
+                  // Sized to the chips beside it. Deliberately no `.touch-target`:
+                  // its ::after would reach 14px back over the last chip and
+                  // swallow the drag that starts there.
+                  'w-7 h-7 transition-colors',
                   // A bright photo washes out a light-weight control, so the
                   // on-photo variant carries its own scrim.
                   onPhoto
@@ -282,8 +285,9 @@ export function TimeGridDayHeader({
                     : 'border-border bg-background/70 text-muted-foreground/60 hover:text-primary hover:border-primary/50'
                 )}
                 title="Park something on this day without a time yet"
+                aria-label="Park something on this day without a time yet"
               >
-                {untimed.length > 0 ? '\uff0b' : '\uff0b sometime that day\u2026'}
+                <Plus className="w-3.5 h-3.5" />
               </button>
             )
           )}
