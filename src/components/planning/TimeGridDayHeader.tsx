@@ -154,10 +154,21 @@ export function TimeGridDayHeader({
       })
     : null
 
+  const hasPhoto = Boolean(day.image_url)
+  /** White-on-image treatment. An empty day has no scrim to read against. */
+  const onPhoto = hasPhoto
+
   return (
     <div
       {...dropHandlers}
-      className="sticky top-0 z-20 bg-background border-b border-border flex flex-col pt-2"
+      // The whole header is the unschedule target now that parked ideas float
+      // on the photo instead of occupying a row of their own. `data-shelf` is
+      // what TimeGridBoard hit-tests, one per column, in column order.
+      data-shelf={day.id}
+      className={cn(
+        'sticky top-0 z-20 bg-background border-b border-border',
+        shelfHighlighted && 'ring-2 ring-inset ring-primary/60'
+      )}
       style={{ height: DAY_HEADER_PX }}
     >
       {isDragging && (
@@ -168,26 +179,6 @@ export function TimeGridDayHeader({
         </div>
       )}
 
-      {/* Photo strip — fixed height, placeholder when unset, so timelines align */}
-      <div
-        className={cn(
-          'relative h-20 shrink-0 rounded-lg overflow-hidden',
-          !day.image_url &&
-            'border border-dashed border-border flex items-center justify-center'
-        )}
-      >
-        {day.image_url ? (
-          <img src={day.image_url} alt={day.label} className="w-full h-full object-cover" />
-        ) : (
-          <Camera className="w-3.5 h-3.5 text-muted-foreground/30" aria-hidden />
-        )}
-        {imageWorking && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <Loader2 className="w-4 h-4 text-white animate-spin" />
-          </div>
-        )}
-      </div>
-
       <input
         ref={fileInputRef}
         type="file"
@@ -196,38 +187,174 @@ export function TimeGridDayHeader({
         onChange={handleImageChange}
       />
 
-      <div className="flex items-center justify-between gap-2 mt-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="font-serif font-semibold text-base text-foreground leading-tight shrink-0">
-            Day {day.day_number}
-          </h3>
-          {dateText && (
-            <span className="text-[11px] text-muted-foreground truncate">{dateText}</span>
+      {/* The photo is the header: it fills the column and carries the day label
+          on a scrim, so a photo, a label row and a shelf row stop being three
+          stacked things. Costs 44px a column against the old layout while
+          leaving the photo itself taller than it was. */}
+      <div
+        className={cn(
+          'relative w-full h-full overflow-hidden rounded-lg',
+          !hasPhoto && 'border border-dashed border-border bg-muted/40'
+        )}
+      >
+        {hasPhoto ? (
+          <img
+            src={day.image_url ?? undefined}
+            alt={day.label}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <Camera
+            className="absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/30"
+            aria-hidden
+          />
+        )}
+        {imageWorking && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <Loader2 className="w-4 h-4 text-white animate-spin" />
+          </div>
+        )}
+
+        {/* "Sometime this day" — chips float along the top of the photo. They
+            carry their own background so they read over any image. */}
+        <div
+          className={cn(
+            'absolute inset-x-1 top-1 z-10 flex items-center gap-1.5 overflow-x-auto',
+            '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           )}
-          {onEditDay && (
+        >
+          {untimed.map((slot) => (
             <button
+              key={slot.id}
+              data-chip-id={slot.id}
               type="button"
-              data-grid-ignore
-              onClick={() => onEditDay(day)}
-              className="touch-target shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-manipulation p-0.5 rounded"
-              title="Edit day"
-              aria-label="Edit day"
+              title={chipTitle(slot)}
+              style={{ touchAction: 'pan-x pan-y' }}
+              className={cn(
+                'shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border/60',
+                'bg-background/90 backdrop-blur-sm shadow-sm',
+                'pl-2 pr-2.5 py-1.5 text-[11px] font-medium text-foreground max-w-[190px] select-none',
+                '[-webkit-touch-callout:none] transition-transform',
+                canEdit ? 'cursor-grab' : 'cursor-pointer',
+                armedChipId === slot.id && 'scale-110 ring-2 ring-primary/50 shadow-md',
+                liftedChipId === slot.id && 'opacity-40'
+              )}
             >
-              <Pencil className="w-3 h-3" />
+              <span className="leading-none">
+                {slot.icon ?? CATEGORY_ICONS[slot.category] ?? '\ud83d\udccc'}
+              </span>
+              <span className="truncate">{chipTitle(slot)}</span>
             </button>
+          ))}
+
+          {canEdit && onAddUntimed && (
+            addingChip ? (
+              <input
+                data-grid-ignore
+                autoFocus
+                value={chipTitleDraft}
+                disabled={savingChip}
+                onChange={(e) => setChipTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void commitChip()
+                  if (e.key === 'Escape') {
+                    setAddingChip(false)
+                    setChipTitleDraft('')
+                  }
+                }}
+                onBlur={() => void commitChip()}
+                placeholder="e.g. browse the market"
+                className="shrink-0 w-36 max-sm:w-56 rounded-full border border-primary bg-card px-2.5 py-1 max-sm:py-0.5 text-[11px] max-sm:text-base max-sm:leading-tight text-foreground outline-none placeholder:text-muted-foreground/50"
+                aria-label="Add something for sometime this day"
+              />
+            ) : (
+              <button
+                data-grid-ignore
+                type="button"
+                onClick={() => setAddingChip(true)}
+                className={cn(
+                  'shrink-0 inline-flex items-center gap-1 rounded-full border border-dashed',
+                  'px-2.5 py-1.5 text-[11px] transition-colors',
+                  // A bright photo washes out a light-weight control, so the
+                  // on-photo variant carries its own scrim.
+                  onPhoto
+                    ? 'border-white/60 bg-black/45 text-white/90 hover:bg-black/60 hover:text-white'
+                    : 'border-border bg-background/70 text-muted-foreground/60 hover:text-primary hover:border-primary/50'
+                )}
+                title="Park something on this day without a time yet"
+              >
+                {untimed.length > 0 ? '\uff0b' : '\uff0b sometime that day\u2026'}
+              </button>
+            )
           )}
         </div>
-        <div className="flex items-center gap-1.5 min-w-0">
-          {day.city && (
-            <CityTag city={day.city} className="bg-muted/80 text-muted-foreground border-border" />
+
+        {/* Day number, date and city, read against a scrim on a photo */}
+        <div
+          className={cn(
+            'absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 px-1.5 pb-1 pt-6',
+            onPhoto && 'bg-gradient-to-t from-black/75 via-black/30 to-transparent'
           )}
-          {canEdit && (
-            <div className="relative shrink-0">
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3
+              className={cn(
+                'font-serif font-semibold text-base leading-tight shrink-0',
+                onPhoto ? 'text-white' : 'text-foreground'
+              )}
+            >
+              Day {day.day_number}
+            </h3>
+            {dateText && (
+              <span
+                className={cn(
+                  'text-[11px] truncate',
+                  onPhoto ? 'text-white/85' : 'text-muted-foreground'
+                )}
+              >
+                {dateText}
+              </span>
+            )}
+            {onEditDay && (
+              <button
+                type="button"
+                data-grid-ignore
+                onClick={() => onEditDay(day)}
+                className={cn(
+                  'touch-target shrink-0 transition-colors touch-manipulation p-0.5 rounded',
+                  onPhoto
+                    ? 'text-white/75 hover:text-white'
+                    : 'text-muted-foreground/50 hover:text-muted-foreground'
+                )}
+                title="Edit day"
+                aria-label="Edit day"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {day.city && (
+              <CityTag
+                city={day.city}
+                className={cn(
+                  onPhoto
+                    ? 'bg-white/90 text-foreground border-transparent'
+                    : 'bg-muted/80 text-muted-foreground border-border'
+                )}
+              />
+            )}
+            {canEdit && (
               <button
                 data-grid-ignore
                 onClick={() => setPhotoMenuOpen((v) => !v)}
                 disabled={imageWorking}
-                className="touch-target text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40 touch-manipulation p-0.5"
+                className={cn(
+                  'touch-target transition-colors disabled:opacity-40 touch-manipulation p-0.5 shrink-0',
+                  onPhoto
+                    ? 'text-white/75 hover:text-white'
+                    : 'text-muted-foreground/50 hover:text-muted-foreground'
+                )}
                 title={day.image_url ? 'Change day photo' : 'Add day photo'}
                 aria-label={day.image_url ? 'Change day photo' : 'Add day photo'}
               >
@@ -239,125 +366,54 @@ export function TimeGridDayHeader({
                   <Camera className="w-3 h-3" />
                 )}
               </button>
-
-              {photoMenuOpen && (
-                <>
-                  <div
-                    data-grid-ignore
-                    className="fixed inset-0 z-40"
-                    onClick={() => setPhotoMenuOpen(false)}
-                  />
-                  <div
-                    data-grid-ignore
-                    className="absolute right-0 top-full mt-1.5 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[200px]"
-                  >
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span>
-                        Upload from computer
-                        <span className="block text-[11px] text-muted-foreground font-normal">
-                          or drop one onto the day
-                        </span>
-                      </span>
-                    </button>
-                    <div className="px-4 py-2.5 border-t border-border">
-                      <ImagePasteBox className="w-full" label="Paste an image here" />
-                    </div>
-                    <button
-                      onClick={handleAutoImage}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span>
-                        Let AI embarrass you
-                        <span className="block text-[11px] text-muted-foreground font-normal">
-                          finds a photo for this day
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* "Sometime this day" shelf — drop target for unscheduling */}
-      <div
-        data-shelf={day.id}
-        className={cn(
-          'flex-1 min-h-0 mt-1 flex items-center gap-1.5 overflow-x-auto rounded-lg',
-          '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          shelfHighlighted &&
-            'outline-dashed outline-1 outline-primary outline-offset-2 bg-primary/5'
-        )}
-      >
-        {untimed.map((slot) => (
-          <button
-            key={slot.id}
-            data-chip-id={slot.id}
-            type="button"
-            title={chipTitle(slot)}
-            style={{ touchAction: 'pan-x pan-y' }}
-            className={cn(
-              'shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/80',
-              'pl-2 pr-2.5 py-1.5 text-[11px] font-medium text-foreground max-w-[190px] select-none',
-              '[-webkit-touch-callout:none] transition-transform',
-              canEdit ? 'cursor-grab' : 'cursor-pointer',
-              armedChipId === slot.id && 'scale-110 ring-2 ring-primary/50 shadow-md',
-              liftedChipId === slot.id && 'opacity-40'
-            )}
+      {/* The photo menu hangs below the header, outside the photo's
+          `overflow-hidden`, which would otherwise clip it. */}
+      {photoMenuOpen && (
+        <>
+          <div
+            data-grid-ignore
+            className="fixed inset-0 z-40"
+            onClick={() => setPhotoMenuOpen(false)}
+          />
+          <div
+            data-grid-ignore
+            className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-xl shadow-lg overflow-hidden min-w-[200px]"
           >
-            <span className="leading-none">
-              {slot.icon ?? CATEGORY_ICONS[slot.category] ?? '📌'}
-            </span>
-            <span className="truncate">{chipTitle(slot)}</span>
-          </button>
-        ))}
-
-        {canEdit && onAddUntimed && (
-          addingChip ? (
-            <input
-              data-grid-ignore
-              autoFocus
-              value={chipTitleDraft}
-              disabled={savingChip}
-              onChange={(e) => setChipTitleDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void commitChip()
-                if (e.key === 'Escape') {
-                  setAddingChip(false)
-                  setChipTitleDraft('')
-                }
-              }}
-              onBlur={() => void commitChip()}
-              placeholder="e.g. browse the market"
-              // 16px below sm so focusing it does not zoom iOS Safari; the
-              // wider pill and tighter padding keep it the height of the chips
-              // it sits beside on the shelf.
-              className="shrink-0 w-36 max-sm:w-56 rounded-full border border-primary bg-card px-2.5 py-1 max-sm:py-0.5 text-[11px] max-sm:text-base max-sm:leading-tight text-foreground outline-none placeholder:text-muted-foreground/50"
-              aria-label="Add something for sometime this day"
-            />
-          ) : (
             <button
-              data-grid-ignore
-              type="button"
-              onClick={() => setAddingChip(true)}
-              className={cn(
-                'shrink-0 inline-flex items-center gap-1 rounded-full border border-dashed border-border',
-                'px-2.5 py-1.5 text-[11px] text-muted-foreground/50 hover:text-primary hover:border-primary/50 transition-colors'
-              )}
-              title="Park something on this day without a time yet"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors"
             >
-              {untimed.length > 0 ? '＋' : '＋ sometime that day…'}
+              <Upload className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span>
+                Upload from computer
+                <span className="block text-[11px] text-muted-foreground font-normal">
+                  or drop one onto the day
+                </span>
+              </span>
             </button>
-          )
-        )}
-      </div>
+            <div className="px-4 py-2.5 border-t border-border">
+              <ImagePasteBox className="w-full" label="Paste an image here" />
+            </div>
+            <button
+              onClick={handleAutoImage}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors border-t border-border"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span>
+                Let AI embarrass you
+                <span className="block text-[11px] text-muted-foreground font-normal">
+                  finds a photo for this day
+                </span>
+              </span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

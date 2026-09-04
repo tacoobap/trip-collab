@@ -261,7 +261,7 @@ export function TripPage() {
       {/* The time grid owns its own two-axis scroll region, so the page
           itself must not scroll: cap the column at the viewport and let the
           board fill what's left. */}
-      <main className="flex-1 min-h-0 flex flex-col pt-5 px-5 sm:px-6 max-w-7xl mx-auto w-full min-w-0 max-sm:pt-3">
+      <main className="flex-1 min-h-0 flex flex-col pt-4 px-5 sm:px-6 max-w-7xl mx-auto w-full min-w-0 max-sm:pt-3">
         <PlanningBoard
           trip={trip}
           days={days}

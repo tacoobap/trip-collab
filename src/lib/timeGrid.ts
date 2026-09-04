@@ -6,7 +6,7 @@ import { parseTimeToMinutes, minutesToTimeLabel } from './timeUtils'
  * from midnight; all pixel values assume `HOUR_PX` pixels per hour.
  */
 
-export const HOUR_PX = 52
+export const HOUR_PX = 46
 export const SNAP_MIN = 15
 export const GRID_END_MIN = 24 * 60
 /** Where the grid renders from when the trip has nothing scheduled yet. */
@@ -21,8 +21,13 @@ export const DEFAULT_GRID_END_MIN = 22 * 60
 export const MIN_AUTO_GRID_END_MIN = 21 * 60
 /** Duration given to a shelf item when it's dragged onto the timeline. */
 export const SHELF_DROP_DURATION_MIN = 90
-/** Fixed day-header height — identical across columns so timelines align. */
-export const DAY_HEADER_PX = 156
+/**
+ * Fixed day-header height — identical across columns so timelines align. The
+ * photo fills the whole header and carries the day label and the parked-idea
+ * chips on top of it, rather than sitting above a label row and a shelf row,
+ * so 112px here is a *bigger* photo than the 156 it replaced.
+ */
+export const DAY_HEADER_PX = 112
 
 export function lockedProposalOf(slot: SlotWithProposals): Proposal | null {
   if (!slot.locked_proposal_id) return null

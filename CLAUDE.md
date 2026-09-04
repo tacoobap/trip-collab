@@ -75,6 +75,16 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
   (`DayColumn.tsx` / `SlotCard.tsx` are the old stacked board — still in the tree,
   no longer rendered. The `w-[calc(100vw-2.5rem)]` convention that used to live
   here is theirs, not the grid's.)
+- The day header **is** the photo: it fills all `DAY_HEADER_PX`, with the day
+  label on a bottom scrim and the "sometime this day" chips floating along the
+  top, instead of a photo, a label row and a shelf row stacked. Two consequences.
+  `data-shelf` now lives on the header root, so the whole header is the
+  unschedule drop target — `TimeGridBoard` hit-tests one `[data-shelf]` per
+  column in column order, so keep it to exactly one. And the photo box is
+  `overflow-hidden`, so anything that has to escape it — the photo menu popover
+  — renders as a sibling at the header root instead. A day with no photo swaps
+  the white-on-scrim treatment for ordinary text on a dashed muted ground; white
+  on a light placeholder is unreadable.
 - Don't call `getComputedStyle` (or other unknown globals) in a component body:
   the React Compiler eslint pass bails on the whole component and
   `react-hooks/preserve-manual-memoization` fails the build.
