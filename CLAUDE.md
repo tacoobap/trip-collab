@@ -54,6 +54,17 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
 - Mobile gutter is `px-5`, desktop `sm:px-6`, on every page container — the page
   header, the trip bar, and each page's `<main>`. Keep them in sync; they were
   drifting at 8/12/16px before.
+- The planning page has **one** top bar from `lg` up, two below it. `PageHeader`
+  takes optional `title`/`actions` nodes and folds them in beside the centred
+  nav at `lg`; `TripPage` renders the same `TripIdentity`/`TripActions` nodes
+  again in a `lg:hidden` trip bar for narrower screens. That is worth 83px of
+  permanent chrome on a laptop (300 → 217 above the timeline). `lg` is where it
+  lands because the absolutely-centred nav needs ~250px of its own: at `md` the
+  actions cluster would sit under the tabs. The left block is capped at
+  `lg:max-w-[calc(50%-9rem)]` so a long trip name truncates 17px short of the
+  nav — put that cap on the flex child, not on the title inside it, where a
+  percentage resolves against a shrink-to-fit parent and collapses the name to
+  nothing. Collection and Itinerary pass neither prop and are unchanged.
 - The planning board is the time grid in `TimeGridBoard.tsx`. On phones it shows
   one day per screen: each column is `calc(100vw-6.25rem)` — the viewport less
   the left page gutter (`px-5`), the `w-9` hour gutter (`sm:w-12`), the column
