@@ -928,7 +928,12 @@ export function TimeGridBoard({
                         onBlur={() => void commitDraft()}
                         placeholder="What's planned?"
                         aria-label="What's planned?"
-                        className="mt-0.5 w-full bg-transparent outline-none text-[13px] font-medium text-foreground placeholder:text-muted-foreground/50"
+                        // 16px below sm: iOS Safari zooms the page when a
+                        // focused input is any smaller, and this one is
+                        // autofocused the instant you tap the grid to add.
+                        // leading-tight keeps the taller text from growing the
+                        // dashed box more than a few pixels.
+                        className="mt-0.5 w-full bg-transparent outline-none text-[13px] max-sm:text-base max-sm:leading-tight font-medium text-foreground placeholder:text-muted-foreground/50"
                       />
                     </div>
                   </div>

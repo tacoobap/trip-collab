@@ -336,7 +336,10 @@ export function TimeGridDayHeader({
               }}
               onBlur={() => void commitChip()}
               placeholder="e.g. browse the market"
-              className="shrink-0 w-36 rounded-full border border-primary bg-card px-2.5 py-1 text-[11px] text-foreground outline-none placeholder:text-muted-foreground/50"
+              // 16px below sm so focusing it does not zoom iOS Safari; the
+              // wider pill and tighter padding keep it the height of the chips
+              // it sits beside on the shelf.
+              className="shrink-0 w-36 max-sm:w-56 rounded-full border border-primary bg-card px-2.5 py-1 max-sm:py-0.5 text-[11px] max-sm:text-base max-sm:leading-tight text-foreground outline-none placeholder:text-muted-foreground/50"
               aria-label="Add something for sometime this day"
             />
           ) : (
