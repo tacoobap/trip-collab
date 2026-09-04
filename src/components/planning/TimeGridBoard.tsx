@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { TouchEvent as ReactTouchEvent } from 'react'
 import type { DayWithSlots, SlotWithProposals, Trip } from '@/types/database'
 import { addLockedSlot, updateSlotSchedule } from '@/services/planningService'
 import { minutesToTimeLabel } from '@/lib/timeUtils'
@@ -53,6 +54,44 @@ function edgeHint(
 const LIFT_DELAY_MS = 350
 /** Movement before the lift fires proves the finger meant to scroll. */
 const LIFT_TOLERANCE_PX = 8
+
+/** How far a touch travels before the board judges which axis it meant. */
+const SWIPE_AXIS_PX = 12
+/**
+ * How much more sideways than vertical that travel has to be to page days —
+ * about 35° off horizontal. Anything steeper scrolls the hours instead.
+ */
+const SWIPE_AXIS_RATIO = 1.4
+/** How much of a column a sideways swipe must cover to commit to the next day. */
+const SWIPE_COMMIT_FRACTION = 0.25
+/** …or the flick speed, in px/ms, that commits regardless of distance. */
+const SWIPE_COMMIT_SPEED = 0.4
+
+/**
+ * The day columns as the wrapper's x scroll sees them: which one it sits
+ * nearest, and where any of them comes to rest — just right of the sticky hour
+ * gutter, which is where the first one already sits and what `scroll-ml`
+ * restates in CSS.
+ */
+function dayColumns(wrap: HTMLElement, root: HTMLElement) {
+  const cols = [...root.querySelectorAll<HTMLElement>('[data-day-col]')]
+  const rest = cols[0]?.offsetLeft ?? 0
+  const count = cols.length
+  const at = (i: number) => {
+    const col = cols[Math.min(Math.max(i, 0), count - 1)]
+    return Math.max(0, (col?.offsetLeft ?? rest) - rest)
+  }
+  let idx = 0
+  let off = Infinity
+  for (let i = 0; i < count; i++) {
+    const d = Math.abs(at(i) - wrap.scrollLeft)
+    if (d < off) {
+      off = d
+      idx = i
+    }
+  }
+  return { idx, at, count, width: cols[0]?.offsetWidth ?? 1 }
+}
 
 interface TimeGridBoardProps {
   trip: Trip
@@ -112,6 +151,18 @@ export function TimeGridBoard({
   const wrapRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const gesture = useRef<Gesture | null>(null)
+  /** The in-flight day swipe: where it started, and what it has committed to. */
+  const swipe = useRef<{
+    x: number
+    y: number
+    left: number
+    day: number
+    dir: 'x' | 'y' | null
+    dx: number
+    vx: number
+    lastX: number
+    lastT: number
+  } | null>(null)
 
   const [preview, setPreview] = useState<Preview | null>(null)
   const [shelfTarget, setShelfTarget] = useState<number | null>(null)
@@ -602,6 +653,80 @@ export function TimeGridBoard({
     prevGridStart.current = gridStart
   }, [gridStart])
 
+  // ── Day swipe ──────────────────────────────────────────────────────────
+  // Paging is ours, not the browser's: below `sm` the wrapper is `touch-pan-y`,
+  // so a touch can only ever scroll the hours natively and no amount of
+  // sideways drift in a vertical swipe can carry the snap fling onto the next
+  // day. A swipe judged sideways moves the column under the finger instead,
+  // and settles onto a day when the finger lifts.
+  const beginSwipe = (e: ReactTouchEvent) => {
+    const wrap = wrapRef.current
+    const root = boardRef.current
+    // A second finger landing mid-drag ends it here rather than in `endSwipe`,
+    // so restore snapping from both.
+    if (wrap) wrap.style.scrollSnapType = ''
+    // Phones only: above `sm` the columns scroll freely, several at a time.
+    if (!wrap || !root || e.touches.length !== 1 || wrap.clientWidth >= 600) {
+      swipe.current = null
+      return
+    }
+    const t = e.touches[0]
+    swipe.current = {
+      x: t.clientX,
+      y: t.clientY,
+      left: wrap.scrollLeft,
+      day: dayColumns(wrap, root).idx,
+      dir: null,
+      dx: 0,
+      vx: 0,
+      lastX: t.clientX,
+      lastT: e.timeStamp,
+    }
+  }
+
+  const trackSwipe = (e: ReactTouchEvent) => {
+    const s = swipe.current
+    const wrap = wrapRef.current
+    const root = boardRef.current
+    if (!s || !wrap || !root || e.touches.length !== 1) return
+    // A lifted card owns the finger — let it drag rather than paging under it.
+    if (gesture.current?.armed && gesture.current.touch) return
+    const t = e.touches[0]
+    const dx = t.clientX - s.x
+    const dy = t.clientY - s.y
+    if (!s.dir) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_AXIS_PX) return
+      s.dir = Math.abs(dx) > Math.abs(dy) * SWIPE_AXIS_RATIO ? 'x' : 'y'
+      // Snapping would fight every frame of the drag; it comes back on release.
+      if (s.dir === 'x') wrap.style.scrollSnapType = 'none'
+    }
+    if (s.dir !== 'x') return
+    const dt = e.timeStamp - s.lastT
+    if (dt > 0) {
+      s.vx = (t.clientX - s.lastX) / dt
+      s.lastX = t.clientX
+      s.lastT = e.timeStamp
+    }
+    s.dx = dx
+    const cols = dayColumns(wrap, root)
+    wrap.scrollLeft = Math.min(Math.max(s.left - dx, cols.at(0)), cols.at(cols.count - 1))
+  }
+
+  const endSwipe = () => {
+    const s = swipe.current
+    const wrap = wrapRef.current
+    const root = boardRef.current
+    swipe.current = null
+    if (!s || s.dir !== 'x' || !wrap || !root) return
+    wrap.style.scrollSnapType = ''
+    const cols = dayColumns(wrap, root)
+    const committed =
+      Math.abs(s.dx) > cols.width * SWIPE_COMMIT_FRACTION ||
+      Math.abs(s.vx) > SWIPE_COMMIT_SPEED
+    const day = s.day + (committed ? (s.dx < 0 ? 1 : -1) : 0)
+    wrap.scrollTo({ left: cols.at(day), behavior: 'smooth' })
+  }
+
   // ── Mobile day pills ───────────────────────────────────────────────────
   const handleWrapScroll = () => {
     const wrap = wrapRef.current
@@ -648,11 +773,12 @@ export function TimeGridBoard({
   }, [gridStart, gridEnd])
 
   /**
-   * Phones show one day per screen and page between them: the wrapper snaps on
-   * x, and each column is the viewport less the page gutters (2×1.25rem), the
-   * hour gutter (3rem) and the column gap (1rem) — exactly full-bleed.
-   * `scroll-ml` matches the hour gutter + gap so a snapped day lands flush
-   * against it — `handleWrapScroll` reads that same offset back off column 0.
+   * Phones show one day per screen and page between them: each column is the
+   * viewport less the page gutters (2×1.25rem), the hour gutter (3rem) and the
+   * column gap (1rem) — exactly full-bleed. `scroll-ml` matches the hour gutter
+   * + gap so a day lands flush against it; `dayColumns` reads that same offset
+   * back off column 0. Snapping is only how a swipe or a pill tap settles —
+   * `beginSwipe` drives the paging itself, so a vertical scroll can't trip it.
    */
   const canvasStyle = {
     height: canvasH,
@@ -705,7 +831,11 @@ export function TimeGridBoard({
       <div
         ref={wrapRef}
         onScroll={handleWrapScroll}
-        className="flex-1 min-h-0 overflow-auto overscroll-contain max-sm:snap-x max-sm:snap-mandatory"
+        onTouchStart={beginSwipe}
+        onTouchMove={trackSwipe}
+        onTouchEnd={endSwipe}
+        onTouchCancel={endSwipe}
+        className="flex-1 min-h-0 overflow-auto overscroll-contain max-sm:snap-x max-sm:snap-mandatory max-sm:touch-pan-y"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div

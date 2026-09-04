@@ -59,8 +59,14 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
   `calc(100vw-6.5rem)` — the viewport less the page gutters (2×`px-5`), the
   `w-12` hour gutter and the column gap, so a day fills the width exactly. A
   column's `scroll-ml` must equal hour gutter + gap, which is also column 0's
-  `offsetLeft`; `handleWrapScroll` reads it back from there. Desktop keeps the
-  free multi-column scroll at `w-[260px]`. `DAY_HEADER_PX` in
+  `offsetLeft`; `dayColumns` reads it back from there. Paging between days is
+  ours, not the browser's: below `sm` the wrapper is `touch-pan-y`, so a touch
+  can only scroll the hours natively, and `beginSwipe`/`trackSwipe`/`endSwipe`
+  drive `scrollLeft` for swipes judged sideways. That is what keeps a vertical
+  swipe's sideways drift from riding the snap fling onto the next day, so don't
+  hand x back to `touch-action` without replacing it. Snapping is left on only
+  to settle a swipe or a pill tap. Desktop keeps the free multi-column scroll at
+  `w-[260px]`. `DAY_HEADER_PX` in
   `src/lib/timeGrid.ts` must stay identical across columns or the timelines stop
   lining up.
   (`DayColumn.tsx` / `SlotCard.tsx` are the old stacked board — still in the tree,
