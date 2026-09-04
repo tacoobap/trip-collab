@@ -773,11 +773,12 @@ export function TimeGridBoard({
   }, [gridStart, gridEnd])
 
   /**
-   * Phones show one day per screen and page between them: each column is the
-   * viewport less the page gutters (2×1.25rem), the hour gutter (3rem) and the
-   * column gap (1rem) — exactly full-bleed. `scroll-ml` matches the hour gutter
-   * + gap so a day lands flush against it; `dayColumns` reads that same offset
-   * back off column 0. Snapping is only how a swipe or a pill tap settles —
+   * Phones show one day per screen and page between them: 6.25rem of the
+   * viewport is the left page gutter (1.25rem), the hour gutter (2.25rem), the
+   * column gap (1rem) and 1.75rem of air on the right, which is what keeps a
+   * card off the edge of the screen. `scroll-ml` matches the hour gutter + gap
+   * so a day lands flush against it; `dayColumns` reads that same offset back
+   * off column 0. Snapping is only how a swipe or a pill tap settles —
    * `beginSwipe` drives the paging itself, so a vertical scroll can't trip it.
    */
   const canvasStyle = {
@@ -857,7 +858,7 @@ export function TimeGridBoard({
           className="relative flex w-max gap-6 max-sm:gap-4 pr-4 pb-6"
         >
           {/* Hour gutter — sticky against horizontal scroll */}
-          <div className="w-12 shrink-0 sticky left-0 z-[25] bg-background">
+          <div className="w-9 sm:w-12 shrink-0 sticky left-0 z-[25] bg-background">
             <div
               className="sticky top-0 z-[5] bg-background flex items-end justify-end pb-1.5 pr-1"
               style={{ height: DAY_HEADER_PX }}
@@ -871,7 +872,8 @@ export function TimeGridBoard({
                   title={edgeHint('up', hiddenEarly, gridStart)}
                   aria-label={edgeHint('up', hiddenEarly, gridStart)}
                 >
-                  ▴ 12 AM
+                  <span className="sm:hidden">▴ 12a</span>
+                  <span className="hidden sm:inline">▴ 12 AM</span>
                   {hiddenEarly && (
                     <span
                       aria-hidden
@@ -895,7 +897,7 @@ export function TimeGridBoard({
               {hourLabels.map((l) => (
                 <span
                   key={l.top}
-                  className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap"
+                  className="absolute right-1.5 sm:right-2 -translate-y-1/2 text-[10px] text-muted-foreground/60 tabular-nums whitespace-nowrap"
                   style={{ top: l.top }}
                 >
                   {l.text}
@@ -908,11 +910,12 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(true)}
-                  className="touch-target absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target absolute right-1.5 sm:right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title={edgeHint('down', hiddenLate, gridEnd)}
                   aria-label={edgeHint('down', hiddenLate, gridEnd)}
                 >
-                  ▾ 12 AM
+                  <span className="sm:hidden">▾ 12a</span>
+                  <span className="hidden sm:inline">▾ 12 AM</span>
                   {hiddenLate && (
                     <span
                       aria-hidden
@@ -925,7 +928,7 @@ export function TimeGridBoard({
                   type="button"
                   data-grid-ignore
                   onClick={() => setEveningOpen(false)}
-                  className="touch-target absolute right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
+                  className="touch-target absolute right-1.5 sm:right-2 bottom-1 text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground transition-colors tabular-nums"
                   title="Hide the empty late hours"
                 >
                   ▴ hide
@@ -940,8 +943,8 @@ export function TimeGridBoard({
               data-day-col
               className={cn(
                 'shrink-0 flex flex-col snap-start',
-                'w-[260px] max-sm:w-[calc(100vw-6.5rem)]',
-                'scroll-ml-16 sm:scroll-ml-[4.5rem]'
+                'w-[260px] max-sm:w-[calc(100vw-6.25rem)]',
+                'scroll-ml-[3.25rem] sm:scroll-ml-[4.5rem]'
               )}
             >
               <TimeGridDayHeader

@@ -55,11 +55,14 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
   header, the trip bar, and each page's `<main>`. Keep them in sync; they were
   drifting at 8/12/16px before.
 - The planning board is the time grid in `TimeGridBoard.tsx`. On phones it shows
-  one day per screen: the wrapper snaps on x and each column is
-  `calc(100vw-6.5rem)` — the viewport less the page gutters (2×`px-5`), the
-  `w-12` hour gutter and the column gap, so a day fills the width exactly. A
-  column's `scroll-ml` must equal hour gutter + gap, which is also column 0's
-  `offsetLeft`; `dayColumns` reads it back from there. Paging between days is
+  one day per screen: each column is `calc(100vw-6.25rem)` — the viewport less
+  the left page gutter (`px-5`), the `w-9` hour gutter (`sm:w-12`), the column
+  gap and `1.75rem` of air on the right, so a card is not flush to the edge of
+  the screen. That air is why a day column stops 8px short of the page gutter on
+  phones; it is deliberate, not drift. A column's `scroll-ml` must equal hour
+  gutter + gap — `3.25rem` on phones — which is also column 0's `offsetLeft`;
+  `dayColumns` reads it back from there. The gutter only fits its hour labels at
+  `w-9`, so the two `12 AM` edge toggles render a compact `12a` below `sm`. Paging between days is
   ours, not the browser's: below `sm` the wrapper is `touch-pan-y`, so a touch
   can only scroll the hours natively, and `beginSwipe`/`trackSwipe`/`endSwipe`
   drive `scrollLeft` for swipes judged sideways. That is what keeps a vertical
