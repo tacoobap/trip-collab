@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { X, LockOpen, Loader2, Trash2, ExternalLink, Check } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useDragControls } from 'framer-motion'
 import {
   addProposal,
   updateProposal,
@@ -363,6 +363,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const [pickFromCollectionOpen, setPickFromCollectionOpen] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
+  const dragControls = useDragControls()
   const history = usePlanningHistory()
   const [deletingSlot, setDeletingSlot] = useState(false)
 
@@ -522,6 +523,20 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              // Swipe down to dismiss, started by the grab handle alone —
+              // dragListener={false} also keeps framer from stamping a
+              // touch-action on the sheet, which would stop the body scrolling
+              // under a finger. Elastic only downwards: there is no taller
+              // state to drag up into, so the sheet doesn't pretend there is.
+              drag="y"
+              dragListener={false}
+              dragControls={dragControls}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.9 }}
+              dragMomentum={false}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 120 || info.velocity.y > 700) onClose()
+              }}
               // Centred with auto margins on both axes rather than a translate,
               // which framer-motion's own transform would overwrite. A sheet
               // rising from the bottom edge on phones; a dialog in the middle
@@ -529,12 +544,17 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               // bottom of a large monitor read as an afterthought.
               className="fixed bottom-0 left-0 right-0 mx-auto sm:inset-y-0 sm:my-auto sm:h-fit sm:max-w-2xl z-50 bg-background rounded-t-2xl sm:rounded-2xl border-t sm:border border-border shadow-2xl max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
             >
-              {/* Drag handle (mobile) — hidden on sm and up */}
-              <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">
+              {/* Grab handle (mobile) — hidden on sm and up. The whole strip
+                  is the target, not the 36px bar, and it swallows touch so a
+                  drag on it moves the sheet instead of scrolling. */}
+              <div
+                className="sm:hidden flex justify-center pt-2.5 pb-1.5 shrink-0 touch-none cursor-grab active:cursor-grabbing"
+                onPointerDown={(e) => dragControls.start(e)}
+              >
                 <div className="w-9 h-1 rounded-full bg-muted-foreground/30" aria-hidden />
               </div>
               {/* Header */}
-              <div className="px-5 pt-2 sm:pt-4 pb-3 border-b border-border shrink-0">
+              <div className="px-5 pt-0.5 sm:pt-4 pb-3 border-b border-border shrink-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="relative flex items-start gap-2 min-w-0 flex-1">
                     {canEdit ? (

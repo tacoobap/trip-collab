@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useDragControls } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 import { SLOT_EMOJI_GROUPS, matchesEmoji } from '@/lib/slotEmojis'
 
@@ -82,6 +82,7 @@ function PickerPanel({
   const [query, setQuery] = useState('')
   const compact = useCompactLayout()
   const keyboardInset = useKeyboardInset()
+  const dragControls = useDragControls()
 
   // Close on outside click
   useEffect(() => {
@@ -204,11 +205,25 @@ function PickerPanel({
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 32, stiffness: 320 }}
           style={{ bottom: keyboardInset }}
+          // Same bargain as the event sheet: the handle drags it away, and
+          // dragListener={false} leaves the emoji grid free to scroll.
+          drag="y"
+          dragListener={false}
+          dragControls={dragControls}
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0, bottom: 0.9 }}
+          dragMomentum={false}
+          onDragEnd={(_, info) => {
+            if (info.offset.y > 100 || info.velocity.y > 700) onClose()
+          }}
           role="dialog"
           aria-label="Choose an icon"
-          className="fixed inset-x-0 z-[1100] flex flex-col bg-background border-t border-border rounded-t-2xl shadow-2xl px-4 pt-2 pb-3 max-h-[70dvh]"
+          className="fixed inset-x-0 z-[1100] flex flex-col bg-background border-t border-border rounded-t-2xl shadow-2xl px-4 pb-3 max-h-[70dvh]"
         >
-          <div className="flex justify-center pb-2 shrink-0">
+          <div
+            className="flex justify-center pt-2 pb-2 shrink-0 touch-none cursor-grab active:cursor-grabbing"
+            onPointerDown={(e) => dragControls.start(e)}
+          >
             <div className="w-9 h-1 rounded-full bg-muted-foreground/30" aria-hidden />
           </div>
           {body}
