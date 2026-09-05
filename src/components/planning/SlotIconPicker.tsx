@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 import { SLOT_EMOJI_GROUPS, matchesEmoji } from '@/lib/slotEmojis'
@@ -21,6 +22,53 @@ export function SlotIconPicker({ open, current, onSelect, onClose }: SlotIconPic
 }
 
 /**
+ * Phones get the picker as its own sheet, not a popover hanging off the
+ * trigger: both hosts open near the bottom of the screen (the event sheet's
+ * header, the last row of a dialog), so a panel dropped below the trigger fell
+ * off the viewport with only its search box visible.
+ *
+ * Matched in an effect rather than read during render — the React Compiler
+ * pass bails on a component that calls an unknown global in its body. Null
+ * until the layout effect runs so the wrong variant never paints.
+ */
+function useCompactLayout(): boolean | null {
+  const [compact, setCompact] = useState<boolean | null>(null)
+  useLayoutEffect(() => {
+    const mq = window.matchMedia('(max-width: 639.98px)')
+    const update = () => setCompact(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return compact
+}
+
+/**
+ * How much of the layout viewport the on-screen keyboard is covering. A sheet
+ * pinned to `bottom: 0` sits behind it on iOS, which would hide the grid the
+ * moment someone typed in the search box.
+ */
+function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const overlap = window.innerHeight - (vv.height + vv.offsetTop)
+      setInset(overlap > 40 ? Math.round(overlap) : 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+  return inset
+}
+
+/**
  * Split out so it unmounts with AnimatePresence — the search box then resets
  * itself on every reopen without an effect reaching back into state.
  */
@@ -32,6 +80,8 @@ function PickerPanel({
   const ref = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
+  const compact = useCompactLayout()
+  const keyboardInset = useKeyboardInset()
 
   // Close on outside click
   useEffect(() => {
@@ -73,17 +123,10 @@ function PickerPanel({
 
   const resultCount = groups.reduce((n, g) => n + g.emojis.length, 0)
 
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: -4, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -4, scale: 0.97 }}
-      transition={{ duration: 0.15 }}
-      className="absolute left-0 right-0 top-full mt-2 z-10 bg-background border border-border rounded-xl shadow-xl p-3"
-    >
+  const body = (
+    <>
       {/* Search */}
-      <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/50 border border-border/60 focus-within:border-primary/40 transition-colors">
+      <div className="flex items-center gap-2 mb-2 px-2 py-1.5 max-sm:py-2.5 rounded-lg bg-muted/50 border border-border/60 focus-within:border-primary/40 transition-colors shrink-0">
         <Search className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
         <input
           ref={searchRef}
@@ -97,7 +140,7 @@ function PickerPanel({
           <button
             type="button"
             onClick={() => { setQuery(''); searchRef.current?.focus() }}
-            className="shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors"
+            className="shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors max-sm:w-8 max-sm:h-8 max-sm:flex max-sm:items-center max-sm:justify-center max-sm:-my-1"
             aria-label="Clear search"
           >
             <X className="w-3.5 h-3.5" />
@@ -105,7 +148,7 @@ function PickerPanel({
         )}
       </div>
 
-      <div className="max-h-56 overflow-y-auto overflow-x-hidden overscroll-contain">
+      <div className="max-sm:flex-1 max-sm:min-h-0 sm:max-h-56 overflow-y-auto overflow-x-hidden overscroll-contain">
         {resultCount === 0 ? (
           <p className="text-xs text-muted-foreground/70 text-center py-6">
             No icons match “{query}”
@@ -122,8 +165,9 @@ function PickerPanel({
                     key={`${group.name}-${emoji}`}
                     type="button"
                     title={label}
+                    aria-label={label}
                     onClick={() => { onSelect(emoji); onClose() }}
-                    className={`w-9 h-9 text-xl flex items-center justify-center rounded-lg transition-colors hover:bg-muted ${
+                    className={`w-9 h-9 max-sm:w-full max-sm:h-11 text-xl flex items-center justify-center rounded-lg transition-colors hover:bg-muted ${
                       current === emoji ? 'bg-primary/10 ring-1 ring-primary/40' : ''
                     }`}
                   >
@@ -135,6 +179,56 @@ function PickerPanel({
           ))
         )}
       </div>
+    </>
+  )
+
+  if (compact === null) return null
+
+  if (compact) {
+    // Above the dialog layer (z-[1000]) — the day dialog hosts a picker too.
+    return createPortal(
+      <>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[1090] bg-black/40"
+          onClick={onClose}
+          aria-hidden
+        />
+        <motion.div
+          ref={ref}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+          style={{ bottom: keyboardInset }}
+          role="dialog"
+          aria-label="Choose an icon"
+          className="fixed inset-x-0 z-[1100] flex flex-col bg-background border-t border-border rounded-t-2xl shadow-2xl px-4 pt-2 pb-3 max-h-[70dvh]"
+        >
+          <div className="flex justify-center pb-2 shrink-0">
+            <div className="w-9 h-1 rounded-full bg-muted-foreground/30" aria-hidden />
+          </div>
+          {body}
+          <div style={{ height: keyboardInset ? 0 : 'env(safe-area-inset-bottom)' }} aria-hidden />
+        </motion.div>
+      </>,
+      document.body
+    )
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+      transition={{ duration: 0.15 }}
+      className="absolute left-0 right-0 top-full mt-2 z-10 bg-background border border-border rounded-xl shadow-xl p-3"
+    >
+      {body}
     </motion.div>
   )
 }

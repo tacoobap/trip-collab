@@ -542,7 +542,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                         type="button"
                         onClick={() => setIconPickerOpen((v) => !v)}
                         title="Change icon"
-                        className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+                        // Bare emoji on desktop, where hover says it is a
+                        // control. Phones get a chip, or the only thing
+                        // marking the icon as tappable is nothing at all.
+                        className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center max-sm:rounded-xl max-sm:bg-muted/60"
                       >
                         {currentIcon}
                       </button>
