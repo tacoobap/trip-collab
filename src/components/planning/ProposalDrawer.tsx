@@ -529,12 +529,12 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               // bottom of a large monitor read as an afterthought.
               className="fixed bottom-0 left-0 right-0 mx-auto sm:inset-y-0 sm:my-auto sm:h-fit sm:max-w-2xl z-50 bg-background rounded-t-2xl sm:rounded-2xl border-t sm:border border-border shadow-2xl max-h-[85vh] flex flex-col min-h-0 max-sm:pb-[env(safe-area-inset-bottom)]"
             >
-              {/* Drag handle (mobile) — hidden on sm and up */}
-              <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">
-                <div className="w-9 h-1 rounded-full bg-muted-foreground/30" aria-hidden />
-              </div>
+              {/* No grab handle: this sheet is as tall as its content, so a
+                  grabber only ever promised a taller state that isn't there.
+                  Closing is the X, the overlay, or Escape. The header keeps
+                  the air the handle used to occupy. */}
               {/* Header */}
-              <div className="px-5 pt-2 sm:pt-4 pb-3 border-b border-border shrink-0">
+              <div className="px-5 pt-5 sm:pt-4 pb-3 border-b border-border shrink-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="relative flex items-start gap-2 min-w-0 flex-1">
                     {canEdit ? (
@@ -542,7 +542,10 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                         type="button"
                         onClick={() => setIconPickerOpen((v) => !v)}
                         title="Change icon"
-                        className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
+                        // Bare emoji on desktop, where hover says it is a
+                        // control. Phones get a chip, or the only thing
+                        // marking the icon as tappable is nothing at all.
+                        className="text-lg leading-none hover:scale-110 active:scale-95 transition-transform shrink-0 max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center max-sm:rounded-xl max-sm:bg-muted/60"
                       >
                         {currentIcon}
                       </button>
