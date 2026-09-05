@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import type { DayWithSlots } from '@/types/database'
 import type { Trip } from '@/types/database'
-import { updateDay, renumberTripDays } from '@/services/planningService'
+import { updateDay } from '@/services/planningService'
+import { dayLabel } from '@/lib/dateRange'
 
 interface EditDayModalProps {
   open: boolean
@@ -20,6 +21,14 @@ interface EditDayModalProps {
   onSaved?: () => void
 }
 
+/**
+ * Which city a day is spent in — the one thing about a day that is a choice
+ * rather than a consequence. A day's *date* is its identity: it comes from the
+ * trip's range, `day_number` is derived from date order, and moving one day's
+ * date only shuffles it in the sequence (or strands it outside the range for
+ * the next `syncTripDays` to reconcile). Dates are edited as a range in the
+ * trip editor; days are added in `AddDayDialog`.
+ */
 export function EditDayModal({
   open,
   onOpenChange,
@@ -29,7 +38,6 @@ export function EditDayModal({
 }: EditDayModalProps) {
   const [city, setCity] = useState('')
   const [customCity, setCustomCity] = useState('')
-  const [date, setDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,17 +45,13 @@ export function EditDayModal({
     if (open && day) {
       setCity((day.city || trip.destinations?.[0]) ?? '')
       setCustomCity('')
-      setDate(day.date ?? '')
       setError('')
     }
-  }, [open, day?.id, day?.city, day?.date, trip.destinations])
+  }, [open, day?.id, day?.city, trip.destinations])
 
   if (!day) return null
 
   const effectiveCity = city === '__custom__' ? customCity.trim() : city
-  const label = effectiveCity
-    ? `Day ${day.day_number} · ${effectiveCity}`
-    : `Day ${day.day_number}`
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,15 +64,9 @@ export function EditDayModal({
     setError('')
     try {
       await updateDay(day.id, {
-        label,
+        label: dayLabel(day.day_number, effectiveCity),
         city: effectiveCity,
-        date: date || null,
       })
-      // Moving a day's date moves it in the sequence; day numbers are derived
-      // from date order, so re-derive them rather than leave a gap
-      if (date !== (day.date ?? '')) {
-        await renumberTripDays(trip.id)
-      }
       onOpenChange(false)
       onSaved?.()
     } catch (err) {
@@ -87,73 +85,58 @@ export function EditDayModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="font-serif">Edit day {day.day_number}</DialogTitle>
+          <DialogTitle className="font-serif">
+            Which city on day {day.day_number}?
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              City <span className="text-destructive">*</span>
-            </label>
-            {trip.destinations?.length ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {trip.destinations.map((dest) => (
-                    <button
-                      key={dest}
-                      type="button"
-                      onClick={() => setCity(dest)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                        city === dest
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-foreground border-border hover:border-primary/40'
-                      }`}
-                    >
-                      {dest}
-                    </button>
-                  ))}
+          {trip.destinations?.length ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {trip.destinations.map((dest) => (
                   <button
+                    key={dest}
                     type="button"
-                    onClick={() => setCity('__custom__')}
+                    onClick={() => setCity(dest)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                      city === '__custom__'
+                      city === dest
                         ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
+                        : 'bg-background text-foreground border-border hover:border-primary/40'
                     }`}
                   >
-                    Other
+                    {dest}
                   </button>
-                </div>
-                {city === '__custom__' && (
-                  <Input
-                    className="mt-2"
-                    placeholder="City name"
-                    value={customCity}
-                    onChange={(e) => setCustomCity(e.target.value)}
-                    autoFocus
-                  />
-                )}
-              </>
-            ) : (
-              <Input
-                placeholder="e.g. Paris"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                autoFocus
-              />
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              Date
-            </label>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCity('__custom__')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                    city === '__custom__'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
+                  }`}
+                >
+                  Other
+                </button>
+              </div>
+              {city === '__custom__' && (
+                <Input
+                  placeholder="City name"
+                  value={customCity}
+                  onChange={(e) => setCustomCity(e.target.value)}
+                  autoFocus
+                />
+              )}
+            </>
+          ) : (
             <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              placeholder="e.g. Paris"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              autoFocus
             />
-          </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

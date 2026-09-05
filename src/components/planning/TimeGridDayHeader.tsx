@@ -10,7 +10,7 @@ import { CityTag } from '@/components/shared/CityTag'
 import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
 import { CATEGORY_ICONS } from '@/lib/slotEmojis'
 import { DAY_HEADER_PX, lockedProposalOf } from '@/lib/timeGrid'
-import { Camera, Loader2, Upload, Sparkles, Pencil, Plus } from 'lucide-react'
+import { Camera, Loader2, Upload, Sparkles, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TimeGridDayHeaderProps {
@@ -319,34 +319,70 @@ export function TimeGridDayHeader({
                 {dateText}
               </span>
             )}
-            {onEditDay && (
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {/* The city tag is its own edit affordance. A day's city is the
+                only thing about it that is a choice — its date comes from the
+                trip's range — so tapping the tag opens the picker rather than
+                spending header width on a pencil beside it. Deliberately no
+                `.touch-target`: its ::after reaches 14px out and would swallow
+                the camera button 6px to its right, so the pill carries a
+                taller box of its own instead. */}
+            {onEditDay ? (
               <button
                 type="button"
                 data-grid-ignore
                 onClick={() => onEditDay(day)}
-                className={cn(
-                  'touch-target shrink-0 transition-colors touch-manipulation p-0.5 rounded',
-                  onPhoto
-                    ? 'text-white/75 hover:text-white'
-                    : 'text-muted-foreground/50 hover:text-muted-foreground'
-                )}
-                title="Edit day"
-                aria-label="Edit day"
+                className="min-w-0 rounded-full touch-manipulation"
+                title={
+                  day.city
+                    ? `Change the city for day ${day.day_number}`
+                    : `Set the city for day ${day.day_number}`
+                }
+                aria-label={
+                  day.city
+                    ? `Day ${day.day_number} is in ${day.city}. Change the city`
+                    : `Set the city for day ${day.day_number}`
+                }
               >
-                <Pencil className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 min-w-0">
-            {day.city && (
-              <CityTag
-                city={day.city}
-                className={cn(
-                  onPhoto
-                    ? 'bg-white/90 text-foreground border-transparent'
-                    : 'bg-muted/80 text-muted-foreground border-border'
+                {day.city ? (
+                  <CityTag
+                    city={day.city}
+                    className={cn(
+                      'max-w-full min-w-0 py-1 transition-colors',
+                      onPhoto
+                        ? 'bg-white/90 text-foreground border-transparent hover:bg-white'
+                        : 'bg-muted/80 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                    )}
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full border border-dashed px-2.5 py-1',
+                      'text-xs font-medium transition-colors',
+                      // A bright photo washes out a light-weight control, so
+                      // the on-photo variant carries its own scrim.
+                      onPhoto
+                        ? 'border-white/60 bg-black/45 text-white/90 hover:bg-black/60 hover:text-white'
+                        : 'border-border bg-background/80 text-muted-foreground hover:text-primary hover:border-primary/50'
+                    )}
+                  >
+                    Add city
+                  </span>
                 )}
-              />
+              </button>
+            ) : (
+              day.city && (
+                <CityTag
+                  city={day.city}
+                  className={cn(
+                    'max-w-full min-w-0 py-1',
+                    onPhoto
+                      ? 'bg-white/90 text-foreground border-transparent'
+                      : 'bg-muted/80 text-muted-foreground border-border'
+                  )}
+                />
+              )
             )}
             {canEdit && (
               <button

@@ -21,7 +21,10 @@ export function CityTag({ city, className }: CityTagProps) {
         className
       )}
     >
-      {city}
+      {/* The text carries its own `truncate`: `text-overflow` does nothing on
+          the inline-flex container, so a tag squeezed by its row needs a block
+          child to ellipsise. Inert wherever the tag is free to size itself. */}
+      <span className="truncate">{city}</span>
     </span>
   )
 }

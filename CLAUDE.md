@@ -117,4 +117,10 @@ card with nothing failing.
 - `day_number` is **derived from date order**, never stored independently. Anything
   that can move a day (date edits, range changes) must go through `syncTripDays` or
   `renumberTripDays` in `src/services/planningService.ts`.
+- A day's date is therefore its identity, not one of its fields, and there is no
+  per-day date editor on purpose. Re-dating one day only shuffles it in the
+  sequence — it can collide with its neighbour, or strand itself outside the
+  range for the next `syncTripDays` to delete or bolt onto the end. Dates move as
+  a range in `EditTripModal`; `EditDayModal` sets the day's **city** and nothing
+  else.
 - `npm run build` does not type-check `netlify/functions/` — only `src`.
