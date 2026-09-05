@@ -132,7 +132,225 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 ## Future to-dos / enhancements
 
-### Image storage — move off the GitHub repo
+Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
+by what to do first. Each is written to be picked up cold in a fresh session —
+what's wrong, where it lives, and what "done" looks like. Item 9 predates that
+review and is still open.
+
+### 1. Lock down `firestore.rules` — any signed-in account can read, and take over, every trip
+
+Do this before anything else.
+
+**What's wrong.** Every collection is `allow read: if request.auth != null` —
+`firestore.rules` lines 30, 61, 72, 100, 125, 138, 155, 169. Rules gate `list`
+as well as `get`, and none of these look at `resource.data`, so any signed-in
+account can run `getDocs(collection(db, 'trips'))` — or the same against `days`,
+`slots`, `proposals`, `stays`, `collection_items`, `trip_notes`, `trip_todos` —
+and read every trip in the database. The comment at the top of the file explains
+the open read as being for invite links, but an invite link only needs a
+single-document read.
+
+There is also a takeover chain:
+
+1. The second `allow update` branch on `/trips` (~line 48) requires only that
+   `member_uids` is the sole changed key and that the caller's uid appears in
+   the **new** value. Nothing requires the existing members to survive, so any
+   signed-in user can set `member_uids: [attacker]` and evict everyone else.
+2. Now a member, the first branch (~line 40) validates only `name`, `slug` and
+   `destinations`. `owner_uid` is unpinned, so they can make themselves owner.
+3. `netlify/functions/delete-trip.ts:49` trusts `owner_uid` — so they can then
+   delete the trip.
+
+**Done when**
+
+- No collection is readable by an arbitrary signed-in account.
+- Self-join adds the caller and nothing else: the new `member_uids` must be the
+  old array plus the caller's uid.
+- `owner_uid` can't change on update. (If ownership transfer is ever wanted, it
+  belongs in a server function.)
+- The invite flow still works end to end: paste `/trip/:slug` → sign in → see
+  the trip → **Join this trip** → edit.
+
+**How, and the trade-off to decide.** For `list`, Firestore evaluates the rule
+against every document the query returns and rejects the whole query if any one
+fails; it does not inspect the `where` clauses. So the rule and the client query
+have to agree.
+
+- `trips` is the easy one: `allow list: if request.auth.uid in resource.data.member_uids`.
+  `listUserTrips` (`src/services/tripService.ts:66`) already filters on
+  `owner_uid ==` and `member_uids array-contains`, and create forces the owner
+  into `member_uids`, so both of its queries still pass. Keep `allow get` open to
+  authed users so an invitee can see a trip before joining.
+- Child collections are queried by `trip_id` (slots by `day_id`), so a
+  membership rule needs the membership on the document itself. Two ways:
+  - **Denormalize `member_uids` onto every child document** and test it
+    directly. No rule-time `get()`, so no extra read cost — but it needs a
+    backfill and somewhere that keeps the array in sync when membership changes.
+  - **Call `tripMember(resource.data.trip_id)`**, as the write rules already do.
+    Trivial to write, but it's a document read per document evaluated, on every
+    list.
+
+**Gotcha.** `getTripBySlug` (`src/services/tripService.ts:21`) resolves a slug
+with `where('slug', '==', slug)` — a `list`. Once `list` is membership-scoped,
+an invitee who isn't a member yet can no longer resolve the slug, which breaks
+the invite link. Resolve it server-side instead (`netlify/functions/lib/` already
+does this with the Admin SDK for `link-preview`), or add a `trip_slugs/{slug}`
+mapping document holding just `{ trip_id }`.
+
+Check every query shape against whatever rules you land on —
+`src/services/tripSubscription.ts` and the `useTrip` / `useStays` / `useTodos` /
+`useCollectionItems` hooks all have to keep matching.
+
+### 2. Key identity on `uid`, not display name
+
+**What's wrong.** Everything that records *who* stores a display-name string,
+taken from `useDisplayName()` (`src/hooks/useDisplayName.ts`), which returns
+`user.displayName` — or the email prefix, or `'Traveler'`. Two travellers with
+the same Google name share one identity, and anyone who renames themselves
+silently orphans every vote, like and assignment they've made.
+
+Affected fields (`src/types/database.ts`):
+
+| Document | Fields |
+|---|---|
+| `proposals` | `proposer_name`, `votes[]` |
+| `collection_items` | `likes[]`, `created_by` |
+| `stays` | `proposed_by` |
+| `trip_todos` | `assigned_to`, `created_by`, `completed_by` |
+| `trip_notes` | `author_name` |
+
+The comparisons to replace are the `.includes(currentName)` / filter-by-name
+patterns — `ProposalCard.tsx:34`, `ProposalDrawer`'s `handleVote`,
+`CollectionPage`'s `handleLike`, and the `travelers` / `todoPeople` lists in
+`TripPage.tsx`.
+
+**Done when** those fields hold uids, names are resolved for display only, and
+existing documents are migrated.
+
+**Notes.** `netlify/functions/trip-members.ts` already returns
+`{ uid, display_name }[]` for a trip — that's the resolver, and it exists
+because `firestore.rules` restricts `/users/{uid}` to that same user, so a
+browser can't read anyone else's profile. Don't reach for Firestore directly.
+`useTripMembers` currently only fetches when the to-dos sheet opens
+(`TripPage.tsx:45`); a uid-keyed UI needs the roster on every surface that shows
+a name, so fetch it once per trip and cache it.
+
+Migration: a script in `scripts/`, in the shape of `migrate-trip-members.mjs`,
+mapping name → uid per trip. Some names will match no member — someone who left,
+or a legacy guest — so decide whether to keep the raw string as a fallback
+(`{ uid: null, name }`) or drop it; keeping it is safer. Comparing on
+`uid ?? name` during the transition lets old and new documents coexist.
+
+### 3. Offline cache + installable app
+
+**Why.** This is a travel app that currently shows nothing without a network.
+`src/lib/firebase.ts:20` uses a plain `getFirestore(app)` — no local cache — and
+there's no `manifest.json` or service worker in `public/`. On a plane, abroad on
+an expensive roaming plan, or on bad hotel wifi, an itinerary that has already
+been loaded once is unreachable.
+
+**Done when**
+
+- Firestore is initialised with `persistentLocalCache` (via `initializeFirestore`,
+  with multi-tab support if it's cheap) so an already-loaded trip renders from
+  cache and writes queue until reconnection.
+- `public/manifest.json` plus icons and `apple-touch-icon`, linked from
+  `index.html`, so the app can be added to a phone home screen.
+- The UI is honest about cache state: Firestore exposes `metadata.fromCache` and
+  `hasPendingWrites`. The toast system (`ToastProvider`) is the obvious place to
+  say "offline — changes will sync".
+
+**Gotcha.** A manifest alone gives an installable icon that opens a blank page
+offline; the app shell still needs the network unless a service worker caches
+it. Decide up front whether to add one (`vite-plugin-pwa`) or to stop at the
+Firestore cache and say so.
+
+### 4. Schedule a collection idea without going to the board
+
+**What's wrong.** The only idea → plan path runs the wrong way round: Planning →
+drag out a slot → open the drawer → **Pick from collection**
+(`src/components/planning/PickFromCollectionModal.tsx`, opened from
+`ProposalDrawer.tsx:756`). A collection card
+(`src/components/collection/CollectionItemCard.tsx`) offers only like, edit and
+delete — so at the moment you're looking at the idea you want to schedule,
+there's nothing to click.
+
+**Done when** a collection item has a "Put this on a day" action that picks a
+day, creates the slot and its proposal, and confirms where it landed. Reuse
+`addLockedSlot` / `addProposal` in `src/services/planningService.ts` — the same
+calls `handlePickFromCollection` ends up making in `ProposalDrawer.tsx` — and
+carry `name`, `google_maps_url` and `place_name` across the same way it does.
+
+**Worth deciding:** whether it lands on the day's "sometime this day" shelf
+(`start_minutes: null`) or asks for a time. The shelf is the lower-friction
+default, and the grid already supports dragging a chip onto the timeline later.
+
+### 5. Give signed-out visitors something to land on
+
+**What's wrong.** `/` is `SignInPage` — a wordmark, one line of copy and a
+sign-in form (`src/App.tsx`, `src/pages/SignInPage.tsx`). Nothing says what the
+app is or shows what it looks like. `src/pages/LandingPage.tsx:113` still
+carries the comment `// Signed out: marketing + sign-in`, but that marketing
+page doesn't exist. Anyone sent an invite link who isn't signed in hits an auth
+wall with no idea what they're being invited to.
+
+Related and cheap: every "sign in" link outside the sign-in page reads **Sign in
+with Google** (`TripPage.tsx`, `ItineraryPage.tsx`, `CollectionPage.tsx`) even
+though email/password sign-in exists. Make it just "Sign in".
+
+**Done when** signed-out `/` explains the product and shows it, with sign-in
+still one click away; and an invitee arriving at `/trip/:slug` signed out sees
+at least the trip's name, dates and cover photo before being asked to sign in.
+That data already exists server-side — `netlify/functions/lib/tripPreview.ts`
+assembles exactly this for link previews.
+
+### 6. Per-trip browser tab title
+
+`document.title` is `Trup` for the whole app, so two trips open in two tabs are
+indistinguishable. The only code that touches it is
+`src/hooks/useItineraryExport.ts:38`, which sets it temporarily so the browser
+seeds the PDF filename and then restores it. Set it per trip — and restore it on
+unmount — wherever `useTrip` resolves.
+
+### 7. Navigation — three metaphors for five destinations
+
+Not a bug; a design question worth settling before more gets added.
+
+A trip's surfaces are reached three different ways:
+
+- **Planning / Collection / Itinerary** — tabs in `PageHeader`
+  (`src/components/layout/PageHeader.tsx`), absolutely centred in the bar.
+- **Stays** and **To-dos** — unlabelled icon buttons in the trip name bar
+  (`src/pages/TripPage.tsx`), opening drawers.
+- **Trip settings** — inside the avatar menu (`src/components/layout/UserMenu.tsx`).
+
+The sharpest symptom: Stays and To-dos are trip-wide data, but they're only
+reachable from the Planning page — `TripLayout` takes the trip name bar as a
+prop and `CollectionPage` passes its own, while `ItineraryPage` doesn't use
+`TripLayout` at all. Whatever the answer — promote them into the tab row, put
+everything trip-level behind one consistent control, or make the drawers
+reachable from every page — the goal is a single rule for "where do I find a
+thing about this trip".
+
+### 8. Error boundary, and type-check the functions
+
+`src/main.tsx` mounts `App` bare — there is no error boundary anywhere in the
+tree, so one bad document renders a white page with no way back. That matters
+more than usual here because so much of the schema is optional-or-legacy:
+`start_minutes?`, `duration_minutes?`, `stretches_grid?`, slots with no
+`trip_id` that resolve through `day_id`, and the legacy booking fields on
+`Proposal`.
+
+**Done when** there's a route-level boundary that shows an apology, a **Reload**
+and a link back to `/home`, and logs the error — plus a top-level one for
+anything thrown outside a route.
+
+Separately: `npm run build` only type-checks `src` (`tsconfig.app.json`), so
+`netlify/functions/` ships unchecked — and that's where the auth verification,
+the share-token minting and the cascade delete live. Add a tsconfig for it and a
+`typecheck:functions` script, and run both in CI.
+
+### 9. Image storage — move off the GitHub repo
 
 Every uploaded image (day photos, the itinerary hero, collection item photos) is
 compressed to JPEG in the browser by `src/lib/imageUpload.ts` and then
