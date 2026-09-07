@@ -29,6 +29,7 @@ export function ProposalCard({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(proposal.title)
+  const [editNote, setEditNote] = useState(proposal.note ?? '')
   const [savingEdit, setSavingEdit] = useState(false)
 
   const hasVoted = proposal.votes.includes(currentName)
@@ -36,6 +37,7 @@ export function ProposalCard({
 
   const startEdit = () => {
     setEditTitle(proposal.title)
+    setEditNote(proposal.note ?? '')
     setConfirmDelete(false)
     setEditing(true)
   }
@@ -48,7 +50,7 @@ export function ProposalCard({
     try {
       await onEdit(proposal.id, {
         title: editTitle.trim(),
-        note: proposal.note ?? null,
+        note: editNote.trim() || null,
         url: proposal.url ?? null,
       })
       setEditing(false)
@@ -57,7 +59,7 @@ export function ProposalCard({
     }
   }
 
-  // ── Edit mode (title only) ────────────────────────────────────────────────
+  // ── Edit mode (title + note) ──────────────────────────────────────────────
   if (editing) {
     return (
       <motion.div
@@ -68,7 +70,7 @@ export function ProposalCard({
       >
         <div className="flex gap-2.5">
           <ProposerAvatar name={proposal.proposer_name} size="xs" className="mt-1 shrink-0" />
-          <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div className="flex-1 min-w-0 space-y-2">
             <input
               autoFocus
               value={editTitle}
@@ -80,21 +82,38 @@ export function ProposalCard({
               placeholder="Idea title"
               className="w-full text-base md:text-sm bg-muted/50 border border-border/70 rounded-lg px-3 py-1.5 outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
             />
-            <button
-              onClick={cancelEdit}
-              className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors"
-            >
-              <X className="w-3 h-3" />
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveEdit}
-              disabled={!editTitle.trim() || savingEdit}
-              className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-            >
-              {savingEdit ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-              Save
-            </button>
+            {/* A textarea, not an input: a note wraps to two lines as often as
+                one, and an input's value sanitisation would quietly eat the
+                newlines of a note written in the drawer. */}
+            <textarea
+              rows={2}
+              value={editNote}
+              onChange={(e) => setEditNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') cancelEdit()
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSaveEdit()
+              }}
+              placeholder="Note — optional"
+              aria-label="Note"
+              className="w-full resize-none text-base md:text-sm bg-muted/50 border border-border/70 rounded-lg px-3 py-1.5 outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={cancelEdit}
+                className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={!editTitle.trim() || savingEdit}
+                className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+              >
+                {savingEdit ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                Save
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>

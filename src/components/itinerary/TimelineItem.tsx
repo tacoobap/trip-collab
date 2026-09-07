@@ -26,7 +26,9 @@ export function TimelineItem({ slot, isLast = false }: TimelineItemProps) {
 
   const { exact_time, narrative_time, editorial_caption } = lockedProposal
   const displayTime = exact_time ?? narrative_time ?? slot.time_label
-  const note = editorial_caption || lockedProposal.note
+  // A note someone sat down and wrote beats copy an LLM generated for them; the
+  // caption stays as the fallback for items nobody has annotated.
+  const note = lockedProposal.note || editorial_caption
 
   return (
     <div data-print="item" className="flex gap-4 group">
