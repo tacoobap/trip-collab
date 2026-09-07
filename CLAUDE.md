@@ -104,13 +104,24 @@ card with nothing failing.
   CDN at runtime**, not bundled — `included_files` paths differ between local dev
   and Lambda, and this sidesteps that. Deleting anything in `public/og/` breaks
   the card, not the build.
+- Satori's *fourth* wasm, harfbuzz's, is not one of those and can't be — satori
+  loads it itself, at import time, from `hb.wasm` beside its own file. Bundled,
+  that resolves to the function's directory, where the file isn't; harfbuzzjs
+  exports a bare promise, so the miss lands as an unhandled rejection during
+  module load and Lambda 502s **every** `og-image` request, fallback included.
+  `[functions."og-image"] external_node_modules = ["harfbuzzjs"]` in
+  `netlify.toml` is what keeps the package whole and its wasm beside it. Drop
+  that line and the card silently goes back to a blank preview.
 - Satori collapses the space in `", 2026"` — it reads a comma followed by digits
   as one numeric token — so `metaText` in `ogCard.ts` swaps in a non-breaking
   space. Check any new text on the card at full size before trusting it.
 - `og:title` is the wordmark on every link on purpose, not an oversight. The trip
   name lives in `og:description` and on the card itself.
 - Verify with a crawler UA, since a normal request is served the plain shell:
-  `curl -sA facebookexternalhit/1.1 <url> | grep 'og:'`
+  `curl -sA facebookexternalhit/1.1 <url> | grep 'og:'`. Then **fetch the
+  `og:image` it prints** and check it comes back `200 image/jpeg`. Right tags
+  over a broken card look identical to right tags over a working one, and that
+  is the half a chat app actually shows.
 
 ## Firestore
 
