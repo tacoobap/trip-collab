@@ -99,6 +99,15 @@ installed, and `--alias:firebase/firestore=<mock>` works well.
 takes the first match, so moving them below it silently restores the old generic
 card with nothing failing.
 
+- **The rewrite does not carry the `kind` and `id` written into its target.**
+  They are in the `to` and they do not arrive, so `link-preview` reads both back
+  off `event.path` instead and treats the query string only as a fallback. This
+  cost a day of looking in the wrong place: the function was perfect when called
+  directly with `?kind=&id=`, and served the generic card for every link a person
+  actually pasted. If you are testing this function, test it **through
+  `/trip/<slug>`**, never through `/.netlify/functions/link-preview?...` — the
+  two disagree, and only the first is what a crawler hits.
+
 - The card is drawn by `og-image` with satori, then rasterised by resvg. Its
   three fonts and resvg's `.wasm` live in `public/og/` and are **fetched from the
   CDN at runtime**, not bundled — `included_files` paths differ between local dev

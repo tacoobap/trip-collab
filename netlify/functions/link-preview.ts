@@ -1,4 +1,4 @@
-import type { Handler } from '@netlify/functions'
+import type { Handler, HandlerEvent } from '@netlify/functions'
 import {
   canonicalUrl,
   cardUrl,
@@ -109,6 +109,52 @@ function loadShell(origin: string): Promise<string> {
   return entry.html
 }
 
+const pathOf = (url: string | undefined): string | null => {
+  try {
+    return url ? new URL(url).pathname : null
+  } catch {
+    return null
+  }
+}
+
+/** A slug rides in the path, so it arrives percent-encoded; a bad escape is not a trip. */
+const decodeId = (value: string): string => {
+  try {
+    return decodeURIComponent(value).trim()
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Which trip this request is asking about.
+ *
+ * The **path is authoritative**, not the query string. `netlify.toml` rewrites
+ * both links here with `kind` and `id` written into the target, but a rewrite
+ * doesn't carry them — which is why every link pasted into a chat got the
+ * generic card while calling this function directly worked perfectly, and why
+ * the two look identical from the outside. Reading the address the request
+ * actually arrived on doesn't depend on that behaviour either way.
+ *
+ * The query string is still honoured when the path holds no link, so addressing
+ * the function directly — how `curl` reaches it when verifying — keeps working.
+ * It is the fallback rather than the first choice because a rewrite that passed
+ * the placeholder through un-substituted would look like a perfectly good `id`.
+ */
+function target(event: HandlerEvent): { kind: PreviewKind; id: string } | null {
+  for (const path of [event.path, pathOf(event.rawUrl)]) {
+    const match = /^\/(trip|i)\/([^/?#]+)/.exec(path ?? '')
+    if (match) {
+      const id = decodeId(match[2])
+      if (id) return { kind: match[1] === 'trip' ? 'trip' : 'share', id }
+    }
+  }
+
+  const kind = parseKind(event.queryStringParameters?.kind)
+  const id = event.queryStringParameters?.id?.trim()
+  return kind && id ? { kind, id } : null
+}
+
 const html = (body: string, cache: string) => ({
   statusCode: 200,
   headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': cache },
@@ -167,14 +213,14 @@ export const handler: Handler = async (event) => {
   }
 
   const ua = event.headers?.['user-agent'] ?? ''
-  const kind = parseKind(event.queryStringParameters?.kind) as PreviewKind | null
-  const id = event.queryStringParameters?.id?.trim() ?? ''
+  const link = target(event)
 
   // A browser never needs the trip data — the app fetches it itself — so skip
   // straight past Firestore, and past importing the Admin SDK at all.
-  if (!kind || !id || !isCrawler(ua)) {
+  if (!link || !isCrawler(ua)) {
     return html(shellHtml, 'public, max-age=0, must-revalidate')
   }
+  const { kind, id } = link
 
   try {
     const { lookupTrip } = await import('./lib/tripLookup')
