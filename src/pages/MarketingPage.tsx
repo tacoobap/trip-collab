@@ -32,12 +32,12 @@ export function MarketingPage() {
           <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 lg:items-center">
             <div className="max-w-xl">
               <h1 className="font-serif text-4xl sm:text-5xl font-bold text-foreground leading-[1.1] text-balance">
-                Plan the trip together, not in a group chat and a shared doc.
+                One place to plan the whole trip together.
               </h1>
               <p className="mt-5 text-lg text-muted-foreground leading-relaxed">
-                Right now it's split three ways — messages, someone's calendar,
-                and a doc that stopped being true a week ago. Here it's one
-                board, and one link that hands it to everyone.
+                It doesn't have to live in a group chat, a shared doc and
+                someone's calendar. Ideas, the day-by-day plan and where you're
+                staying all sit on one board — and one link hands it to everyone.
               </p>
               <div className="mt-8">
                 <Link to="/sign-in">
