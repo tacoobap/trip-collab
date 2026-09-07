@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { X, LockOpen, Loader2, Trash2, ExternalLink, Check } from 'lucide-react'
+import { X, LockOpen, Loader2, Trash2, ExternalLink, Check, NotebookPen } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   addProposal,
@@ -427,28 +427,51 @@ function InlineNote({ proposal, canEdit }: { proposal: Proposal; canEdit: boolea
     )
   }
 
+  // A viewer with nothing to read gets nothing; the control is for editors.
   if (!note && !canEdit) return null
+
+  const startEditing = () => {
+    if (!canEdit) return
+    setDraft(proposal.note ?? '')
+    setEditing(true)
+  }
+
+  /**
+   * Two different things wearing one style was the bug that hid this: a written
+   * note is content, and reads as text you can click into, but an empty one is
+   * a control and has to carry the same weight as "Add another idea" below it.
+   * At `text-muted-foreground/50` it read as disabled placeholder text, and
+   * nobody found it.
+   */
+  if (!note) {
+    return (
+      <button
+        type="button"
+        onClick={startEditing}
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors max-sm:min-h-[44px]"
+      >
+        <NotebookPen className="w-3.5 h-3.5 shrink-0" />
+        Add a note
+      </button>
+    )
+  }
 
   return (
     <button
       type="button"
-      onClick={() => {
-        if (!canEdit) return
-        setDraft(proposal.note ?? '')
-        setEditing(true)
-      }}
+      onClick={startEditing}
       disabled={!canEdit}
-      aria-label={note ? 'Edit this note' : 'Add a note'}
+      aria-label="Edit this note"
       className={cn(
         'block w-full text-left text-sm rounded px-1 -mx-1 py-0.5 transition-colors',
-        note ? 'text-muted-foreground whitespace-pre-wrap' : 'text-muted-foreground/50',
+        'text-muted-foreground whitespace-pre-wrap',
         canEdit &&
           'underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 ' +
             'hover:bg-primary/5 hover:decoration-primary',
         'disabled:pointer-events-none disabled:no-underline'
       )}
     >
-      {note ?? 'Add a note'}
+      {note}
       {saving && <Loader2 className="inline w-3 h-3 ml-1.5 animate-spin opacity-50" />}
     </button>
   )
