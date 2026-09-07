@@ -155,6 +155,29 @@
   }
 }
 
+/* ── A field never zooms the page ─────────────────────────────────────────
+   iOS Safari zooms in the moment a focused form control computes under 16px,
+   and it does not zoom back out on blur — one tap on a 14px field leaves the
+   whole app magnified until you pinch out by hand. Individual fields have
+   been chased up to 16px twice already and a third slipped through, so this
+   is the floor instead: below `sm` every control that takes text renders at
+   at least 16px, whatever utility it carries.
+
+   The `:not()`s are load-bearing. The type ones keep the rule off controls
+   that never take typed text, and the size ones let a field that is already
+   larger than the threshold keep its own size — the event sheet's `text-lg`
+   title is the only one in the app today. Together they also lift the
+   selector above a bare `text-sm` utility, which is the whole point.
+
+   `sm` and up is untouched: that is a mouse, and the design sizes stand. */
+@media (max-width: 639.98px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(.text-base):not(.text-lg):not(.text-xl):not(.text-2xl),
+  textarea:not(.text-base):not(.text-lg):not(.text-xl):not(.text-2xl),
+  select:not(.text-base):not(.text-lg):not(.text-xl):not(.text-2xl) {
+    font-size: max(16px, 1rem);
+  }
+}
+
 /* ── Print / "Export PDF" (itinerary) ─────────────────────────────────────
    The PDF is the live page repaginated, not a separate layout, so design
    changes flow through automatically. Triggered from useItineraryExport.

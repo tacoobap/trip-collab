@@ -62,7 +62,16 @@ function TimePartInput({
       }}
       placeholder="e.g. 9:00 AM"
       className={cn(
-        'text-sm font-semibold bg-transparent border-b outline-none text-foreground w-24 min-w-0',
+        // The 16px floor in index.css lifts this to 16px on phones so focusing
+        // it can't zoom the page, and the wider text has to go somewhere.
+        // `shrink-0` is what stops the flex row it sits in from clipping the
+        // last character; the width then has to be honest about what it holds.
+        // A time needs 70px at 16px, the "e.g. 9:00 AM" placeholder 93px — and
+        // the placeholder only ever shows on a slot with no time yet, where
+        // this field is alone in the row and 96px fits. With a time either
+        // side of a dash, 96px pushed past the header on a 360px screen.
+        'text-sm font-semibold bg-transparent border-b outline-none text-foreground shrink-0',
+        initial === '' ? 'w-24' : 'w-[4.75rem] sm:w-24',
         error ? 'border-destructive' : 'border-primary'
       )}
       aria-invalid={!!error}
@@ -156,7 +165,10 @@ function InlineTimeRange({ slot, canEdit }: { slot: SlotWithProposals; canEdit: 
   )
 
   return (
-    <span className="inline-flex flex-col gap-0.5 min-w-0">
+    // While a part is being edited the field keeps its full width and the
+    // day label beside it truncates instead — the other way round clipped
+    // the time itself, which is the thing being typed.
+    <span className={cn('inline-flex flex-col gap-0.5 min-w-0', editing && 'shrink-0')}>
       <span className="flex items-center gap-1 text-sm font-semibold text-foreground whitespace-nowrap">
         {start === null && editing === null && (
           <button
