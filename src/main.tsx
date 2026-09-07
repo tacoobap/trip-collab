@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/components/ui/ToastProvider'
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import App from './App'
 
 // Google Analytics 4 (optional): set VITE_GA_MEASUREMENT_ID in .env
@@ -23,10 +24,14 @@ if (gaId) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </AuthProvider>
+    {/* Outside the router, so it also covers the providers and the router
+        itself — anything that throws before a route gets to render. */}
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )

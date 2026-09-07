@@ -18,6 +18,7 @@ import { firebaseProjectId } from '@/lib/firebase'
 import { Loader2, BedDouble, ListChecks, Pencil } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
 import { PlanningHistoryProvider } from '@/contexts/PlanningHistoryProvider'
+import { TripInvitePreview } from '@/components/marketing/TripInvitePreview'
 import { UndoButton } from '@/components/planning/UndoButton'
 
 export function TripPage() {
@@ -86,7 +87,22 @@ export function TripPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Signed out, this check has to come before the trip loads at all: rules deny
+  // an unauthenticated read, so waiting for `useTrip` only ever arrives at
+  // "Trip not found" for someone who was handed a perfectly good invite link.
+  if (!user) {
+    return <TripInvitePreview slug={slug} />
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -101,7 +117,7 @@ export function TripPage() {
           <p className="text-lg font-serif font-semibold text-foreground mb-2">
             {error || 'Trip not found'}
           </p>
-          {user && import.meta.env.DEV && (
+          {import.meta.env.DEV && (
             <>
               <p className="text-xs text-muted-foreground mb-1 font-mono break-all max-w-md mx-auto">
                 Signed-in UID: {user.uid}
@@ -111,50 +127,9 @@ export function TripPage() {
               </p>
             </>
           )}
-          {!user && (
-            <p className="text-sm text-muted-foreground mb-4">
-              Sign in to view this trip.
-            </p>
-          )}
-          <div className="flex flex-col gap-2">
-            {!user && (
-              <a
-                href={slug ? `/sign-in?from=/trip/${slug}` : '/sign-in'}
-                className="text-sm text-primary hover:underline"
-              >
-                Sign in with Google
-              </a>
-            )}
-            <a href="/" className="text-sm text-primary hover:underline">
-              ← Back to home
-            </a>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 text-center">
-        <div>
-          <p className="text-lg font-serif font-semibold text-foreground mb-2">
-            Sign in to view this trip
-          </p>
-          <p className="text-sm text-muted-foreground mb-4">
-            You need to be signed in to access trip plans.
-          </p>
-          <div className="flex flex-col gap-2">
-            <a
-              href={slug ? `/sign-in?from=/trip/${slug}` : '/sign-in'}
-              className="text-sm text-primary hover:underline"
-            >
-              Sign in with Google
-            </a>
-            <a href="/" className="text-sm text-primary hover:underline">
-              ← Back to home
-            </a>
-          </div>
+          <a href="/home" className="text-sm text-primary hover:underline">
+            ← Back to home
+          </a>
         </div>
       </div>
     )

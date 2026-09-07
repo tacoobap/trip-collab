@@ -299,24 +299,37 @@ one.
 `addLockedSlot` gained `note` / `url` so `place_name` and `google_maps_url`
 carry across the way `handlePickFromCollection` does.
 
-### 5. Give signed-out visitors something to land on
+### 5. Give signed-out visitors something to land on — **done (7 Sep 2026)**
 
-**What's wrong.** `/` is `SignInPage` — a wordmark, one line of copy and a
-sign-in form (`src/App.tsx`, `src/pages/SignInPage.tsx`). Nothing says what the
-app is or shows what it looks like. `src/pages/LandingPage.tsx:113` still
-carries the comment `// Signed out: marketing + sign-in`, but that marketing
-page doesn't exist. Anyone sent an invite link who isn't signed in hits an auth
-wall with no idea what they're being invited to.
+`/` is now `MarketingPage` (`src/pages/MarketingPage.tsx`) for anyone signed
+out; `RootRoute` in `App.tsx` sends a signed-in visitor straight to `/home`, and
+`/sign-in` keeps the bare form so `?from=` redirects still land somewhere
+focused. The page shows the product with drawn mockups
+(`src/components/marketing/Mockups.tsx`) rather than screenshots — the app is
+behind sign-in, so a real capture would need an account and somewhere to host
+the file, and would go stale on every UI change. They're built from the same
+tokens and proportions as the real surfaces. Nothing on the page starts at
+`opacity: 0`: a landing page shouldn't need JS to become readable, so the
+entrance animations went.
 
-Related and cheap: every "sign in" link outside the sign-in page reads **Sign in
-with Google** (`TripPage.tsx`, `ItineraryPage.tsx`, `CollectionPage.tsx`) even
-though email/password sign-in exists. Make it just "Sign in".
+An invitee arriving signed out at `/trip/:slug` (or its `/itinerary` and
+`/collection` siblings) now gets `TripInvitePreview` — the trip's cover photo,
+name, dates and destinations, then **Sign in to join**. The fields come from a
+new public `trip-preview` function, a thin wrapper over the `lookupTrip` that
+`link-preview` already uses, so it reads through the Admin SDK and
+`firestore.rules` stays closed. It reveals exactly what pasting the link into a
+chat already reveals, and nothing more.
 
-**Done when** signed-out `/` explains the product and shows it, with sign-in
-still one click away; and an invitee arriving at `/trip/:slug` signed out sees
-at least the trip's name, dates and cover photo before being asked to sign in.
-That data already exists server-side — `netlify/functions/lib/tripPreview.ts`
-assembles exactly this for link previews.
+Two things worth keeping in mind. The `!user` check had to move **above** the
+trip load in all three pages: rules deny an unauthenticated read, so waiting for
+`useTrip` only ever arrived at "Trip not found" for someone holding a perfectly
+good invite link. And `formatRange` in `netlify/functions/lib/tripPreview.ts`
+can't be imported from `src`, so `TripInvitePreview` has its own range collapse
+— building the tail from the ISO string, because Intl asked for a day and a year
+and nothing else renders "2026 (day: 18)".
+
+The related label fix is done too: the "Sign in with Google" links outside the
+sign-in page now read "Sign in".
 
 ### 6. Per-trip browser tab title
 
@@ -346,23 +359,41 @@ everything trip-level behind one consistent control, or make the drawers
 reachable from every page — the goal is a single rule for "where do I find a
 thing about this trip".
 
-### 8. Error boundary, and type-check the functions
+### 8. Error boundary, and type-check the functions — **done (7 Sep 2026)**
 
-`src/main.tsx` mounts `App` bare — there is no error boundary anywhere in the
-tree, so one bad document renders a white page with no way back. That matters
-more than usual here because so much of the schema is optional-or-legacy:
-`start_minutes?`, `duration_minutes?`, `stretches_grid?`, slots with no
-`trip_id` that resolve through `day_id`, and the legacy booking fields on
-`Proposal`.
+**Error boundary.** `src/components/shared/ErrorBoundary.tsx` is mounted twice:
+route-level in `App.tsx`, wrapping `<Routes>` inside the router, and top-level in
+`main.tsx`, outside it, so a throw in `AuthProvider`, `ToastProvider` or the
+router itself is caught too. The fallback is an apology, a **Reload** button and
+a link to `/home`; in DEV it also prints the stack. `componentDidCatch` logs to
+the console with the component stack and sends a GA `exception` event — a no-op
+without `VITE_GA_MEASUREMENT_ID`, which is otherwise the only reason nobody ever
+hears about a production crash.
 
-**Done when** there's a route-level boundary that shows an apology, a **Reload**
-and a link back to `/home`, and logs the error — plus a top-level one for
-anything thrown outside a route.
+Two things worth knowing before changing it. The route boundary takes the
+pathname as `resetKey` rather than as React's `key`: a caught error is sticky by
+design, but keying the boundary would remount all of `<Routes>` on every
+navigation and throw away healthy page state, whereas `resetKey` only clears an
+error already on screen — which is what makes a browser Back out of a crashed
+page recover. And the fallback's **Back to home** is a plain `<a href>`, not a
+`<Link>`: whatever broke is still mounted above it, so a fresh document is the
+only guaranteed reset.
 
-Separately: `npm run build` only type-checks `src` (`tsconfig.app.json`), so
-`netlify/functions/` ships unchecked — and that's where the auth verification,
-the share-token minting and the cascade delete live. Add a tsconfig for it and a
-`typecheck:functions` script, and run both in CI.
+Standard limits still apply — a boundary sees throws from rendering, lifecycles
+and constructors, but not from event handlers, `setTimeout` or a rejected
+promise. Those keep needing the try/catch-and-toast the pages already do.
+
+**Type-checking the functions.** `tsconfig.functions.json` covers
+`netlify/functions/`, run by `npm run typecheck:functions`. It is deliberately
+**not** in `tsconfig.json`'s `references`, so `npm run build` is unchanged —
+Netlify bundles functions with its own esbuild pass, and a type error there
+shouldn't be able to fail the site build. Its first run found one: `verifyAuth.ts`
+typed `match` as `false | RegExpMatchArray | null` via `&&`, and `?.` doesn't
+short-circuit on `false`. It happened to behave (`false[1]` is `undefined`), but
+the type was a lie; it's a ternary now.
+
+Not done: there is still no CI — no `.github/workflows` at all — so `lint`,
+`build` and `typecheck:functions` are local-only.
 
 ### 9. Image storage — move off the GitHub repo
 

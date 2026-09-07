@@ -24,6 +24,7 @@ import { useNarrativeGeneration } from '@/hooks/useNarrativeGeneration'
 import { useItineraryExport } from '@/hooks/useItineraryExport'
 import { searchImage } from '@/lib/imageSearch'
 import { formatTripDate } from '@/lib/utils'
+import { TripInvitePreview } from '@/components/marketing/TripInvitePreview'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -287,7 +288,21 @@ export function ItineraryPage() {
     setUpdateTextModalOpen(true)
   }
 
-  if (authLoading || loading) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Before the trip load, not after: rules deny an unauthenticated read, so
+  // waiting only ever lands an invitee on "Trip not found".
+  if (!user) {
+    return <TripInvitePreview slug={slug} returnTo={slug ? `/trip/${slug}/itinerary` : undefined} />
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -300,42 +315,9 @@ export function ItineraryPage() {
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
           <p className="text-muted-foreground mb-2">{error || 'Trip not found'}</p>
-          {!user && (
-            <a href="/sign-in" className="text-sm text-primary hover:underline">
-              Sign in with Google
-            </a>
-          )}
-          <div className="mt-2">
-            <a href="/" className="text-sm text-primary hover:underline">
-              ← Back to home
-            </a>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 text-center">
-        <div>
-          <p className="text-lg font-serif font-semibold text-foreground mb-2">
-            Sign in to view this trip
-          </p>
-          <p className="text-sm text-muted-foreground mb-4">
-            You need to be signed in to view the itinerary.
-          </p>
-          <div className="flex flex-col gap-2">
-            <a
-              href={slug ? `/sign-in?from=/trip/${slug}/itinerary` : '/sign-in'}
-              className="text-sm text-primary hover:underline"
-            >
-              Sign in with Google
-            </a>
-            <a href="/" className="text-sm text-primary hover:underline">
-              ← Back to home
-            </a>
-          </div>
+          <a href="/home" className="text-sm text-primary hover:underline">
+            ← Back to home
+          </a>
         </div>
       </div>
     )

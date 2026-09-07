@@ -47,7 +47,7 @@ export function serialize<T>(value: T): T {
  */
 export async function getAuthUidFromEvent(event: HandlerEvent): Promise<string | null> {
   const authHeader = event.headers?.authorization || event.headers?.Authorization
-  const match = typeof authHeader === 'string' && authHeader.match(/^Bearer\s+(.+)$/i)
+  const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer\s+(.+)$/i) : null
   const token = match?.[1]
   if (!token) return null
   try {
