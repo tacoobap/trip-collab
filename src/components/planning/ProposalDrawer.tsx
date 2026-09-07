@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { X, LockOpen, Loader2, Trash2, ExternalLink, Check, NotebookPen } from 'lucide-react'
+import { X, LockOpen, Loader2, Trash2, ExternalLink, Check, NotebookPen, Link2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   addProposal,
@@ -25,6 +25,12 @@ import { AddProposalForm } from './AddProposalForm'
 import { PickFromCollectionModal } from './PickFromCollectionModal'
 import { Button } from '@/components/ui/button'
 import { formatTimeLabel, parseTimeToMinutes, minutesToTimeLabel } from '@/lib/timeUtils'
+import {
+  classifyPlaceInput,
+  mapsSearchUrl,
+  normalizePlaceUrl,
+  placeFieldValue,
+} from '@/lib/placeInput'
 import {
   slotStartMinutes,
   slotDurationMinutes,
@@ -477,6 +483,125 @@ function InlineNote({ proposal, canEdit }: { proposal: Proposal; canEdit: boolea
   )
 }
 
+/**
+ * Where the event is. Until now this was the one field on a decided event you
+ * could read but never write: the link only rendered when it already existed,
+ * because the editor lives on `ProposalCard` and a locked proposal is never
+ * drawn as one. So a link pasted wrong stayed wrong, and one you didn't have
+ * yet could never be added.
+ *
+ * It takes an address as readily as a URL, on the same reasoning as the
+ * collection form — you know where a place is long before you have found it on
+ * a map — so `classifyPlaceInput` decides which it got and an address is saved
+ * as a Google Maps search for it. `placeFieldValue` reads that back as the
+ * address, so re-opening the field shows what was typed.
+ */
+function InlineLink({ proposal, canEdit }: { proposal: Proposal; canEdit: boolean }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(() => placeFieldValue(proposal.url))
+  const [saving, setSaving] = useState(false)
+
+  const url = proposal.url?.trim() || null
+  const label = placeFieldValue(proposal.url)
+
+  const commit = async () => {
+    const typed = draft.trim()
+    const kind = classifyPlaceInput(typed)
+    const next =
+      kind === 'empty' ? null : kind === 'url' ? normalizePlaceUrl(typed) : mapsSearchUrl(typed)
+    setEditing(false)
+    if (next === (proposal.url ?? null)) return
+    setSaving(true)
+    try {
+      await updateProposal(proposal.id, {
+        title: proposal.title,
+        note: proposal.note ?? null,
+        url: next,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+          if (e.key === 'Escape') {
+            setDraft(placeFieldValue(proposal.url))
+            setEditing(false)
+          }
+        }}
+        placeholder="A Google Maps link, or just the address"
+        aria-label="Link or address"
+        // The 16px floor in index.css lifts this on phones so focusing it can't
+        // zoom the page.
+        className="w-full min-w-0 bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/40 border-b border-primary"
+      />
+    )
+  }
+
+  // A viewer with nothing to open gets nothing; the control is for editors.
+  if (!url && !canEdit) return null
+
+  const startEditing = () => {
+    if (!canEdit) return
+    setDraft(placeFieldValue(proposal.url))
+    setEditing(true)
+  }
+
+  // Empty: a control, weighted to match "Add a note" beside it.
+  if (!url) {
+    return (
+      <button
+        type="button"
+        onClick={startEditing}
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors max-sm:min-h-[44px]"
+      >
+        <Link2 className="w-3.5 h-3.5 shrink-0" />
+        Add a link or address
+      </button>
+    )
+  }
+
+  // Filled: two different things to want, so two targets rather than a hover
+  // reveal — opening it is the common one, and touch has no hover to give.
+  return (
+    <span className="flex items-center gap-2 min-w-0 max-w-full text-sm">
+      <button
+        type="button"
+        onClick={startEditing}
+        disabled={!canEdit}
+        aria-label="Change the link or address"
+        className={cn(
+          'min-w-0 truncate text-left text-muted-foreground rounded px-1 -mx-1 py-0.5 transition-colors',
+          canEdit &&
+            'underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 ' +
+              'hover:bg-primary/5 hover:decoration-primary',
+          'disabled:pointer-events-none disabled:no-underline'
+        )}
+      >
+        {label}
+      </button>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1 shrink-0 text-xs text-muted-foreground/70 hover:text-foreground transition-colors max-sm:min-h-[44px]"
+      >
+        <ExternalLink className="w-3 h-3 shrink-0" />
+        Open
+      </a>
+      {saving && <Loader2 className="w-3 h-3 animate-spin opacity-50 shrink-0" />}
+    </span>
+  )
+}
+
 // ── Main drawer ─────────────────────────────────────────────────────────────
 
 interface ProposalDrawerProps {
@@ -678,7 +803,19 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                   Closing is the X, the overlay, or Escape. The header keeps
                   the air the handle used to occupy. */}
               {/* Header */}
-              <div className="px-5 pt-5 sm:pt-4 pb-3 border-b border-border shrink-0">
+              {/* A decided event is one object, so it gets one block: no rule
+                  under the header and no bottom padding either, because the
+                  body below carries the gap down to the note. Note and link
+                  stay in the scrolling body rather than moving up here — this
+                  half is `shrink-0`, and a long note has to be able to scroll.
+                  Still deciding is the other case: a ballot follows, and the
+                  rule is what bounds it. */}
+              <div
+                className={cn(
+                  'px-5 pt-5 sm:pt-4 shrink-0',
+                  isLocked ? (bodyEmpty ? 'pb-3' : 'pb-0') : 'pb-3 border-b border-border'
+                )}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="relative flex items-start gap-2 min-w-0 flex-1">
                     {canEdit ? (
@@ -772,19 +909,16 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                 {/* Decided: just the thing itself, with the ideas it beat folded
                     away as history. The ballot only comes back when unlocked. */}
                 {isLocked && lockedProposal ? (
-                  <div className="py-3">
-                    <InlineNote proposal={lockedProposal} canEdit={canEdit} />
-                    {lockedProposal.url && (
-                      <a
-                        href={lockedProposal.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">Open link</span>
-                      </a>
-                    )}
+                  // `pt-3.5` is the whole gap between the time row and the note,
+                  // now that the header above gives none — the two read as one
+                  // block, which is the point.
+                  <div className="pt-3.5 pb-3">
+                    {/* What this event is: the note and where it is. Siblings,
+                        so they carry the same weight and sit on one rhythm. */}
+                    <div className="flex flex-col gap-2">
+                      <InlineNote proposal={lockedProposal} canEdit={canEdit} />
+                      <InlineLink proposal={lockedProposal} canEdit={canEdit} />
+                    </div>
                     {otherIdeas.length > 0 && (
                       <details className="mt-3 group/other">
                         <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors">
@@ -878,16 +1012,22 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
               </div>
               )}
 
-              {/* Footer — only when locked and member can edit */}
+              {/* Footer — only when locked and member can edit.
+                  The sheet's one remaining rule, and it now means something:
+                  everything above it edits this event, the one thing below it
+                  hands the decision back to the group. Which is also why this
+                  row is smaller and quieter than the note and link above —
+                  matched in weight, they read as three of the same thing, and
+                  that was the reason nobody could tell them apart. */}
               {canEdit && isLocked && (
-                <div className={cn('px-5 py-3 shrink-0', !bodyEmpty && 'border-t border-border')}>
+                <div className="px-5 py-2.5 shrink-0 border-t border-border">
                   <button
                     type="button"
                     onClick={handleReopenWithIdea}
                     disabled={unlockLoading}
-                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 max-sm:min-h-[44px]"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50 max-sm:min-h-[44px]"
                   >
-                    <LockOpen className="w-3.5 h-3.5 shrink-0" />
+                    <LockOpen className="w-3 h-3 shrink-0" />
                     {unlockLoading ? 'Reopening…' : 'Add another idea — reopens this for the group'}
                   </button>
                 </div>
