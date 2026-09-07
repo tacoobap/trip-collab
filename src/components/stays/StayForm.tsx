@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { MapsLinkStatus } from '@/components/shared/MapsLinkStatus'
 import { useMapsLinkLocation } from '@/hooks/useMapsLinkLocation'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
+import { classifyPlaceInput, normalizePlaceUrl, placeFieldValue } from '@/lib/placeInput'
 import type { StayInput } from '@/services/staysService'
 import type { Stay, Trip } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -47,17 +48,27 @@ export function StayForm({
   const [customCity, setCustomCity] = useState(stay && !cityIsKnown ? stay.city : '')
   const [checkIn, setCheckIn] = useState(stay?.check_in ?? trip.start_date ?? '')
   const [checkOut, setCheckOut] = useState(stay?.check_out ?? trip.end_date ?? '')
-  const [mapsUrl, setMapsUrl] = useState(stay?.google_maps_url ?? '')
+  // An address saved as a search link reads back as the address it was typed as.
+  const savedPlaceValue = placeFieldValue(stay?.google_maps_url)
+  const [mapsUrl, setMapsUrl] = useState(savedPlaceValue)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const effectiveCity = city === CUSTOM_CITY ? customCity.trim() : city
 
   const location = useMapsLinkLocation({
-    url: mapsUrl,
+    value: mapsUrl,
     getToken,
     lookupQuery: [name.trim(), effectiveCity].filter(Boolean).join(', '),
     lookupKey: effectiveCity,
+    saved: stay
+      ? {
+          value: savedPlaceValue,
+          latitude: stay.latitude,
+          longitude: stay.longitude,
+          placeName: stay.place_name,
+        }
+      : null,
     onLinkName: isEdit
       ? undefined
       : (placeName) => setName((current) => current.trim() || placeName),
@@ -65,9 +76,12 @@ export function StayForm({
 
   const handleMapsUrlChange = (value: string) => {
     setMapsUrl(value)
+    // Only a link carries a name worth borrowing. An address is where a place
+    // is, not what it's called, so it never fills in the name.
     if (!isEdit) {
-      const parsed = value.trim() ? parseGoogleMapsUrl(value.trim()) : null
-      if (parsed?.placeName && !name.trim()) setName(parsed.placeName)
+      const fromLink =
+        classifyPlaceInput(value) === 'url' ? parseGoogleMapsUrl(normalizePlaceUrl(value)) : null
+      if (fromLink?.placeName && !name.trim()) setName(fromLink.placeName)
     }
     setError('')
   }
@@ -124,13 +138,13 @@ export function StayForm({
 
       <div className="min-w-0">
         <label className="block text-xs font-medium text-foreground mb-1">
-          Google Maps link (optional)
+          Address or Google Maps link (optional)
         </label>
         <Input
           value={mapsUrl}
           onChange={(e) => handleMapsUrlChange(e.target.value)}
-          placeholder="Paste a Maps link to pin it on the collection map"
-          type="url"
+          placeholder="Paste a Maps link or type an address to pin it on the map"
+          type="text"
           className="text-sm w-full min-w-0"
         />
         <MapsLinkStatus location={location} />

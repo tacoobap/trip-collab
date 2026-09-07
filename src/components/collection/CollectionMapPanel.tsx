@@ -60,7 +60,8 @@ export function CollectionMapPanel({
             <>
               {plural(unmappable.linksWithoutPosition)}{' '}
               {unmappable.linksWithoutPosition === 1 ? 'links' : 'link'} to Maps without a
-              position — search for the place and copy the link from the address bar.
+              position — open {unmappable.linksWithoutPosition === 1 ? 'it' : 'one'} for editing
+              and type the address instead.
             </>
           )}
         </p>

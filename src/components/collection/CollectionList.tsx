@@ -214,7 +214,8 @@ export function CollectionList({
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Nothing here has a Google Maps link with coordinates yet.
+                    Nothing here has a location yet — add an address or a Google
+                    Maps link to an idea to pin it.
                   </p>
                 )
               ) : (

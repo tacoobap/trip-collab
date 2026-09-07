@@ -9,6 +9,7 @@ import { searchImage } from '@/lib/imageSearch'
 import { useImageDrop } from '@/hooks/useImageDrop'
 import type { DroppedImage } from '@/lib/imageFromTransfer'
 import { parseGoogleMapsUrl } from '@/lib/parseGoogleMapsUrl'
+import { classifyPlaceInput, normalizePlaceUrl, placeFieldValue } from '@/lib/placeInput'
 import { useMapsLinkLocation } from '@/hooks/useMapsLinkLocation'
 import { MapsLinkStatus } from '@/components/shared/MapsLinkStatus'
 import type { CollectionItem, CollectionItemCategory } from '@/types/database'
@@ -50,7 +51,9 @@ export function CollectionItemForm({
     (item?.category as CollectionItemCategory) ?? 'other'
   )
   const [destination, setDestination] = useState<string | null>(item?.destination ?? null)
-  const [mapsUrl, setMapsUrl] = useState(item?.google_maps_url ?? '')
+  // An address saved as a search link reads back as the address it was typed as.
+  const savedPlaceValue = placeFieldValue(item?.google_maps_url)
+  const [mapsUrl, setMapsUrl] = useState(savedPlaceValue)
   const [url, setUrl] = useState(item?.url ?? '')
   const [note, setNote] = useState(item?.note ?? '')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -65,10 +68,18 @@ export function CollectionItemForm({
   const revealPhotoRef = useRef(false)
 
   const location = useMapsLinkLocation({
-    url: mapsUrl,
+    value: mapsUrl,
     getToken,
     lookupQuery: [name.trim(), destination?.trim()].filter(Boolean).join(', '),
     lookupKey: destination,
+    saved: item
+      ? {
+          value: savedPlaceValue,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          placeName: item.place_name,
+        }
+      : null,
     // An expanded link is often the first thing that knows the name.
     onLinkName: isEdit
       ? undefined
@@ -77,12 +88,12 @@ export function CollectionItemForm({
 
   const effectiveMapsUrl = location.effectiveUrl
   const parsed = location.position
-  // A geocoded `placeName` is a postal address ("Vidyarthi Bhavan, 32, Gandhi
-  // Bazaar Main Road, …"), which finds no photo. Use what the user called it.
+  // A looked-up `placeName` is a postal address ("Vidyarthi Bhavan, 32, Gandhi
+  // Bazaar Main Road, …"), which finds no photo — as is a typed address. Only a
+  // name that came off the link itself is worth searching for a picture of;
+  // otherwise use what the user called it.
   const searchQuery = parsed
-    ? location.source === 'search'
-      ? name.trim() || null
-      : parsed.placeName?.trim() || name.trim() || null
+    ? (location.source === 'link' ? parsed.placeName?.trim() : null) || name.trim() || null
     : null
 
   useEffect(() => {
@@ -117,12 +128,12 @@ export function CollectionItemForm({
 
   const handleMapsUrlChange = (value: string) => {
     setMapsUrl(value)
-    if (!isEdit) {
-      const result = value.trim() ? parseGoogleMapsUrl(value.trim()) : null
-      if (result?.placeName && !name.trim()) setName(result.placeName)
-    }
-    const hasPlace = value.trim() && parseGoogleMapsUrl(value.trim())?.placeName
-    if (!hasPlace) setFetchedImageUrl(isEdit && item?.image_url ? item.image_url : null)
+    // Only a link carries a name worth borrowing. An address is where a place
+    // is, not what it's called, so it never fills in the name.
+    const fromLink =
+      classifyPlaceInput(value) === 'url' ? parseGoogleMapsUrl(normalizePlaceUrl(value)) : null
+    if (!isEdit && fromLink?.placeName && !name.trim()) setName(fromLink.placeName)
+    if (!fromLink?.placeName) setFetchedImageUrl(isEdit && item?.image_url ? item.image_url : null)
     setSubmitError(null)
   }
 
@@ -230,13 +241,13 @@ export function CollectionItemForm({
     <form onSubmit={handleSubmit} {...dropHandlers} className="space-y-4 min-w-0">
       <div className="min-w-0">
         <label className="block text-sm font-medium text-foreground mb-1">
-          Google Maps link (optional)
+          Address or Google Maps link (optional)
         </label>
         <Input
           value={mapsUrl}
           onChange={(e) => handleMapsUrlChange(e.target.value)}
-          placeholder="Paste a Google Maps URL to extract name and location"
-          type="url"
+          placeholder="Paste a Maps link, or type an address"
+          type="text"
           className="w-full min-w-0"
         />
         <MapsLinkStatus location={location} />
@@ -260,7 +271,7 @@ export function CollectionItemForm({
             setName(e.target.value)
             setSubmitError(null)
           }}
-          placeholder={isEdit ? 'e.g. Husk, Rainbow Row walk' : 'e.g. Husk, Rainbow Row walk (or paste Maps link above)'}
+          placeholder={isEdit ? 'e.g. Husk, Rainbow Row walk' : 'e.g. Husk, Rainbow Row walk (or paste a Maps link above)'}
           maxLength={300}
           required
           className="w-full"
