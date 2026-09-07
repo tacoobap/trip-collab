@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarPlus, Check, Loader2 } from 'lucide-react'
+import { CalendarPlus, Check, ChevronDown, Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -90,6 +90,31 @@ function dayIdsHolding(item: CollectionItem, days: DayWithSlots[]): Set<string> 
   return ids
 }
 
+/** Same rule `CollectionList` groups by, so the two agree on what one city is. */
+function sameCity(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+/**
+ * Days in the idea's own city first, the rest folded away behind a toggle.
+ *
+ * Scheduling a Kyoto restaurant onto a Tokyo day is nearly always a mistake, so
+ * the matching days are the whole list until you ask for more. Two cases have
+ * no basis to split on and show everything instead: a legacy item carrying no
+ * `destination`, and an idea whose city no day is in — hiding every day behind
+ * a toggle there would be a worse list, not a shorter one.
+ */
+function splitByCity(
+  item: CollectionItem,
+  days: DayWithSlots[]
+): { inCity: DayWithSlots[]; elsewhere: DayWithSlots[] } {
+  const destination = item.destination?.trim()
+  if (!destination) return { inCity: days, elsewhere: [] }
+  const inCity = days.filter((d) => sameCity(d.city, destination))
+  if (inCity.length === 0) return { inCity: days, elsewhere: [] }
+  return { inCity, elsewhere: days.filter((d) => !sameCity(d.city, destination)) }
+}
+
 function dateTextFor(day: DayWithSlots): string | null {
   if (!day.date) return null
   return new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {
@@ -139,6 +164,7 @@ export function ScheduleIdeaDialog({
   const [endInput, setEndInput] = useState('')
   const [timeError, setTimeError] = useState<string | null>(null)
   const [savingDayId, setSavingDayId] = useState<string | null>(null)
+  const [showElsewhere, setShowElsewhere] = useState(false)
 
   // Each idea gets a fresh choice; a time typed for one shouldn't follow the next.
   useEffect(() => {
@@ -147,11 +173,13 @@ export function ScheduleIdeaDialog({
     setEndInput('')
     setTimeError(null)
     setSavingDayId(null)
+    setShowElsewhere(false)
   }, [open, item?.id])
 
   if (!item) return null
 
   const alreadyOn = dayIdsHolding(item, days)
+  const { inCity, elsewhere } = splitByCity(item, days)
   const schedule = resolveSchedule(startInput, endInput)
 
   // The hint always says what the current input would do, muted; only a commit
@@ -200,6 +228,43 @@ export function ScheduleIdeaDialog({
     } finally {
       setSavingDayId(null)
     }
+  }
+
+  const dayRow = (day: DayWithSlots) => {
+    const dateText = dateTextFor(day)
+    const saving = savingDayId === day.id
+    return (
+      <button
+        key={day.id}
+        type="button"
+        disabled={!!savingDayId}
+        onClick={() => void handlePick(day)}
+        className={cn(
+          'w-full text-left rounded-lg border border-border/60 bg-muted/20 p-2.5',
+          'flex items-center gap-2 transition-colors',
+          'hover:bg-muted/40 hover:border-primary/30',
+          'disabled:opacity-60 disabled:hover:bg-muted/20 disabled:hover:border-border/60'
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground text-sm truncate">{day.label}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {dateText && <span className="text-xs text-muted-foreground">{dateText}</span>}
+            {alreadyOn.has(day.id) && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Check className="w-3 h-3" />
+                Already here
+              </span>
+            )}
+          </div>
+        </div>
+        {saving ? (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+        ) : (
+          <CalendarPlus className="w-4 h-4 text-muted-foreground shrink-0" />
+        )}
+      </button>
+    )
   }
 
   const timeField = (
@@ -264,46 +329,32 @@ export function ScheduleIdeaDialog({
             </p>
           ) : (
             <div className="space-y-1">
-              {days.map((day) => {
-                const dateText = dateTextFor(day)
-                const saving = savingDayId === day.id
-                return (
+              {inCity.map(dayRow)}
+
+              {elsewhere.length > 0 && (
+                <>
                   <button
-                    key={day.id}
                     type="button"
-                    disabled={!!savingDayId}
-                    onClick={() => void handlePick(day)}
+                    onClick={() => setShowElsewhere((v) => !v)}
+                    aria-expanded={showElsewhere}
                     className={cn(
-                      'w-full text-left rounded-lg border border-border/60 bg-muted/20 p-2.5',
-                      'flex items-center gap-2 transition-colors',
-                      'hover:bg-muted/40 hover:border-primary/30',
-                      'disabled:opacity-60 disabled:hover:bg-muted/20 disabled:hover:border-border/60'
+                      'w-full flex items-center justify-center gap-1 py-3 touch-manipulation',
+                      'text-xs text-muted-foreground hover:text-foreground transition-colors'
                     )}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-foreground text-sm truncate">
-                        {day.label}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {dateText && (
-                          <span className="text-xs text-muted-foreground">{dateText}</span>
-                        )}
-                        {alreadyOn.has(day.id) && (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Check className="w-3 h-3" />
-                            Already here
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {saving ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
-                    ) : (
-                      <CalendarPlus className="w-4 h-4 text-muted-foreground shrink-0" />
-                    )}
+                    <ChevronDown
+                      className={cn(
+                        'w-3.5 h-3.5 transition-transform',
+                        showElsewhere && 'rotate-180'
+                      )}
+                    />
+                    {elsewhere.length === 1
+                      ? '1 day in another city'
+                      : `${elsewhere.length} days in other cities`}
                   </button>
-                )
-              })}
+                  {showElsewhere && elsewhere.map(dayRow)}
+                </>
+              )}
             </div>
           )}
         </div>

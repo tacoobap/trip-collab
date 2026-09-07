@@ -288,6 +288,14 @@ this day" shelf; a start alone runs `DEFAULT_DURATION_MIN`; an end replaces
 that. `resolveSchedule` is shared by the live hint and the commit so the two
 can't disagree.
 
+The day list is filtered to the idea's own city — `splitByCity` matches
+`item.destination` against `day.city` on the same case-insensitive rule
+`CollectionList` groups by — with the rest folded behind a "N days in other
+cities" toggle. Two cases have nothing to split on and show every day instead:
+a legacy item with no `destination`, and an idea whose city no day is in.
+Hiding every day behind a toggle there would be a worse list, not a shorter
+one.
+
 `addLockedSlot` gained `note` / `url` so `place_name` and `google_maps_url`
 carry across the way `handlePickFromCollection` does.
 
