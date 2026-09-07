@@ -65,6 +65,29 @@ export function TimeGridCard({
     ? lockedProposal?.title ?? slot.time_label
     : slot.proposals.map((p) => p.title).join(' · ')
 
+  /**
+   * The note, the way Google Calendar shows an event's location: a third line
+   * under the title, quieter than it, and only when the block is tall enough to
+   * hold one. Two hours is 92px at HOUR_PX, which is where a note first fits —
+   * paid for by the title's second line until 104px, see `titleOneLine`.
+   * Anything shorter keeps its note in the drawer.
+   *
+   * Locked only, and not by omission: an undecided slot has no single note to
+   * show, and `showMicro` already claims this line at exactly the same height.
+   */
+  const note = isLocked ? lockedProposal?.note?.trim() || null : null
+  const showNote = note !== null && height >= 92
+  /** Three hours leaves room for a second line before the card runs out. */
+  const noteClamp = height >= 138 ? 'line-clamp-2' : 'line-clamp-1'
+  /**
+   * A note costs the title its second line until the card is tall enough to
+   * hold both — the trade Google Calendar makes for the same reason. Measured
+   * at 260px wide: two lines of title plus a note line ends 93px down, so a
+   * 92px card clips the note by a pixel and eats its bottom padding. 104px
+   * (2h15) is the first height where both fit whole.
+   */
+  const titleOneLine = oneLine || (showNote && height < 104)
+
   // `touch-action` below stays scrollable: on touch the board only takes the
   // gesture once a long press has lifted the card (see LIFT_DELAY_MS).
   const placement =
@@ -80,7 +103,15 @@ export function TimeGridCard({
       data-slot-id={slot.id}
       tabIndex={0}
       role="button"
-      aria-label={`${isOpen ? 'Open slot' : title}, ${formatMinuteRange(start, duration)}`}
+      // The card is a button, so its label replaces its contents for a screen
+      // reader — the note has to be spoken here or it isn't spoken at all.
+      aria-label={[
+        isOpen ? 'Open slot' : title,
+        formatMinuteRange(start, duration),
+        showNote ? note : null,
+      ]
+        .filter(Boolean)
+        .join(', ')}
       className={cn(
         'group absolute overflow-hidden rounded-lg outline-none select-none',
         '[-webkit-touch-callout:none]',
@@ -129,7 +160,7 @@ export function TimeGridCard({
           {isProposed && (
             <p className={cn(
               'text-[13px] font-medium text-foreground break-words',
-              oneLine ? 'line-clamp-1' : 'line-clamp-2'
+              titleOneLine ? 'line-clamp-1' : 'line-clamp-2'
             )}>
               {slot.proposals.map((p, i) => (
                 <span key={p.id}>
@@ -142,12 +173,18 @@ export function TimeGridCard({
           {isLocked && (
             <p className={cn(
               'text-[13px] font-medium text-foreground break-words',
-              oneLine ? 'line-clamp-1' : 'line-clamp-2'
+              titleOneLine ? 'line-clamp-1' : 'line-clamp-2'
             )}>
               {title}
             </p>
           )}
         </div>
+      )}
+
+      {showNote && (
+        <p className={cn('mt-0.5 text-[11px] font-normal leading-snug text-muted-foreground/80 break-words', noteClamp)}>
+          {note}
+        </p>
       )}
 
       {showMicro && (

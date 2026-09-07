@@ -12,6 +12,15 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# satori shapes text with harfbuzz, whose emscripten glue loads `hb.wasm` from
+# its own directory at import time. Bundled, that directory becomes the
+# function's, where the file isn't — and because harfbuzzjs exports a bare
+# promise, the miss surfaces as an unhandled rejection during module load, so
+# every `og-image` request 502s before the handler runs at all. Left external,
+# the package ships whole and finds its wasm beside itself.
+[functions."og-image"]
+  external_node_modules = ["harfbuzzjs"]
+
 # `og-image` resizes a trip's cover photo through Netlify's image CDN before
 # drawing the card. Remote hosts have to be listed here or it refuses them —
 # these are the two places `image_url` can point at.

@@ -355,6 +355,105 @@ function InlineTitle({ proposal, canEdit }: { proposal: Proposal; canEdit: boole
   )
 }
 
+/**
+ * The note under the title — what Google Calendar puts where the location goes:
+ * the reservation name, the entrance to use, what to order. Editable in place
+ * like the title, because the only way one existed before was to schedule an
+ * idea out of the Collection and inherit its place name.
+ *
+ * The empty state is a control, not blank space: an event with nothing written
+ * on it is exactly the one that needs somewhere to write.
+ */
+function InlineNote({ proposal, canEdit }: { proposal: Proposal; canEdit: boolean }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(proposal.note ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const note = proposal.note?.trim() || null
+
+  // A note runs to a couple of lines as often as one, so the field grows with
+  // it rather than making you scroll a two-row box. Called from a ref callback
+  // and from onChange — never from the component body, which would bail the
+  // React Compiler out of this whole component.
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
+  const commit = async () => {
+    const next = draft.trim() || null
+    setEditing(false)
+    if (next === (proposal.note ?? null)) return
+    setSaving(true)
+    try {
+      await updateProposal(proposal.id, {
+        title: proposal.title,
+        note: next,
+        url: proposal.url ?? null,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <textarea
+        autoFocus
+        ref={autoGrow}
+        rows={1}
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          autoGrow(e.currentTarget)
+        }}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          // Enter breaks the line, as it does in any note field. Cmd/Ctrl+Enter
+          // is the deliberate save for anyone who reaches for it.
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) e.currentTarget.blur()
+          if (e.key === 'Escape') {
+            setDraft(proposal.note ?? '')
+            setEditing(false)
+          }
+        }}
+        placeholder="Reservation name, which entrance, what to order…"
+        aria-label="Note"
+        // The 16px floor in index.css lifts this on phones so focusing it can't
+        // zoom the page; `resize-none` because the height is already the text's.
+        className="w-full min-w-0 resize-none overflow-hidden bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/40 border-b border-primary"
+      />
+    )
+  }
+
+  if (!note && !canEdit) return null
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (!canEdit) return
+        setDraft(proposal.note ?? '')
+        setEditing(true)
+      }}
+      disabled={!canEdit}
+      aria-label={note ? 'Edit this note' : 'Add a note'}
+      className={cn(
+        'block w-full text-left text-sm rounded px-1 -mx-1 py-0.5 transition-colors',
+        note ? 'text-muted-foreground whitespace-pre-wrap' : 'text-muted-foreground/50',
+        canEdit &&
+          'underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 ' +
+            'hover:bg-primary/5 hover:decoration-primary',
+        'disabled:pointer-events-none disabled:no-underline'
+      )}
+    >
+      {note ?? 'Add a note'}
+      {saving && <Loader2 className="inline w-3 h-3 ml-1.5 animate-spin opacity-50" />}
+    </button>
+  )
+}
+
 // ── Main drawer ─────────────────────────────────────────────────────────────
 
 interface ProposalDrawerProps {
@@ -404,9 +503,19 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
   const otherIdeas = lockedProposal
     ? slot.proposals.filter((p) => p.id !== lockedProposal.id)
     : slot.proposals
-  /** A decided event with nothing more to say: no body, and only one rule. */
+  /**
+   * A decided event with nothing more to say: no body, and only one rule. Only
+   * ever true for a viewer — someone who can edit always gets the body, because
+   * that is where the note field lives and an empty event is the one that most
+   * needs it.
+   */
   const bodyEmpty = Boolean(
-    isLocked && lockedProposal && !lockedProposal.note && !lockedProposal.url && !otherIdeas.length
+    isLocked &&
+      lockedProposal &&
+      !canEdit &&
+      !lockedProposal.note &&
+      !lockedProposal.url &&
+      !otherIdeas.length
   )
 
   const handleAddProposal = async (data: { title: string; note?: string | null; url?: string | null }) => {
@@ -641,9 +750,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                     away as history. The ballot only comes back when unlocked. */}
                 {isLocked && lockedProposal ? (
                   <div className="py-3">
-                    {lockedProposal.note && (
-                      <p className="text-sm text-muted-foreground">{lockedProposal.note}</p>
-                    )}
+                    <InlineNote proposal={lockedProposal} canEdit={canEdit} />
                     {lockedProposal.url && (
                       <a
                         href={lockedProposal.url}

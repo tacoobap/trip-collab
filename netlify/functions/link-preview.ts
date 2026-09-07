@@ -72,22 +72,41 @@ const escapeAttr = (value: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 
-let shell: Promise<string> | null = null
+/**
+ * How long a fetched shell may be reused. This is the whole reason the cache is
+ * time-bounded rather than permanent: `index.html` names the build's hashed
+ * asset URLs, and a container that cached one deploy's copy went on serving
+ * those URLs after the next deploy had deleted them. The browser then asked for
+ * an asset that no longer existed, fell through the `/*` catch-all to
+ * `index.html`, and refused the HTML it got back where it expected a module —
+ * so every direct load of `/trip/:slug` and `/i/:token` rendered a blank page
+ * until that container happened to be recycled.
+ */
+const SHELL_TTL_MS = 60_000
 
-/** The built `index.html`, with its hashed asset URLs, fetched once per container. */
+let shell: { html: Promise<string>; fetchedAt: number } | null = null
+
+/** The built `index.html`, with its hashed asset URLs. Re-read once a minute. */
 function loadShell(origin: string): Promise<string> {
-  if (!shell) {
-    shell = fetch(`${origin}/index.html`)
+  if (shell && Date.now() - shell.fetchedAt < SHELL_TTL_MS) return shell.html
+
+  // `no-cache` so the re-read can't itself be answered with the previous
+  // build's copy from the edge, which would just re-pin the same stale hashes.
+  const entry: { html: Promise<string>; fetchedAt: number } = {
+    fetchedAt: Date.now(),
+    html: fetch(`${origin}/index.html`, { headers: { 'Cache-Control': 'no-cache' } })
       .then((res) => {
         if (!res.ok) throw new Error(`Could not load the app shell (${res.status})`)
         return res.text()
       })
       .catch((err) => {
-        shell = null
+        // Don't let a failed read serve as the cached answer for a minute.
+        if (shell === entry) shell = null
         throw err
-      })
+      }),
   }
-  return shell
+  shell = entry
+  return entry.html
 }
 
 const html = (body: string, cache: string) => ({

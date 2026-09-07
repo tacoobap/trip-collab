@@ -47,6 +47,8 @@ Both addresses are redirected (in `netlify.toml`, **above** the SPA catch-all) t
 
 The card itself comes from `og-image`, which lays it out with satori and rasterises it with resvg — the cover photo is cropped to 1200×630 through Netlify's image CDN first, so the hosts `image_url` can point at have to stay listed under `[images] remote_images`. Its fonts and resvg's wasm live in `public/og/` and are fetched from the CDN at runtime rather than bundled. A trip with no cover photo gets the same card over the app's navy-to-golden wash.
 
+Satori's own text shaping needs a wasm too — harfbuzz's — and that one it loads itself, at import time, from `hb.wasm` next to its own file. Bundle it and the lookup lands in the function's directory instead, where the file isn't, which surfaces as an unhandled rejection during module load: **every** `og-image` request 502s, including the fallback redirect, and the link falls back to a bare card with no photo. `[functions."og-image"] external_node_modules = ["harfbuzzjs"]` in `netlify.toml` keeps the package unbundled so its wasm ships beside it.
+
 Note that this makes a trip's name, cover photo and dates readable by anyone holding the URL, without signing in — which is what a link preview is. The slug's random suffix is still the only thing gating an invite link, exactly as before.
 
 ## Scripts

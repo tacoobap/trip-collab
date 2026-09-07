@@ -203,6 +203,26 @@ export function TimeGridDayHeader({
             alt={day.label}
             className="absolute inset-0 w-full h-full object-cover"
           />
+        ) : canEdit ? (
+          // The placeholder is an affordance, not decoration: it opens the same
+          // menu as the camera in the corner, so the biggest thing in an empty
+          // header isn't the one thing you can't press. Deliberately no
+          // `.touch-target` — its ::after would reach up into the chips row.
+          <button
+            data-grid-ignore
+            type="button"
+            onClick={() => setPhotoMenuOpen((v) => !v)}
+            disabled={imageWorking}
+            className={cn(
+              'absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2',
+              'rounded-full p-3 transition-colors touch-manipulation disabled:opacity-40',
+              'text-muted-foreground/30 hover:bg-muted hover:text-muted-foreground/70'
+            )}
+            title="Add day photo"
+            aria-label={`Add a photo for day ${day.day_number}`}
+          >
+            <Camera className="w-4 h-4" />
+          </button>
         ) : (
           <Camera
             className="absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/30"
