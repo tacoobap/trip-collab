@@ -8,10 +8,16 @@ import {
   DialogClose,
 } from '@/components/ui/dialog'
 import { addLockedSlot } from '@/services/planningService'
-import { DEFAULT_DURATION_MIN, SHELF_DROP_DURATION_MIN } from '@/lib/timeGrid'
+import {
+  DEFAULT_DURATION_MIN,
+  SHELF_DROP_DURATION_MIN,
+  formatMinuteRange,
+} from '@/lib/timeGrid'
 import { formatTimeLabel, parseTimeToMinutes } from '@/lib/timeUtils'
 import { cn } from '@/lib/utils'
 import type { CollectionItem, DayWithSlots, Slot } from '@/types/database'
+
+const TIME_HINT = 'Use a time like 9:00 AM or 2:30 PM'
 
 /**
  * A collection idea is food/activity/other; a slot has a wider vocabulary.
@@ -20,6 +26,48 @@ import type { CollectionItem, DayWithSlots, Slot } from '@/types/database'
  */
 function slotCategoryFor(category: CollectionItem['category']): Slot['category'] {
   return category === 'food' ? 'food' : 'activity'
+}
+
+type Schedule =
+  | { ok: true; startMinutes: number | null; duration: number; label: string | null }
+  | { ok: false; error: string }
+
+/**
+ * Turns the two optional time fields into what the slot needs.
+ *
+ * Blank start is the whole point of the fields being optional: it means
+ * "sometime this day", the shelf, and the end is meaningless without it. A
+ * start on its own runs for `DEFAULT_DURATION_MIN`; an end replaces that.
+ * Shared by the live hint and the commit so the two can't drift.
+ */
+function resolveSchedule(startInput: string, endInput: string): Schedule {
+  const rawStart = startInput.trim()
+  const rawEnd = endInput.trim()
+
+  if (!rawStart) {
+    // An end alone can't be honoured, and silently dropping it would lose
+    // something the user deliberately typed.
+    if (rawEnd) return { ok: false, error: 'Add a start time too, or clear the end.' }
+    return { ok: true, startMinutes: null, duration: SHELF_DROP_DURATION_MIN, label: null }
+  }
+
+  const startLabel = formatTimeLabel(rawStart)
+  if (!startLabel) return { ok: false, error: TIME_HINT }
+  const startMinutes = parseTimeToMinutes(startLabel)
+
+  if (!rawEnd) {
+    return { ok: true, startMinutes, duration: DEFAULT_DURATION_MIN, label: startLabel }
+  }
+
+  const endLabel = formatTimeLabel(rawEnd)
+  if (!endLabel) return { ok: false, error: TIME_HINT }
+  // Midnight reads as the end of the day, not the start of it — the same
+  // reading `InlineTimeRange` gives it in the proposal drawer.
+  const parsedEnd = parseTimeToMinutes(endLabel)
+  const endMinutes = parsedEnd === 0 ? 24 * 60 : parsedEnd
+  if (endMinutes <= startMinutes) return { ok: false, error: 'End must be after the start.' }
+
+  return { ok: true, startMinutes, duration: endMinutes - startMinutes, label: startLabel }
 }
 
 /**
@@ -59,10 +107,10 @@ interface ScheduleIdeaDialogProps {
   days: DayWithSlots[]
   currentName: string
   /**
-   * The day it landed on and the time label it took, `null` for the shelf —
+   * The day it landed on and the time range it took, `null` for the shelf —
    * enough for the caller to say where it went.
    */
-  onScheduled: (day: DayWithSlots, timeLabel: string | null) => void
+  onScheduled: (day: DayWithSlots, timeRange: string | null) => void
   onError: () => void
 }
 
@@ -70,12 +118,12 @@ interface ScheduleIdeaDialogProps {
  * "Put this on a day" from a collection card — the missing half of
  * `PickFromCollectionModal`, which only runs the other way round.
  *
- * The day list is the commit: one tap schedules. Time is an optional step
- * taken *before* that tap, because the shelf ("sometime this day") is the
- * cheap default and the grid can drag a chip onto the timeline later. The idea
- * lands locked, matching what the board's own quick-add does — putting
- * something on a day is the decision, and the collection is where undecided
- * ideas already live.
+ * The day list is the commit: one tap schedules. Time is two optional fields
+ * filled in *before* that tap, and leaving them empty is the cheap default —
+ * the idea lands on the day's "sometime this day" shelf, which the grid can
+ * drag onto the timeline later. The idea lands locked, matching what the
+ * board's own quick-add does: putting something on a day is the decision, and
+ * the collection is where undecided ideas already live.
  */
 export function ScheduleIdeaDialog({
   open,
@@ -87,16 +135,16 @@ export function ScheduleIdeaDialog({
   onScheduled,
   onError,
 }: ScheduleIdeaDialogProps) {
-  const [timed, setTimed] = useState(false)
-  const [timeInput, setTimeInput] = useState('')
+  const [startInput, setStartInput] = useState('')
+  const [endInput, setEndInput] = useState('')
   const [timeError, setTimeError] = useState<string | null>(null)
   const [savingDayId, setSavingDayId] = useState<string | null>(null)
 
   // Each idea gets a fresh choice; a time typed for one shouldn't follow the next.
   useEffect(() => {
     if (!open) return
-    setTimed(false)
-    setTimeInput('')
+    setStartInput('')
+    setEndInput('')
     setTimeError(null)
     setSavingDayId(null)
   }, [open, item?.id])
@@ -104,37 +152,48 @@ export function ScheduleIdeaDialog({
   if (!item) return null
 
   const alreadyOn = dayIdsHolding(item, days)
+  const schedule = resolveSchedule(startInput, endInput)
+
+  // The hint always says what the current input would do, muted; only a commit
+  // attempt turns the same message red (`timeError`). So a half-typed "9" reads
+  // as the format guide rather than as a failure, and an end that lands before
+  // the start says so instead of falling back to the empty case's promise of
+  // the shelf, which by then isn't what would happen.
+  const hint = !schedule.ok
+    ? schedule.error
+    : schedule.startMinutes === null
+      ? 'Leave blank and it lands on the day’s “sometime this day” shelf.'
+      : `${formatMinuteRange(schedule.startMinutes, schedule.duration)} — drag to resize on the board later.`
 
   const handlePick = async (day: DayWithSlots) => {
     if (savingDayId) return
-
-    let timeLabel: string | null = null
-    if (timed) {
-      timeLabel = formatTimeLabel(timeInput)
-      if (!timeLabel) {
-        setTimeError('Use a time like 9:00 AM or 2:30 PM')
-        return
-      }
-      setTimeError(null)
+    if (!schedule.ok) {
+      setTimeError(schedule.error)
+      return
     }
-    const start = timeLabel === null ? null : parseTimeToMinutes(timeLabel)
+    setTimeError(null)
 
     setSavingDayId(day.id)
     try {
       await addLockedSlot({
         day_id: day.id,
         trip_id: tripId,
-        time_label: timeLabel ?? '',
+        time_label: schedule.label ?? '',
         sort_order: day.slots.length,
         category: slotCategoryFor(item.category),
         proposer_name: currentName,
         title: item.name,
         note: item.place_name ?? null,
         url: item.google_maps_url ?? null,
-        start_minutes: start,
-        duration_minutes: start === null ? SHELF_DROP_DURATION_MIN : DEFAULT_DURATION_MIN,
+        start_minutes: schedule.startMinutes,
+        duration_minutes: schedule.duration,
       })
-      onScheduled(day, timeLabel)
+      onScheduled(
+        day,
+        schedule.startMinutes === null
+          ? null
+          : formatMinuteRange(schedule.startMinutes, schedule.duration)
+      )
       onOpenChange(false)
     } catch {
       onError()
@@ -142,6 +201,29 @@ export function ScheduleIdeaDialog({
       setSavingDayId(null)
     }
   }
+
+  const timeField = (
+    value: string,
+    onChange: (v: string) => void,
+    placeholder: string,
+    label: string
+  ) => (
+    <input
+      value={value}
+      onChange={(e) => {
+        onChange(e.target.value)
+        if (timeError) setTimeError(null)
+      }}
+      placeholder={placeholder}
+      aria-label={label}
+      aria-invalid={!!timeError}
+      className={cn(
+        'w-[5.5rem] text-sm bg-transparent border-b outline-none text-foreground',
+        'placeholder:text-muted-foreground/70',
+        timeError ? 'border-destructive' : 'border-border focus:border-primary'
+      )}
+    />
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -156,63 +238,23 @@ export function ScheduleIdeaDialog({
         </DialogHeader>
 
         <div className="shrink-0 pb-3 mb-1 border-b border-border/60">
-          <div
-            className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 p-0.5"
-            role="group"
-            aria-label="When during the day"
-          >
-            {(
-              [
-                { value: false, label: 'Sometime this day' },
-                { value: true, label: 'At a time' },
-              ] as const
-            ).map(({ value, label }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => {
-                  setTimed(value)
-                  setTimeError(null)
-                }}
-                aria-pressed={timed === value}
-                className={cn(
-                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                  timed === value
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Time
+            </span>
+            {timeField(startInput, setStartInput, 'e.g. 9:00 AM', 'Start time')}
+            <span className="text-sm text-muted-foreground">–</span>
+            {timeField(endInput, setEndInput, 'optional', 'End time')}
           </div>
 
-          {timed && (
-            <div className="mt-2.5">
-              <input
-                autoFocus
-                value={timeInput}
-                onChange={(e) => {
-                  setTimeInput(e.target.value)
-                  if (timeError) setTimeError(null)
-                }}
-                placeholder="e.g. 9:00 AM"
-                aria-label="Start time"
-                aria-invalid={!!timeError}
-                className={cn(
-                  'w-32 text-sm bg-transparent border-b outline-none text-foreground',
-                  timeError ? 'border-destructive' : 'border-primary'
-                )}
-              />
-              {timeError ? (
-                <p className="text-xs text-destructive mt-1">{timeError}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Lands as a {DEFAULT_DURATION_MIN}-minute event you can resize on the board.
-                </p>
-              )}
-            </div>
-          )}
+          <p
+            className={cn(
+              'text-xs mt-1.5',
+              timeError ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {timeError ?? hint}
+          </p>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">

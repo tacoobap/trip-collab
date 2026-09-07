@@ -246,11 +246,11 @@ export function CollectionPage() {
         tripId={trip.id}
         days={days}
         currentName={displayName ?? ''}
-        onScheduled={(day, timeLabel) => {
+        onScheduled={(day, timeRange) => {
           setScheduleItem(null)
           addToast(
-            timeLabel
-              ? `Added to ${day.label} at ${timeLabel}.`
+            timeRange
+              ? `Added to ${day.label}, ${timeRange}.`
               : `Added to ${day.label} — sometime this day.`,
             { variant: 'success' }
           )

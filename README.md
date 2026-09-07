@@ -282,9 +282,12 @@ A collection card now carries a calendar icon next to edit and delete;
 `ScheduleIdeaDialog` (`src/components/collection/ScheduleIdeaDialog.tsx`) picks
 the day. It lands **locked**, the way the board's own quick-add does — the
 collection is where undecided ideas live, so moving one to a day is the
-decision. Default is the day's "sometime this day" shelf; an **At a time**
-toggle takes a typed time (parsed by `formatTimeLabel`, the same free-text
-convention `ProposalDrawer` uses) and lands a 60-minute event instead.
+decision. Time is two optional fields, parsed by `formatTimeLabel` — the same
+free-text convention `ProposalDrawer` uses. Both blank is the day's "sometime
+this day" shelf; a start alone runs `DEFAULT_DURATION_MIN`; an end replaces
+that. `resolveSchedule` is shared by the live hint and the commit so the two
+can't disagree.
+
 `addLockedSlot` gained `note` / `url` so `place_name` and `google_maps_url`
 carry across the way `handlePickFromCollection` does.
 
