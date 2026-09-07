@@ -97,6 +97,8 @@ interface CollectionListProps {
   onLike: (itemId: string) => void
   onEdit: (item: CollectionItem) => void
   onDelete: (itemId: string) => void
+  /** Absent when the trip has no days to schedule onto yet. */
+  onSchedule?: (item: CollectionItem) => void
   onAddClick: () => void
 }
 
@@ -111,6 +113,7 @@ export function CollectionList({
   onLike,
   onEdit,
   onDelete,
+  onSchedule,
   onAddClick,
 }: CollectionListProps) {
   const [view, setView] = useState<CollectionView>(readStoredView)
@@ -232,6 +235,7 @@ export function CollectionList({
                           ? onDelete
                           : undefined
                       }
+                      onSchedule={isMember ? onSchedule : undefined}
                     />
                   ))}
                 </div>

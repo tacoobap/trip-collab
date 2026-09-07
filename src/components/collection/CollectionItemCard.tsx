@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Heart, Image, Pencil, Trash2 } from 'lucide-react'
+import { CalendarPlus, Heart, Image, Pencil, Trash2 } from 'lucide-react'
 import type { CollectionItem } from '@/types/database'
 import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
 import { cn } from '@/lib/utils'
@@ -11,6 +11,8 @@ interface CollectionItemCardProps {
   onLike?: (itemId: string) => void
   onEdit?: (item: CollectionItem) => void
   onDelete?: (itemId: string) => void
+  /** Absent when the trip has no days yet, or the viewer can't edit it. */
+  onSchedule?: (item: CollectionItem) => void
   className?: string
 }
 
@@ -26,6 +28,7 @@ export function CollectionItemCard({
   onLike,
   onEdit,
   onDelete,
+  onSchedule,
   className,
 }: CollectionItemCardProps) {
   const hasLiked = item.likes.includes(currentName)
@@ -76,6 +79,17 @@ export function CollectionItemCard({
           </div>
         )}
         <div className="absolute top-2 right-2 flex items-center gap-1 max-sm:top-2 max-sm:right-2 max-sm:gap-1.5">
+          {onSchedule && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSchedule(item) }}
+              className="w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 hover:border-primary/40 shadow-sm touch-manipulation max-sm:w-10 max-sm:h-10 max-sm:min-w-[44px] max-sm:min-h-[44px]"
+              aria-label="Put on a day"
+              title="Put on a day"
+            >
+              <CalendarPlus className="w-3.5 h-3.5 max-sm:w-4 max-sm:h-4" />
+            </button>
+          )}
           {onEdit && (
             <button
               type="button"

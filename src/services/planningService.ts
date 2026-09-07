@@ -360,6 +360,9 @@ export type AddLockedSlotInput = {
   category?: SlotCategory
   proposer_name: string
   title: string
+  /** Carried onto the proposal, as the pick-from-collection path does. */
+  note?: string | null
+  url?: string | null
   /** Grid schedule; null = unscheduled (day shelf). Omit on legacy paths. */
   start_minutes?: number | null
   duration_minutes?: number | null
@@ -379,6 +382,8 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
     category = 'activity',
     proposer_name,
     title,
+    note = null,
+    url = null,
     start_minutes,
     duration_minutes,
   } = input
@@ -405,8 +410,8 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
     trip_id,
     proposer_name,
     title,
-    note: null,
-    url: null,
+    note,
+    url,
     votes: [],
     created_at: serverTimestamp(),
   })

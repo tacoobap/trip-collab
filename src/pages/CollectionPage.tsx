@@ -27,6 +27,7 @@ import { CollectionItemForm } from '@/components/collection/CollectionItemForm'
 import { CollectionHeader } from '@/components/collection/CollectionHeader'
 import { CollectionList } from '@/components/collection/CollectionList'
 import { CollectionSuggestionsDialog } from '@/components/collection/CollectionSuggestionsDialog'
+import { ScheduleIdeaDialog } from '@/components/collection/ScheduleIdeaDialog'
 
 export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -45,6 +46,7 @@ export function CollectionPage() {
   } = useCollectionSuggestions(trip, days)
   const [addOpen, setAddOpen] = useState(false)
   const [editItem, setEditItem] = useState<CollectionItem | null>(null)
+  const [scheduleItem, setScheduleItem] = useState<CollectionItem | null>(null)
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [vibeSentence, setVibeSentence] = useState('')
   const [suggestionImageUrls, setSuggestionImageUrls] = useState<Record<number, string>>({})
@@ -194,6 +196,7 @@ export function CollectionPage() {
           onLike={handleLike}
           onEdit={setEditItem}
           onDelete={handleDelete}
+          onSchedule={days.length > 0 ? setScheduleItem : undefined}
           onAddClick={() => setAddOpen(true)}
         />
       </main>
@@ -235,6 +238,25 @@ export function CollectionPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ScheduleIdeaDialog
+        open={!!scheduleItem}
+        onOpenChange={(open) => !open && setScheduleItem(null)}
+        item={scheduleItem}
+        tripId={trip.id}
+        days={days}
+        currentName={displayName ?? ''}
+        onScheduled={(day, timeLabel) => {
+          setScheduleItem(null)
+          addToast(
+            timeLabel
+              ? `Added to ${day.label} at ${timeLabel}.`
+              : `Added to ${day.label} — sometime this day.`,
+            { variant: 'success' }
+          )
+        }}
+        onError={() => addToast('Could not add it to that day.', { variant: 'error' })}
+      />
 
       <CollectionSuggestionsDialog
         open={suggestOpen}

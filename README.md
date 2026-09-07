@@ -125,17 +125,16 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
   Note: `netlify/functions` isn't covered by `tsconfig.app.json` (which includes only `src`), so `npm run build` does **not** type-check it — esbuild strips types at deploy time without checking them. Type-check functions separately if you change them.
 
-## Next up (productionizing)
-
-- **Done:** All collection writes (add/update/delete/like) live in `collectionService`; trip/days edit flows (EditTripModal, EditDayModal, add first day when no dates, destinations normalized); chunked slots in useTrip; toast system (`ToastProvider` + `useToast`) with user-facing feedback for hero upload, narrative generate/update, collection suggestions and add/delete; AI hooks `useNarrativeGeneration` and `useCollectionSuggestions` (ItineraryPage and CollectionPage).
-- **Next:** Schema docs & migrations; tests. See **Feb 28 Productionizing.md** for the full plan.
-
 ## Future to-dos / enhancements
 
 Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
 by what to do first. Each is written to be picked up cold in a fresh session —
 what's wrong, where it lives, and what "done" looks like. Item 9 predates that
-review and is still open.
+review; item 10 came out of **Feb 28 Productionizing.md**, which is otherwise
+finished or superseded and is kept only as a record of that round.
+
+The numbers are stable — don't renumber a finished item away, since sessions
+refer to them by number. A done item keeps its heading and says so.
 
 ### 1. Lock down `firestore.rules` — any signed-in account can read, and take over, every trip
 
@@ -277,25 +276,17 @@ Also verify the auth gate: the whole app is behind sign-in, and whether
 `AuthContext` resolves a restored session without the network hasn't been
 checked.
 
-### 4. Schedule a collection idea without going to the board
+### 4. Schedule a collection idea without going to the board — **done (7 Sep 2026)**
 
-**What's wrong.** The only idea → plan path runs the wrong way round: Planning →
-drag out a slot → open the drawer → **Pick from collection**
-(`src/components/planning/PickFromCollectionModal.tsx`, opened from
-`ProposalDrawer.tsx:756`). A collection card
-(`src/components/collection/CollectionItemCard.tsx`) offers only like, edit and
-delete — so at the moment you're looking at the idea you want to schedule,
-there's nothing to click.
-
-**Done when** a collection item has a "Put this on a day" action that picks a
-day, creates the slot and its proposal, and confirms where it landed. Reuse
-`addLockedSlot` / `addProposal` in `src/services/planningService.ts` — the same
-calls `handlePickFromCollection` ends up making in `ProposalDrawer.tsx` — and
-carry `name`, `google_maps_url` and `place_name` across the same way it does.
-
-**Worth deciding:** whether it lands on the day's "sometime this day" shelf
-(`start_minutes: null`) or asks for a time. The shelf is the lower-friction
-default, and the grid already supports dragging a chip onto the timeline later.
+A collection card now carries a calendar icon next to edit and delete;
+`ScheduleIdeaDialog` (`src/components/collection/ScheduleIdeaDialog.tsx`) picks
+the day. It lands **locked**, the way the board's own quick-add does — the
+collection is where undecided ideas live, so moving one to a day is the
+decision. Default is the day's "sometime this day" shelf; an **At a time**
+toggle takes a typed time (parsed by `formatTimeLabel`, the same free-text
+convention `ProposalDrawer` uses) and lands a 60-minute event instead.
+`addLockedSlot` gained `note` / `url` so `place_name` and `google_maps_url`
+carry across the way `handlePickFromCollection` does.
 
 ### 5. Give signed-out visitors something to land on
 
@@ -461,6 +452,35 @@ Outstanding either way: the **backfill**, since `image_url` on `trips`, `days`
 and collection items holds absolute GitHub URLs today. It has to skip
 `images.unsplash.com`, which is a legitimate remote host and not something to
 move.
+
+### 10. Move the Gemini key server-side
+
+**Do this alongside item 1** — it's the same class of problem, an API key
+anyone can read rather than a database anyone can read.
+
+`generateNarrative` and `suggestCollectionItems` call Gemini straight from the
+browser with `import.meta.env.VITE_GEMINI_API_KEY`
+(`src/lib/generateNarrative.ts:97`, `src/lib/suggestCollectionItems.ts:90`).
+Vite inlines `VITE_*` at build time, so the key is a string in the shipped
+bundle — anyone can pull it out of the deployed JS and spend against the
+account.
+
+The server-side version already exists and is wired to nothing:
+`netlify/functions/generate-narrative.ts` reads `process.env.GEMINI_API_KEY`.
+Nothing in `src/` imports it.
+
+**Done when** both AI calls go through Netlify functions that verify a Firebase
+ID token (`netlify/functions/lib/` already has that helper, and `search-image`
+is the pattern to copy), `VITE_GEMINI_API_KEY` is gone from `src/` and
+`.env.example`, and the deployed bundle contains no key —
+`curl` the live `assets/index-*.js` and grep for the prefix to confirm. Rotate
+the current key afterwards; it has been public in every build so far.
+
+The rest of **Feb 28 Productionizing.md** is either done or overtaken: its
+schema-doc and migration section never happened and is worth reopening only if
+the legacy optional fields start causing real bugs, and its test section is
+blocked on there being no test runner in the project at all.
+
 
 ## Deploy
 
