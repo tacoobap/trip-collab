@@ -384,22 +384,83 @@ It works, but it's a git repo doing a CDN's job:
 - Bounded by GitHub API rate limits, and the PAT carries write access to a whole
   repo just to store a JPEG.
 
-Two options worth pricing out:
+**Why it's GitHub, and not Firebase Storage.** Not a bug that was hit — a wall
+that was hit before any code was written. `firebase/storage` has never been
+imported in `src/` or `netlify/` at any point in the history, `getStorage` and
+`uploadBytes` have zero hits ever, and no `storage.rules` has ever existed. The
+project was created in `4f722c8` at 12:06 on 22 Feb 2026, and images were on
+GitHub by `49a691f` at 14:56 the same day. Cloud Storage for Firebase stopped
+serving Spark-plan projects after its September 2024 change: no bucket at all,
+every call returns 402/403, and the console refuses to provision one until the
+project is on the pay-as-you-go Blaze plan. That is what was hit, and it is
+still true today.
 
-1. **Firebase Storage** — the natural fit, since auth and Firestore already live
-   there. It wasn't an option when this was first built, so re-check what the
-   current plan allows. Storage rules could reuse the same `member_uids` check
-   as `firestore.rules`, which gets us per-trip access control for free, and
-   `upload-github-image` plus the GitHub PAT both disappear.
-2. **Supabase** — Postgres and Storage in one place. Previously blocked by the
-   free tier's project cap; pausing an unused project would free a slot. This is
-   a database migration, not just a storage swap, so it's only worth it if we
-   also want Postgres, row-level security or its realtime layer for other
-   reasons.
+**Status (7 Sep 2026): Firebase Storage is ruled out** — it requires a billing
+account, and we're not attaching one. Worth recording that the money was never
+the issue: Blaze bills $0 at this scale (Always Free covers 5 GB stored,
+100 GB/month egress, 5K uploads and 50K downloads a month, and overage past that
+is $0.004 per 10K operations). The objection is the card on file and the fact
+that Google alerts on budgets rather than capping them. If that ever stops being
+an objection, the work is already written — see below.
 
-Either way the work includes a **backfill** — `image_url` on `trips`, `days` and
-collection items holds absolute GitHub URLs today — and a **deletion path**, so
-removing a trip takes its images with it.
+**Supabase, re-priced.** The old framing of this item was wrong on one point:
+Supabase Storage can be adopted on its own, with Firestore left exactly where it
+is. It is not a database migration unless we want one. The free tier is 1 GB of
+file storage across 2 active projects and needs **no credit card**, which is what
+makes it the live option. The catch is that free projects pause after 7 days
+without a request, and storage goes offline with the project — every photo 404s,
+including on share links other people hold, until someone unpauses it from the
+dashboard. Judged acceptable on 7 Sep 2026, on the grounds that a paused project
+takes the whole trip down anyway, so the photos aren't the marginal loss.
+`netlify/functions/upload-github-image.ts` already verifies the Firebase ID
+token, so it can stay the authorization point with a Supabase service key behind
+it — no Supabase Auth integration required. (Supabase does support Firebase Auth
+as a third-party JWT issuer, if pushing uploads straight from the browser turns
+out to be worth it.)
+
+**What's already built.** A complete Firebase Storage implementation is parked in
+`docs/firebase-storage-wip.patch`. It type-checks and `npm run build` was green,
+but it has never run against a real bucket; it was reverted out of the tree on
+7 Sep 2026 so it couldn't ship pointing at a bucket that doesn't exist. Most of
+it is backend-agnostic and worth reusing whatever we pick:
+
+- `src/lib/imageUpload.ts` is the **only** seam. Every call site just does
+  `uploadImage(path, file, onProgress)` and stores whatever URL comes back, so
+  swapping backends is a change to one file plus its callers' last argument.
+- Object paths stay `trips/<tripId>/hero.jpg`, `trips/<tripId>/days/<dayId>.jpg`
+  and `trips/<tripId>/collection/<itemId>.jpg`. That `tripId` prefix is what buys
+  per-trip access rules and a single prefix-delete when a trip is deleted — the
+  paths are already shaped right, nothing needs redesigning.
+- **Both hosts coexist.** `image_url` is just a string, so old GitHub photos keep
+  rendering beside new ones. There is no cutover, and the backfill can happen
+  later or never. The price of running both is that the GitHub repo can never be
+  deleted and its photos stay public.
+- `netlify.toml`'s `[images] remote_images` has to list the new host or
+  `og-image` refuses to crop cover photos. `og-image.ts:58` already wraps the URL
+  in `encodeURIComponent`, so a host whose URLs carry their own query string is
+  fine there.
+- Resolve the storage client **lazily**, not at module load. `src/lib/firebase.ts`
+  is imported by ~17 files including sign-in, so a throw at module scope blanks
+  the entire app over a photo feature.
+- `CollectionItemCard.tsx`'s retry cache-buster appends `?v=N` on image error.
+  Any backend whose URLs already carry a query string needs `&` instead, or the
+  second `?` folds the real parameters into a value.
+
+**Done when** uploads land somewhere that isn't a git repo; deleting a trip, day
+or collection item takes its image with it (`netlify/functions/delete-trip.ts` is
+the place — one prefix delete covers a whole trip); the GitHub PAT and the three
+`GITHUB_*` env vars are gone; and there's a decision on whether photos stay
+readable by whoever holds the URL or get gated to `member_uids`.
+
+That last one is a real fork, not a detail. Gating reads breaks the public share
+link at `/i/:token` and the `og-image` preview card unless both mint signed URLs
+— so "unguessable URL, same as today" is the cheap answer and "signed URLs" is
+the correct one.
+
+Outstanding either way: the **backfill**, since `image_url` on `trips`, `days`
+and collection items holds absolute GitHub URLs today. It has to skip
+`images.unsplash.com`, which is a legitimate remote host and not something to
+move.
 
 ## Deploy
 

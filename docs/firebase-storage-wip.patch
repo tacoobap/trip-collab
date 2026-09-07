@@ -1,0 +1,343 @@
+# Firebase Storage for trip photos — WIP, reverted from the tree 2026-09-07
+#
+# Blocked, not broken. Cloud Storage for Firebase requires the Blaze (billing)
+# plan; `trip-collab-3f676` is on Spark, so the bucket does not exist and every
+# call returns 402/403. This code is complete and type-checks (`npm run build`
+# green) but has never run against a real bucket. README item 9 has the full
+# context and the decisions behind it.
+#
+#   git apply docs/firebase-storage-wip.patch
+#
+# Contains only the files that were wholly this change. Two things to redo by
+# hand, both trivial, both left out because other sessions had uncommitted work
+# in those files when this was cut:
+#
+# 1. The five `uploadImage(...)` call sites lose their 4th argument — the
+#    Firebase SDK authorizes off the signed-in user, so no ID token is passed:
+#      src/pages/ItineraryPage.tsx                       (getIdToken)
+#      src/components/planning/DayColumn.tsx             (getToken)
+#      src/components/planning/TimeGridDayHeader.tsx     (getToken)
+#      src/components/collection/CollectionItemForm.tsx  (getToken, x2)
+#    Leave the `getToken` props alone — `searchImage` still uses them.
+#
+# 2. src/components/collection/CollectionItemCard.tsx — the retry cache-buster
+#    must choose its separator, because Firebase download URLs already carry
+#    `?alt=media&token=…` and a second `?` folds the token into a query value:
+#
+#      const imageSrc = !item.image_url
+#        ? null
+#        : retryKey > 0
+#          ? `${item.image_url}${item.image_url.includes('?') ? '&' : '?'}v=${retryKey}`
+#          : item.image_url
+#
+diff --git a/firebase.json b/firebase.json
+index 6a00fb1..7850852 100644
+--- a/firebase.json
++++ b/firebase.json
+@@ -4,5 +4,8 @@
+     "location": "nam5",
+     "rules": "firestore.rules",
+     "indexes": "firestore.indexes.json"
++  },
++  "storage": {
++    "rules": "storage.rules"
+   }
+ }
+diff --git a/netlify.toml b/netlify.toml
+index f204f30..79140fb 100644
+--- a/netlify.toml
++++ b/netlify.toml
+@@ -14,9 +14,11 @@
+ 
+ # `og-image` resizes a trip's cover photo through Netlify's image CDN before
+ # drawing the card. Remote hosts have to be listed here or it refuses them —
+-# these are the two places `image_url` can point at.
++# these are the three places `image_url` can point at. Firebase Storage takes
++# new uploads; the GitHub entry has to stay for every photo uploaded before it.
+ [images]
+   remote_images = [
++    "https://firebasestorage\\.googleapis\\.com/.*",
+     "https://raw\\.githubusercontent\\.com/.*",
+     "https://images\\.unsplash\\.com/.*",
+   ]
+diff --git a/src/lib/firebase.ts b/src/lib/firebase.ts
+index d0035e0..6871a8e 100644
+--- a/src/lib/firebase.ts
++++ b/src/lib/firebase.ts
+@@ -5,6 +5,7 @@ import {
+   persistentLocalCache,
+   persistentMultipleTabManager,
+ } from 'firebase/firestore'
++import { getStorage, type FirebaseStorage } from 'firebase/storage'
+ 
+ const firebaseConfig = {
+   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+@@ -34,6 +35,17 @@ export const db = initializeFirestore(app, {
+     tabManager: persistentMultipleTabManager(),
+   }),
+ })
++// Resolved on first upload rather than at module load. `firebase.ts` is imported
++// by everything, sign-in included, so a `getStorage` that throws here would take
++// the whole app down with it — and photo storage is not load-bearing for reading
++// a trip. Keeping it lazy also means a dev server that hasn't re-optimized since
++// `firebase/storage` was added fails one upload instead of blanking the page.
++let storageInstance: FirebaseStorage | undefined
++export function getPhotoStorage(): FirebaseStorage {
++  storageInstance ??= getStorage(app)
++  return storageInstance
++}
++
+ export const firebaseProjectId = firebaseConfig.projectId
+ 
+ // App Check: optional; enable in Firebase Console and set VITE_APP_CHECK_RECAPTCHA_SITE_KEY
+diff --git a/src/lib/imageUpload.ts b/src/lib/imageUpload.ts
+index c784487..06d3f8d 100644
+--- a/src/lib/imageUpload.ts
++++ b/src/lib/imageUpload.ts
+@@ -1,3 +1,6 @@
++import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
++import { getPhotoStorage } from './firebase'
++
+ async function compressImage(
+   file: File,
+   maxWidth = 3840,
+@@ -24,120 +27,82 @@ async function compressImage(
+   })
+ }
+ 
+-function blobToBase64(blob: Blob): Promise<string> {
+-  return new Promise((resolve) => {
+-    const reader = new FileReader()
+-    reader.onload = () => resolve((reader.result as string).split(',')[1])
+-    reader.readAsDataURL(blob)
+-  })
+-}
+-
+-async function uploadViaNetlifyFunction(
+-  filePath: string,
+-  imageBase64: string,
+-  getIdToken: () => Promise<string | null>,
+-  onProgress?: (pct: number) => void
+-): Promise<string> {
+-  const idToken = await getIdToken()
+-  if (!idToken) {
+-    throw new Error('Sign in to upload images.')
+-  }
+-  onProgress?.(70)
+-  const base =
+-    typeof window !== 'undefined' ? window.location.origin : ''
+-  const res = await fetch(`${base}/.netlify/functions/upload-github-image`, {
+-    method: 'POST',
+-    headers: {
+-      'Content-Type': 'application/json',
+-      Authorization: `Bearer ${idToken}`,
+-    },
+-    body: JSON.stringify({ path: filePath, imageBase64 }),
+-  })
+-  const data = (await res.json()) as { url?: string; error?: string; detail?: string }
+-  onProgress?.(100)
+-  if (!res.ok) {
+-    const msg = data.detail || data.error || `Upload failed: ${res.status}`
+-    throw new Error(msg)
+-  }
+-  if (!data.url) throw new Error('Invalid response from upload')
+-  return data.url
+-}
+-
+-/** Local dev only: direct GitHub API (not included in production bundle — avoids leaking PAT into `dist`). */
+-async function uploadDirectToGithub(
+-  filePath: string,
+-  imageBase64: string,
+-  onProgress?: (pct: number) => void
+-): Promise<string> {
+-  const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined
+-  const GITHUB_OWNER = import.meta.env.VITE_GITHUB_OWNER as string | undefined
+-  const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO as string | undefined
+-  if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
+-    const missing = [
+-      !GITHUB_TOKEN && 'VITE_GITHUB_TOKEN',
+-      !GITHUB_OWNER && 'VITE_GITHUB_OWNER',
+-      !GITHUB_REPO && 'VITE_GITHUB_REPO',
+-    ].filter(Boolean)
+-    throw new Error(
+-      `Image upload not configured: set ${missing.join(', ')} in .env, or use production deploy with Netlify functions.`
+-    )
++/** Firebase Storage error codes are machine-readable; these are not. */
++function friendlyUploadError(err: unknown): Error {
++  const code =
++    err && typeof err === 'object' && 'code' in err
++      ? String((err as { code: unknown }).code)
++      : ''
++  if (code === 'storage/unauthorized') {
++    return new Error("You don't have permission to add photos to this trip.")
+   }
+-  onProgress?.(65)
+-  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`
+-  const headers = {
+-    Authorization: `Bearer ${GITHUB_TOKEN}`,
+-    'Content-Type': 'application/json',
++  if (code === 'storage/unauthenticated') {
++    return new Error('Sign in to upload images.')
+   }
+-
+-  let sha: string | undefined
+-  const getRes = await fetch(apiUrl, { headers })
+-  if (getRes.ok) {
+-    const data = (await getRes.json()) as { sha: string }
+-    sha = data.sha
++  if (code === 'storage/retry-limit-exceeded' || code === 'storage/canceled') {
++    return new Error('The upload timed out. Check your connection and try again.')
+   }
+-
+-  onProgress?.(75)
+-
+-  const body: Record<string, string> = { message: `Upload ${filePath}`, content: imageBase64 }
+-  if (sha) body.sha = sha
+-
+-  const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) })
+-  if (!putRes.ok) {
+-    const putBody = await putRes.text()
+-    throw new Error(`GitHub upload failed: ${putRes.status} ${putBody}`)
++  // A project still on the Spark plan has no bucket at all: the SDK surfaces
++  // that as an unknown error rather than the underlying 402.
++  if (code === 'storage/unknown') {
++    return new Error(
++      'Image upload is unavailable. If this is a new deploy, check that Firebase Storage is enabled on the project.'
++    )
+   }
+-
+-  onProgress?.(100)
+-  // Commit-SHA ref, not `main` — see upload-github-image.ts for why.
+-  const putData = (await putRes.json().catch(() => ({}))) as { commit?: { sha?: string } }
+-  const ref = putData.commit?.sha || 'main'
+-  return `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${ref}/${filePath}`
++  return err instanceof Error ? err : new Error('Upload failed. Please try again.')
+ }
+ 
+ /**
+- * Upload a JPEG to the configured GitHub repo (Contents API).
+- * - **Production:** uses `/.netlify/functions/upload-github-image` with Firebase auth; PAT lives in `GITHUB_TOKEN` (Netlify env).
+- * - **Local `npm run dev`:** optional direct API via `VITE_GITHUB_*` in `.env`.
++ * Upload a JPEG to Firebase Storage and return a URL suitable for `<img src>`.
++ *
++ * Object paths are `trips/<tripId>/…`, which is what lets `storage.rules` gate
++ * writes on the same `member_uids` check as `firestore.rules`, and what lets a
++ * trip delete drop all of its photos by prefix.
++ *
++ * Authorization rides on the signed-in Firebase user, so this works the same in
++ * dev and prod — there is no server hop and no PAT. Photos uploaded before this
++ * still live on `raw.githubusercontent.com`; both hosts render fine, since
++ * `image_url` is just a URL.
+  */
+ export async function uploadImage(
+   path: string,
+   file: File,
+-  onProgress?: (pct: number) => void,
+-  getIdToken?: () => Promise<string | null>
++  onProgress?: (pct: number) => void
+ ): Promise<string> {
+-  onProgress?.(10)
++  onProgress?.(5)
+   const compressed = await compressImage(file)
+-  onProgress?.(40)
+-  const base64 = await blobToBase64(compressed)
+ 
+   const filePath = path.replace(/\.[^/.]+$/, '') + '.jpg'
++  const objectRef = ref(getPhotoStorage(), filePath)
+ 
+-  if (import.meta.env.PROD) {
+-    if (!getIdToken) {
+-      throw new Error('Image upload requires authentication.')
+-    }
+-    return uploadViaNetlifyFunction(filePath, base64, getIdToken, onProgress)
+-  }
++  const task = uploadBytesResumable(objectRef, compressed, {
++    contentType: 'image/jpeg',
++    // Safe to cache hard because the returned URL changes every upload — see
++    // the `&v=` stamp below.
++    cacheControl: 'public, max-age=31536000',
++  })
++
++  await new Promise<void>((resolve, reject) => {
++    task.on(
++      'state_changed',
++      (snap) => {
++        // Reserve the last 5% for getDownloadURL, so the bar doesn't sit at 100%
++        // while the URL is still resolving.
++        const sent = snap.totalBytes > 0 ? snap.bytesTransferred / snap.totalBytes : 0
++        onProgress?.(5 + Math.round(sent * 90))
++      },
++      (err) => reject(friendlyUploadError(err)),
++      () => resolve()
++    )
++  })
++
++  const url = await getDownloadURL(objectRef)
++  onProgress?.(100)
+ 
+-  return uploadDirectToGithub(filePath, base64, onProgress)
++  // Object paths are stable (`hero.jpg`, `<dayId>.jpg`), so a re-upload writes
++  // the same path and a cached copy would otherwise stick around — the bug
++  // 452d8b2 fixed for GitHub by pinning to a commit SHA. Firebase rotates the
++  // download token on overwrite, which busts it already; the stamp makes that
++  // guarantee ours rather than an implementation detail we're leaning on.
++  return `${url}&v=${Date.now()}`
+ }
+diff --git a/storage.rules b/storage.rules
+new file mode 100644
+index 0000000..9f8d637
+--- /dev/null
++++ b/storage.rules
+@@ -0,0 +1,52 @@
++rules_version = '2';
++
++// ─────────────────────────────────────────────────────────────────────────────
++// Trup · Cloud Storage Rules
++//
++// Trip photos: the itinerary hero, day header photos, collection item photos.
++// Every object lives under `trips/{tripId}/`, which is what lets these rules
++// reuse the same membership test as `firestore.rules` — writes are gated on the
++// trip's own `owner_uid` / `member_uids`, not merely on holding a valid token.
++//
++// Note on reads. Images are displayed through the `?alt=media&token=…` download
++// URL stored in `image_url`, and that URL is served without consulting these
++// rules — the token is the credential. That is deliberate: it is what keeps the
++// public share link at `/i/:token` and the `og-image` link-preview card working
++// for people who are not signed in, exactly as the GitHub URLs did. The read
++// rule below therefore governs only SDK/REST reads, where member-only is the
++// right default. Tightening the *displayed* photos to members is a separate
++// change: it means minting signed URLs in `shared-trip` and `og-image`.
++// ─────────────────────────────────────────────────────────────────────────────
++
++service firebase.storage {
++  match /b/{bucket}/o {
++
++    // Mirrors `tripMember()` in firestore.rules. Storage rules may touch at most
++    // two Firestore documents per evaluation; this uses exactly two.
++    function tripMember(tripId) {
++      return request.auth != null
++        && firestore.exists(/databases/(default)/documents/trips/$(tripId))
++        && (
++          firestore.get(/databases/(default)/documents/trips/$(tripId)).data.get('owner_uid', '') == request.auth.uid
++          || request.auth.uid in firestore.get(/databases/(default)/documents/trips/$(tripId)).data.get('member_uids', [])
++        );
++    }
++
++    match /trips/{tripId}/{allPaths=**} {
++      allow read: if tripMember(tripId);
++
++      // `compressImage` caps the long edge at 3840px, which lands well under
++      // 10MB; the limit is here to stop an unbounded write, not to size photos.
++      allow create, update: if tripMember(tripId)
++        && request.resource.size < 10 * 1024 * 1024
++        && request.resource.contentType.matches('image/.*');
++
++      allow delete: if tripMember(tripId);
++    }
++
++    // Nothing else is served from this bucket.
++    match /{allPaths=**} {
++      allow read, write: if false;
++    }
++  }
++}
