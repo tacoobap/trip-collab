@@ -241,29 +241,41 @@ or a legacy guest — so decide whether to keep the raw string as a fallback
 (`{ uid: null, name }`) or drop it; keeping it is safer. Comparing on
 `uid ?? name` during the transition lets old and new documents coexist.
 
-### 3. Offline cache + installable app
+### 3. Offline — data cache done, app shell still needs the network
 
-**Why.** This is a travel app that currently shows nothing without a network.
-`src/lib/firebase.ts:20` uses a plain `getFirestore(app)` — no local cache — and
-there's no `manifest.json` or service worker in `public/`. On a plane, abroad on
-an expensive roaming plan, or on bad hotel wifi, an itinerary that has already
-been loaded once is unreachable.
+**Data cache: done (7 Sep 2026).** `src/lib/firebase.ts` initialises Firestore
+through `initializeFirestore` with `persistentLocalCache` +
+`persistentMultipleTabManager`, so everything read is mirrored into IndexedDB,
+queries resolve from disk, and writes made offline queue until reconnection.
+Verified by booting the client on a throwaway preview entry and confirming
+`firestore/[DEFAULT]/<project>/main` appears in IndexedDB.
 
-**Done when**
+**What's left, and the decision behind it.** This caches the *data*, not the app
+shell — with no service worker a cold start still needs the network to fetch the
+bundle at all, so the cache helps a live tab and a warm reload, not a phone
+opened from scratch in airplane mode. The remaining pieces were considered
+together on 7 Sep 2026 and deliberately **parked**:
 
-- Firestore is initialised with `persistentLocalCache` (via `initializeFirestore`,
-  with multi-tab support if it's cheap) so an already-loaded trip renders from
-  cache and writes queue until reconnection.
-- `public/manifest.json` plus icons and `apple-touch-icon`, linked from
-  `index.html`, so the app can be added to a phone home screen.
-- The UI is honest about cache state: Firestore exposes `metadata.fromCache` and
-  `hasPendingWrites`. The toast system (`ToastProvider`) is the obvious place to
-  say "offline — changes will sync".
+- **Web app manifest** — `public/manifest.json` plus icons and
+  `apple-touch-icon`, linked from `index.html` (which has no manifest link
+  today), so Add to Home Screen gives a real icon and opens without browser
+  chrome. Small, but parked on its own: an icon that looks like an app and shows
+  a blank page offline sets an expectation the manifest can't meet. Only worth
+  doing together with the service worker.
+- **Service worker** — the piece that actually makes offline work, via
+  `vite-plugin-pwa`. Carries the real cost: a precached shell means users can run
+  stale JS after a deploy, so it needs update handling ("new version — reload").
+- **Honest cache-state UI** — Firestore exposes `metadata.fromCache` and
+  `hasPendingWrites`; `ToastProvider` is the obvious place to say "offline —
+  changes will sync". Independent of the two above and can be done any time.
 
-**Gotcha.** A manifest alone gives an installable icon that opens a blank page
-offline; the app shell still needs the network unless a service worker caches
-it. Decide up front whether to add one (`vite-plugin-pwa`) or to stop at the
-Firestore cache and say so.
+**Gotcha for whoever picks this up.** Day photos, the itinerary hero and
+collection thumbnails are absolute URLs on a third-party host, so an offline
+itinerary is correct text with broken images unless the service worker also
+runtime-caches that host — see item 9, which changes where those images live.
+Also verify the auth gate: the whole app is behind sign-in, and whether
+`AuthContext` resolves a restored session without the network hasn't been
+checked.
 
 ### 4. Schedule a collection idea without going to the board
 
