@@ -56,6 +56,18 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
     }
   }
 
+  /**
+   * A city typed but never committed with Enter or + still counts. Dropping it
+   * on submit is what left trips with no destinations at all, and the day setup
+   * screen with nothing to offer but "Add city" on every row.
+   */
+  const allDestinations = () => {
+    const trimmed = destination.trim()
+    return trimmed && !destinations.includes(trimmed)
+      ? [...destinations, trimmed]
+      : destinations
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!tripName.trim() || !user) return
@@ -70,7 +82,7 @@ export function NewTripDialog({ open, onOpenChange }: NewTripDialogProps) {
       await addDoc(collection(db, 'trips'), {
         name: tripName.trim(),
         slug,
-        destinations,
+        destinations: allDestinations(),
         start_date: startDate || null,
         end_date: endDate || null,
         created_at: serverTimestamp(),

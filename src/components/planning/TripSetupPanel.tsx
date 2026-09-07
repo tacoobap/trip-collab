@@ -12,8 +12,10 @@ interface DaySetup {
   date: string
   dayNumber: number
   formatted: string
+  /** `''` is allowed — a day without a city is just `Day N`. */
   city: string
-  customCity: string
+  /** This day's free-text city input is open, and is bound straight to `city`. */
+  editing: boolean
 }
 
 interface TripSetupPanelProps {
@@ -35,11 +37,12 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
         day: 'numeric',
       }),
       city: trip.destinations[0] ?? '',
-      customCity: '',
+      editing: false,
     }))
   }, [trip])
 
   const [days, setDays] = useState<DaySetup[]>(initialDays)
+  const [bulkCity, setBulkCity] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -54,38 +57,68 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
 
   const hasDates = days.length > 0
 
-  const setDayCity = (index: number, city: string) =>
-    setDays((prev) => prev.map((d, i) => (i === index ? { ...d, city, customCity: '' } : d)))
+  // A trip created without destinations has nothing to offer as a pill, so it
+  // gets a field that names every day at once instead of one tap and one typed
+  // city per row. Keyed off the trip, not off `cityOptions`, so the field does
+  // not vanish out from under the user the moment they fill it in.
+  const needsCity = (trip.destinations?.length ?? 0) === 0
 
-  const setDayCustomCity = (index: number, customCity: string) =>
-    setDays((prev) => prev.map((d, i) => (i === index ? { ...d, customCity } : d)))
+  // Cities offered as pills: the trip's own destinations plus any city already
+  // named on a day, so typing one on Day 1 offers it on every other day. Days
+  // still being typed into are excluded — otherwise every keystroke would
+  // flicker a half-spelled name through the other days' pills.
+  const cityOptions = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...(trip.destinations ?? []),
+          ...days.filter((d) => !d.editing).map((d) => d.city),
+        ]),
+      ].filter(Boolean),
+    [trip.destinations, days]
+  )
+
+  const updateDay = (index: number, patch: Partial<DaySetup>) =>
+    setDays((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)))
+
+  /** Tapping the selected city clears it — a day without a city is valid. */
+  const pickCity = (index: number, city: string) =>
+    updateDay(index, { city: days[index].city === city ? '' : city, editing: false })
+
+  /**
+   * Opening the input starts empty; closing it is Enter or another pill, never
+   * blur. Collapsing on blur shifted the page under the pointer, so a click
+   * aimed at "Create days" landed on nothing.
+   */
+  const toggleCustom = (index: number) =>
+    updateDay(index, days[index].editing ? { editing: false } : { editing: true, city: '' })
+
+  const applyToAll = () => {
+    const city = bulkCity.trim()
+    if (!city) return
+    setDays((prev) => prev.map((d) => ({ ...d, city, editing: false })))
+  }
 
   const handleCreate = async () => {
-    const resolved = days.map((d) => ({
-      ...d,
-      effectiveCity: d.city === '__custom__' ? d.customCity.trim() : d.city,
-    }))
-
-    if (resolved.some((d) => !d.effectiveCity)) {
-      setError('Assign a city to every day before continuing.')
-      return
-    }
+    // The inputs write straight into `city`, so a still-open one is already
+    // here — nothing to reconcile, and nothing to silently drop
+    const resolved = days.map((d) => ({ ...d, city: d.city.trim() }))
 
     setLoading(true)
     setError('')
 
     try {
       // Same path the trip editor uses, so first setup and every later date
-      // change agree on numbering and on which city a day belongs to
+      // change agree on numbering and on which city a day belongs to. An empty
+      // city passes straight through: `syncTripDays` carries the previous day's
+      // city forward, and `dayLabel` falls back to a plain `Day N`.
       await syncTripDays(
         trip.id,
         trip.start_date,
         trip.end_date,
         trip.destinations[0] ?? '',
         {
-          cityByDate: Object.fromEntries(
-            resolved.map((d) => [d.date, d.effectiveCity])
-          ),
+          cityByDate: Object.fromEntries(resolved.map((d) => [d.date, d.city])),
         }
       )
       // useTrip's onSnapshot will pick up the new days automatically
@@ -155,16 +188,54 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
           </p>
         </div>
       )}
-      <div className="mb-8">
+      <div className="mb-6">
         <h2 className="text-2xl font-serif font-semibold text-foreground mb-1">
           Set up your days
         </h2>
         <p className="text-sm text-muted-foreground">
           {canEdit
-            ? 'Assign a city to each day. You can always rearrange later.'
+            ? 'Add a city to each day, or skip it and name them later.'
             : 'Days have not been set up yet.'}
         </p>
       </div>
+
+      {canEdit && needsCity && (
+        <div className="mb-6 rounded-xl border border-border bg-card p-4">
+          <label
+            htmlFor="setup-bulk-city"
+            className="block text-sm font-medium text-foreground mb-1.5"
+          >
+            Where are you going?
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id="setup-bulk-city"
+              placeholder="e.g. Tokyo"
+              value={bulkCity}
+              onChange={(e) => setBulkCity(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  applyToAll()
+                }
+              }}
+              autoFocus
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={applyToAll}
+              disabled={!bulkCity.trim()}
+              className="shrink-0"
+            >
+              Apply to all
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Names every day at once — change any of them below.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-4">
         {days.map((day, i) => (
@@ -175,14 +246,14 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
             </p>
 
             <div className="flex flex-wrap gap-2">
-              {trip.destinations.map((dest) => (
+              {cityOptions.map((dest) => (
                 <button
                   key={dest}
                   type="button"
-                  onClick={() => canEdit && setDayCity(i, dest)}
+                  onClick={() => canEdit && pickCity(i, dest)}
                   disabled={!canEdit}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all disabled:opacity-60 disabled:pointer-events-none ${
-                    day.city === dest
+                    day.city === dest && !day.editing
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background text-foreground border-border hover:border-primary/40'
                   }`}
@@ -192,24 +263,30 @@ export function TripSetupPanel({ trip, canEdit = true, onOpenEditTrip }: TripSet
               ))}
               <button
                 type="button"
-                onClick={() => canEdit && setDayCity(i, '__custom__')}
+                onClick={() => canEdit && toggleCustom(i)}
                 disabled={!canEdit}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all disabled:opacity-60 disabled:pointer-events-none ${
-                  day.city === '__custom__'
+                  day.editing
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background text-muted-foreground border-dashed border-border hover:border-primary/40'
                 }`}
               >
-                Other
+                {cityOptions.length > 0 ? 'Other' : 'Add city'}
               </button>
             </div>
 
-            {day.city === '__custom__' && (
+            {day.editing && (
               <Input
                 className="mt-3"
-                placeholder="City name"
-                value={day.customCity}
-                onChange={(e) => setDayCustomCity(i, e.target.value)}
+                placeholder={cityOptions.length > 0 ? 'City name' : 'e.g. Rome, Paris'}
+                value={day.city}
+                onChange={(e) => updateDay(i, { city: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    updateDay(i, { city: day.city.trim(), editing: false })
+                  }
+                }}
                 autoFocus
                 disabled={!canEdit}
               />
