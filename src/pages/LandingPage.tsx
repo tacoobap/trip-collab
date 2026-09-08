@@ -138,13 +138,7 @@ export function LandingPage() {
             <Sparkles className="w-5 h-5 text-primary" />
             <span className="text-lg font-serif font-bold text-foreground">Trup</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
-              <Plus className="w-4 h-4 mr-1.5" />
-              New trip
-            </Button>
-            <UserMenu />
-          </div>
+          <UserMenu />
         </div>
       </header>
 
@@ -173,10 +167,14 @@ export function LandingPage() {
           </motion.div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3 mb-6">
               <h2 className="text-2xl font-serif font-semibold text-foreground">
                 {past.length > 0 ? 'Upcoming' : 'My trips'}
               </h2>
+              <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
+                <Plus className="w-4 h-4 mr-1.5" />
+                New trip
+              </Button>
             </div>
             <motion.div
               initial={{ opacity: 0 }}
