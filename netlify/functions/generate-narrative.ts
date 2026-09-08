@@ -6,14 +6,14 @@ const SYSTEM_PROMPT = `You are crafting editorial copy for a boutique travel iti
 
 Given trip data, return a JSON object with exactly this shape:
 {
-  "tagline": string,          // One line: evocative subtitle for the trip — e.g. "A Romantic Valentine's Getaway · 2026"
-  "vibe_heading": string,      // 2–4 words: section headline above vibe cards, e.g. "Intention Over Itinerary", "Adventure Awaits", "Slow & Savored"
-  "vibe_tags": [               // Exactly 6 tags capturing the trip's character
-    { "label": string, "subtitle": string }  // label: 1–2 words (e.g. "Walkable", "Coffee First"). subtitle: 5 words max — very short punchy phrase, e.g. "Everything on foot", "Boutique over chain", "Designed for two"
+  "tagline": string,          // 4–10 words: evocative subtitle only. No trip name, no dates, no year. Examples: "From Parisian Splendor to Oxfordian Triumph", "A Romantic Valentine's Getaway"
+  "vibe_heading": string,     // 2–4 words: the section headline above the vibe cards, e.g. "Intention Over Itinerary", "Adventure Awaits", "Slow & Savored"
+  "vibe_tags": [              // Exactly 6 tags capturing the trip's character
+    { "label": string, "subtitle": string }  // label: 1–2 words (e.g. "Walkable", "Coffee First", "Golden Hour"). subtitle: 5 words max — very short punchy phrase. Examples: "Everything on foot", "Every morning starts right", "Rooftop cocktails at sunset", "Wander, don't museum", "Boutique over chain", "Designed for two"
   ],
   "days": [
     {
-      "day_id": string,
+      "day_id": string,            // Echo back the day_id given in the prompt, exactly
       "narrative_title": string,   // 3–5 words, punchy day title — e.g. "Arrive & Settle In"
       "image_query": string        // Specific Unsplash search query for a beautiful hero photo for this day
                                    // Be very specific: include place names, lighting cues, city — e.g. "Rainbow Row Charleston golden hour"
@@ -21,22 +21,33 @@ Given trip data, return a JSON object with exactly this shape:
   ],
   "proposals": [
     {
-      "proposal_id": string,
-      "editorial_caption": string  // One vivid sentence or evocative phrase — NOT a description.
-                                   // Impressionistic. e.g. "Spanish moss, oak canopies, morning light"
-                                   // or "A proper start — buttery croissants and the morning buzz of Saint-Germain"
+      "proposal_id": string,        // Echo back the proposal_id given in the prompt, exactly
+      "editorial_caption": string,  // One vivid sentence or evocative phrase — NOT a description.
+                                    // Impressionistic. e.g. "Spanish moss, oak canopies, morning light"
+                                    // or "A proper start — buttery croissants and the morning buzz of Saint-Germain"
+      "suggested_time": string | null  // A specific clock time if context suggests one (e.g. "9:30 AM", "7:00 PM").
+                                       // Use the slot's existing time as a guide (Morning → ~9:00 AM, Afternoon → ~2:00 PM, Evening → ~7:00 PM).
+                                       // null only if genuinely ambiguous.
     }
   ]
 }
 
 Rules:
+- tagline: exactly 4–10 words. Evocative phrase only — no trip name, no dates, no year. e.g. "From Parisian Splendor to Oxfordian Triumph", "A Romantic Valentine's Getaway".
 - Be specific to the actual places and activities. Do not use generic travel phrases.
 - Editorial captions should feel like a sentence from a travel essay, not a review.
-- Vibe tags: exactly 6. Each subtitle must be 5 words max — very short (e.g. "Everything on foot", "Boutique over chain", "Designed for two"). No full sentences.
-- vibe_heading sets the tone (e.g. "Intention Over Itinerary" for a relaxed romantic trip).
+- Vibe tags: exactly 6. Each subtitle must be 5 words max — very short and evocative (e.g. "Everything on foot", "Boutique over chain", "Designed for two"). No full sentences.
+- vibe_heading sets the tone for the section (e.g. "Intention Over Itinerary" for a relaxed romantic trip).
 - Image queries should be highly specific and visual — include place names, time of day, mood.
+- Echo day_id and proposal_id back verbatim. Never invent one, and never return an id that was not in the prompt.
 - Output valid JSON only. No markdown, no explanation.`
 
+/**
+ * The wire shape. The client flattens `DayWithSlots` down to this before
+ * posting — `src/types/database` can't be imported here (functions are outside
+ * `tsconfig.app.json`), and sending the prompt itself would turn this into an
+ * open Gemini proxy for anyone with an account.
+ */
 interface LockedItem {
   id: string
   time: string
@@ -60,6 +71,9 @@ interface InputTrip {
   end_date: string | null
 }
 
+/** A trip longer than this isn't real — it's someone running up the API bill. */
+const MAX_DAYS = 60
+
 function buildPrompt(trip: InputTrip, days: InputDay[]): string {
   const lines: string[] = [
     `Trip: ${trip.name}`,
@@ -70,12 +84,15 @@ function buildPrompt(trip: InputTrip, days: InputDay[]): string {
   ]
 
   for (const day of days) {
-    lines.push(`\n${day.label} (${day.city}${day.date ? `, ${day.date}` : ''})`)
+    lines.push(`\n${day.label} (${day.city}${day.date ? `, ${day.date}` : ''})  [day_id: ${day.id}]`)
     if (day.locked_items.length === 0) {
       lines.push('  — No locked activities yet')
     } else {
       for (const item of day.locked_items) {
-        lines.push(`  • [${item.time}] (${item.category}) ${item.title}${item.note ? ` — ${item.note}` : ''}`)
+        lines.push(
+          `  • [${item.time}] (${item.category}) ${item.title}` +
+          `${item.note ? ` — ${item.note}` : ''}  [proposal_id: ${item.id}]`
+        )
       }
     }
   }
@@ -106,28 +123,31 @@ export const handler: Handler = async (event) => {
       days: InputDay[]
     }
 
-    if (!trip || !days) {
+    if (!trip || !Array.isArray(days)) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Missing trip or days in request body' }) }
     }
-
-    const userPrompt = buildPrompt(trip, days)
+    if (days.length > MAX_DAYS) {
+      return { statusCode: 400, body: JSON.stringify({ error: `Too many days (max ${MAX_DAYS})` }) }
+    }
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-lite',
+      model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.75,
-        maxOutputTokens: 2000,
       },
     })
 
-    const result = await model.generateContent(userPrompt)
+    const result = await model.generateContent(buildPrompt(trip, days))
     const text = result.response.text()
     if (!text) throw new Error('Empty response from Gemini')
 
-    const parsed = JSON.parse(text)
+    // Parsed here rather than passed straight through, so a malformed
+    // generation surfaces as a 500 with a log line instead of as a JSON.parse
+    // throw in the browser, where nobody sees what Gemini actually said.
+    const parsed = JSON.parse(text) as unknown
 
     return {
       statusCode: 200,
