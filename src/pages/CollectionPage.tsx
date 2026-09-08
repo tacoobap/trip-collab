@@ -168,6 +168,7 @@ export function CollectionPage() {
       trip={trip}
       currentName={displayName ?? ''}
       headerActions={tools.buttons}
+      headerPhoneActions={tools.menuItems}
     >
 
       <main className="max-w-4xl mx-auto px-5 sm:px-6 py-6 max-sm:py-4">

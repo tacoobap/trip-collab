@@ -6,6 +6,7 @@ import { TodosDrawer } from '@/components/todos/TodosDrawer'
 import { useStays } from '@/hooks/useStays'
 import { useTodos } from '@/hooks/useTodos'
 import { cn } from '@/lib/utils'
+import type { MenuItem } from '@/components/layout/UserMenu'
 
 interface UseTripToolsArgs {
   /** Null until the trip loads — this hook is called above the page's early returns. */
@@ -19,11 +20,15 @@ interface UseTripToolsArgs {
 }
 
 /**
- * The trip-wide drawers — To-dos and Stays — as two pieces the caller places
- * separately: `buttons` goes into the header's action slot, `drawers` is
- * rendered at page level.
+ * The trip-wide drawers — To-dos and Stays — as three pieces the caller places
+ * separately.
  *
- * They have to be separated because the header carries `backdrop-blur`, and an
+ * `buttons` go into the header's action slot and hide below `sm`, where the tab
+ * row needs their width. `menuItems` is the same two actions as menu rows,
+ * which `UserMenu` shows only below `sm` — so they are offered exactly once at
+ * every width. `drawers` is rendered at page level.
+ *
+ * The drawers are separate because the header carries `backdrop-blur`, and an
  * element with a `backdrop-filter` becomes the containing block for any
  * `position: fixed` descendant. A drawer rendered inside the header would be
  * positioned against the header instead of the viewport, which collapses it to
@@ -62,14 +67,19 @@ export function useTripTools({
 
   const buttons = (
     <>
-      <button onClick={() => setTodosOpen(true)} className={btn} title="To-dos" aria-label="To-dos">
+      <button onClick={() => setTodosOpen(true)} className={cn(btn, 'max-sm:hidden')} title="To-dos" aria-label="To-dos">
         <ListChecks className="w-4 h-4" />
       </button>
-      <button onClick={() => setStaysOpen(true)} className={btn} title="Stays" aria-label="Stays">
+      <button onClick={() => setStaysOpen(true)} className={cn(btn, 'max-sm:hidden')} title="Stays" aria-label="Stays">
         <BedDouble className="w-4 h-4" />
       </button>
     </>
   )
+
+  const menuItems: MenuItem[] = [
+    { label: 'To-dos', Icon: ListChecks, onSelect: () => setTodosOpen(true) },
+    { label: 'Stays', Icon: BedDouble, onSelect: () => setStaysOpen(true) },
+  ]
 
   const drawers = !trip || !userUid ? null : (
     <>
@@ -102,5 +112,10 @@ export function useTripTools({
     </>
   )
 
-  return { buttons: trip && userUid ? buttons : null, drawers }
+  const ready = Boolean(trip && userUid)
+  return {
+    buttons: ready ? buttons : null,
+    menuItems: ready ? menuItems : [],
+    drawers,
+  }
 }

@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
-import { PageHeader, MOBILE_TABBAR_PAD } from '@/components/layout/PageHeader'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { uploadImage } from '@/lib/imageUpload'
 import { useImageDrop } from '@/hooks/useImageDrop'
@@ -23,7 +23,7 @@ import { db } from '@/lib/firebase'
 import { useNarrativeGeneration } from '@/hooks/useNarrativeGeneration'
 import { useItineraryExport } from '@/hooks/useItineraryExport'
 import { searchImage } from '@/lib/imageSearch'
-import { cn, formatTripDate } from '@/lib/utils'
+import { formatTripDate } from '@/lib/utils'
 import { TripInvitePreview } from '@/components/marketing/TripInvitePreview'
 import { TripPeopleProvider } from '@/contexts/TripPeopleContext'
 
@@ -332,7 +332,7 @@ export function ItineraryPage() {
 
   return (
     <TripPeopleProvider tripId={trip.id}>
-    <div data-print="page" className={cn('min-h-screen bg-background', MOBILE_TABBAR_PAD)}>
+    <div data-print="page" className="min-h-screen bg-background">
       {!scrolledPastHero && (
         <PageHeader
           trip={trip}

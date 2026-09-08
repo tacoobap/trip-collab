@@ -381,31 +381,45 @@ second bar over a full-bleed hero) was Itinerary's.
 which has its own heading), the centred tabs, an `actions` slot, and the menu.
 There is no second bar; the trip bar that briefly existed was folded in.
 
-**Below `sm` the tabs move to a bottom bar.** Not a preference — arithmetic. At
-375px the three text tabs measure 238 of the 335 usable pixels, and the mark,
-trip name, To-dos, Stays and the menu cannot share the remaining 97. Icon-only
-tabs were tried and are worse than they look: everything else in the row is
-`shrink-0`, so the trip name absorbs the whole shortfall and collapses to 21px —
-a name in the bar in name only. Moving the tabs to the bottom is the only
-arrangement that keeps the name legible and the labels intact, and it puts
-navigation where a thumb is. It does not save pixels (57px bottom + 61px top vs
-110px for the two bars it replaced); it spends them better.
+**Below `sm` the tabs lose their labels and the trip name goes away.** It is one
+row at every width — 61px on a phone, 73px on desktop. What changes is what the
+row can afford. Three text tabs measure 238 of the 375px viewport, so on a phone
+they become three 44px icons (136px), the trip name is hidden, and To-dos and
+Stays move into the menu; the mark, the tabs, Undo and the menu then fit with
+room to spare. From `sm` up the labels come back, the name and dates appear, and
+the two tools are buttons again.
+
+The order those decisions were made in matters, because the first attempt failed
+in a way that looked like success. Icon tabs *alone*, with the trip name still
+shown, measure as fitting — but everything else in the row is `shrink-0`, so the
+name silently absorbs the entire shortfall and collapses to 21px: a name in the
+bar in name only. Icon tabs work once the name is gone, not before. A bottom tab
+bar was built and shipped briefly as the alternative that kept both, then dropped
+as too heavy a pattern for a web app.
+
+**Each control appears exactly once at any width.** `buttons` carry
+`max-sm:hidden` and the menu rows carry `sm:hidden`, so the pair is
+complementary rather than additive. If you add a third tool, add it to both
+lists — the regression to watch for is it showing up twice on one side of the
+breakpoint, or vanishing on the other.
+
+Below `sm` the tabs stay in normal flow rather than being absolutely centred, so
+a row that gets tighter can never overlap itself. Above it they are centred, and
+the trip name is capped so it truncates instead of running underneath them.
 
 **`useTripTools`** (`src/components/layout/TripTools.tsx`) returns the To-dos and
-Stays controls as two separate pieces — `buttons` for the header's `actions`
-slot, `drawers` rendered at page level. They must be separated: the header sets
+Stays controls as three separate pieces — `buttons` for the header's `actions`
+slot, `menuItems` for its `phoneActions`, and `drawers` rendered at page level. They must be separated: the header sets
 `backdrop-blur`, and an element with a `backdrop-filter` becomes the containing
 block for every `position: fixed` descendant, so a drawer rendered inside the
 header is positioned against the header rather than the viewport and collapses
 to a sliver. The phone tab bar is a sibling of `<header>` for the same reason —
-check `getBoundingClientRect().bottom === innerHeight` if you ever move it.
+this is also why the bottom bar, while it existed, had to be a sibling of
+`<header>` rather than a child.
 
-`UndoButton` goes in the same `actions` slot on Planning only; it undoes board
-drags, not trip-wide actions.
-
-Pages that render `PageHeader` add `MOBILE_TABBAR_PAD` so the tab bar doesn't
-cover their last row — including TripPage, whose board is `h-dvh flex flex-col`
-and would otherwise size itself to the full viewport.
+`UndoButton` goes in the same `actions` slot on Planning only, and stays a
+visible button on phones: it undoes board drags, so it belongs next to the
+board rather than two taps into a menu.
 
 **Page actions live in the page, not the bar.** Collection's Suggest and Add sit
 at the top of `<main>`, aligned to the list they act on. They were briefly in the
@@ -437,18 +451,10 @@ gutter is `z-[25]`, so an open menu was covered by the day photos. The header is
 `PageHeader` also had to learn that `/settings` is not a tab: Planning was the
 "none of the others" branch, so the settings page lit the Planning tab.
 
-**Parked: tabs back in the top bar on phones.** Considered and stopped on
-8 Sep 2026, mid-implementation, in favour of keeping the bottom bar for now —
-recorded because the arithmetic is the expensive part to rediscover. The shape
-was: no bottom bar, no trip name on phones, To-dos and Stays moved into the
-menu, Undo left as a button. It does **not** fit. Tabs (238) + Undo (44) +
-avatar (41) + the mark (16) + gutters (40) plus inter-group gaps comes to about
-395 in a 375px viewport, roughly 20px over — *after* removing the name and the
-two tool buttons. Something further has to give: dropping the mark on phones
-(~24px, with "All trips" moved into the menu) is the cleanest, tightening the
-tab padding the other. Revisit if the bottom bar proves unpopular on a real
-device; the half-finished version put `max-sm:hidden` on the tool buttons and
-gave `UserMenu` a `phoneActions` prop for the menu rows.
+**Why not text tabs on phones.** Keeping the labels and dropping only the name
+and the two tools does not fit: tabs (238) + Undo (44) + menu (41) + mark (16) +
+gutters (40) plus gaps is about 395 in a 375px viewport, roughly 20px over. The
+labels are what has to give, which is why the phone tabs are icons.
 
 The trip name is capped (`sm:max-w-[22rem] lg:max-w-[26rem]`) because the tabs
 are absolutely centred and will not be pushed — without it a long name runs

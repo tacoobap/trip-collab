@@ -3,9 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import type { Trip } from '@/types/database'
 import { cn, formatTripDate } from '@/lib/utils'
 import { UserMenu } from '@/components/layout/UserMenu'
-
-/** Height of the phone tab bar. Pages add this as bottom padding — see MOBILE_TABBAR_PAD. */
-export const MOBILE_TABBAR_PAD = 'max-sm:pb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+import type { MenuItem } from '@/components/layout/UserMenu'
 
 interface PageHeaderProps {
   trip: Trip
@@ -19,6 +17,12 @@ interface PageHeaderProps {
   showTripId?: boolean
   /** Trip-wide controls — To-dos, Stays, Undo — placed before the menu. */
   actions?: React.ReactNode
+  /**
+   * The same trip-wide actions as menu rows, shown only below `sm`. On a phone
+   * the tab row takes the space the buttons would need, so they move into the
+   * menu; `actions` hides its own buttons there, so nothing appears twice.
+   */
+  phoneActions?: MenuItem[]
 }
 
 export function PageHeader({
@@ -27,6 +31,7 @@ export function PageHeader({
   overHero = false,
   showTripId = false,
   actions,
+  phoneActions,
 }: PageHeaderProps) {
   const location = useLocation()
   const isItinerary = location.pathname.endsWith('/itinerary')
@@ -85,9 +90,10 @@ export function PageHeader({
             </Link>
 
             {showTripId && (
-              // Capped so a long name truncates before it can reach the
-              // centred tabs, which are absolutely positioned and won't push.
-              <div className="min-w-0 sm:max-w-[22rem] lg:max-w-[26rem]">
+              // Hidden below `sm`: the tab row needs that width, and the menu
+              // names the trip anyway. Capped above it so a long name truncates
+              // before reaching the centred tabs, which won't be pushed.
+              <div className="hidden sm:block min-w-0 sm:max-w-[22rem] lg:max-w-[26rem]">
                 <h2
                   className={cn(
                     'font-serif text-lg sm:text-xl font-semibold truncate leading-tight',
@@ -111,18 +117,28 @@ export function PageHeader({
             )}
           </div>
 
-          {/* Centre: the three surfaces. Below sm they move to the tab bar. */}
-          <nav className="max-sm:hidden absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5">
-            {tabs.map(({ label, to, on }) => (
+          {/* Centre: the three surfaces. Icons below `sm`, where three labels
+              would take 238 of the 375px viewport and leave nothing for the
+              rest of the row; absolutely centred from `sm` up, where there is
+              room and the labels are worth having. Kept in normal flow on
+              phones so the row can never overlap itself. */}
+          <nav className="flex items-center gap-0.5 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+            {tabs.map(({ label, to, on, Icon }) => (
               <Link
                 key={label}
                 to={to}
+                title={label}
+                aria-label={label}
+                aria-current={on ? 'page' : undefined}
                 className={cn(
-                  'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors whitespace-nowrap',
+                  'rounded-md border-b-2 border-transparent transition-colors whitespace-nowrap',
+                  'max-sm:w-11 max-sm:h-11 max-sm:flex max-sm:items-center max-sm:justify-center max-sm:touch-manipulation',
+                  'sm:px-3 sm:py-2 sm:text-sm sm:font-medium',
                   on ? linkActive : linkInactive
                 )}
               >
-                {label}
+                <Icon className="w-[18px] h-[18px] sm:hidden" />
+                <span className="max-sm:hidden">{label}</span>
               </Link>
             ))}
           </nav>
@@ -130,34 +146,17 @@ export function PageHeader({
           {/* Right: trip-wide tools, then you */}
           <div className="flex items-center gap-1 max-sm:gap-0 shrink-0 z-10">
             {actions}
-            {currentName && <UserMenu isDark={isDark} tripSlug={trip.slug} tripName={trip.name} />}
+            {currentName && (
+              <UserMenu
+                isDark={isDark}
+                tripSlug={trip.slug}
+                tripName={trip.name}
+                phoneActions={phoneActions}
+              />
+            )}
           </div>
         </div>
       </header>
-
-      {/* Phone navigation. Rendered as a sibling, never inside the header: the
-          header's backdrop-blur would become its containing block and pin it
-          under the header instead of the viewport. */}
-      <nav
-        data-print="hide"
-        className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-warm-white/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]"
-      >
-        <div className="flex">
-          {tabs.map(({ label, to, on, Icon }) => (
-            <Link
-              key={label}
-              to={to}
-              className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[3.5rem] transition-colors touch-manipulation',
-                on ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Icon className="w-[18px] h-[18px]" />
-              <span className="text-[11px] font-medium">{label}</span>
-            </Link>
-          ))}
-        </div>
-      </nav>
     </>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { PageHeader, MOBILE_TABBAR_PAD } from '@/components/layout/PageHeader'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
 import { useTripTools } from '@/components/layout/TripTools'
 import { useDisplayName } from '@/hooks/useDisplayName'
@@ -10,7 +10,6 @@ import { useTrip } from '@/hooks/useTrip'
 import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
 import { firebaseProjectId } from '@/lib/firebase'
-import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
 import { TripPeopleProvider } from '@/contexts/TripPeopleContext'
@@ -103,12 +102,13 @@ export function TripPage() {
   return (
     <TripPeopleProvider tripId={trip.id}>
     <PlanningHistoryProvider>
-    <div className={cn('h-dvh flex flex-col bg-background', MOBILE_TABBAR_PAD)}>
+    <div className="h-dvh flex flex-col bg-background">
       <PageHeader
         trip={trip}
         currentName={displayName ?? ''}
         showTripId
         actions={<><UndoButton />{tools.buttons}</>}
+        phoneActions={tools.menuItems}
       />
       {user && isMember === false && (
         <div className="shrink-0 border-b border-warning/30 bg-warning/10">

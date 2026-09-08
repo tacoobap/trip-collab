@@ -1,10 +1,17 @@
 import { useRef, useState, useEffect } from 'react'
 import { ChevronDown, LogOut, Settings } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDisplayName } from '@/hooks/useDisplayName'
+
+export interface MenuItem {
+  label: string
+  Icon: LucideIcon
+  onSelect: () => void
+}
 
 interface UserMenuProps {
   /** When true, use dark styling (e.g. over hero) */
@@ -13,6 +20,12 @@ interface UserMenuProps {
   tripSlug?: string
   /** Trip name, shown as the group heading so the menu's scope reads. */
   tripName?: string
+  /**
+   * Trip-wide actions shown **only below `sm`** — To-dos and Stays. Above that
+   * they are buttons in the header, which hide themselves on phones, so these
+   * are offered exactly once at any width.
+   */
+  phoneActions?: MenuItem[]
 }
 
 /**
@@ -26,6 +39,7 @@ export function UserMenu({
   isDark = false,
   tripSlug,
   tripName,
+  phoneActions = [],
 }: UserMenuProps) {
   const { user, signOut } = useAuth()
   const { displayName } = useDisplayName()
@@ -101,6 +115,21 @@ export function UserMenu({
                   {tripName}
                 </p>
               )}
+              {phoneActions.map(({ label, Icon, onSelect }) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onSelect()
+                  }}
+                  className={cn(itemClass, 'sm:hidden')}
+                >
+                  <Icon className="w-4 h-4 shrink-0 opacity-70" />
+                  {label}
+                </button>
+              ))}
               <Link
                 to={`/trip/${tripSlug}/settings`}
                 role="menuitem"
