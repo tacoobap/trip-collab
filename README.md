@@ -584,6 +584,78 @@ the legacy optional fields start causing real bugs, and its test section is
 blocked on there being no test runner in the project at all.
 
 
+### 11. Consider moving trip data into subcollections
+
+**Not recommended today** — recorded so the reasoning isn't re-derived, and so
+the trigger for reconsidering is written down. Came out of the rules work on
+**7 Sep 2026**.
+
+**The idea.** `days`, `slots`, `proposals`, `collection_items`, `stays`,
+`trip_todos` and `trip_notes` are top-level collections carrying a `trip_id`
+field. They could instead live under the trip — `trips/{tripId}/slots/{slotId}`
+— and `firestore.rules` would then take the trip from the document's *path*:
+
+```
+match /trips/{tripId}/slots/{slotId} {
+  allow read: if tripMember(tripId);
+}
+```
+
+**What that would buy.** Exactly one thing: queries would no longer have to
+filter on `trip_id`. Today a rule reads `trip_id` off the document, and a list
+rule only sees the fields the query filters on, so every query in
+`src/services/` has to carry `where('trip_id', '==', tripId)` — see item 1. With
+subcollections there'd be nothing for a query to forget.
+
+**What it would not buy**, both worth knowing before anyone reaches for this:
+
+- **No cost saving.** The rule still has to `get()` the trip document to read
+  `member_uids`, so it's one access call per query either way.
+- **No help with orphans.** Firestore does not cascade-delete subcollections, so
+  a deleted trip would strand its children exactly as it does now — see item 12.
+
+**What it would cost.** Every read and write path changes shape:
+`doc(db, 'slots', id)` becomes `doc(db, 'trips', tripId, 'slots', id)`, so every
+function taking a slot or day id needs a trip id threaded to it. That's most of
+`planningService.ts`, plus the functions that read trip data with the Admin SDK
+(`shared-trip`, `link-preview`, `og-image`, `delete-trip`), which are the hardest
+things here to test. Then a data migration relocating ~400 documents across seven
+collections, with a dual-read window or a moment of downtime, and index rebuilds.
+
+**Why it doesn't clear the bar.** The convention it removes already fails safely:
+a query that doesn't filter on `trip_id` is refused on its first run, in dev,
+with a clear permission error, and `npm run test:rules` pins that. That's very
+different from the bug this replaced, which was silent and scaled with trip
+length — fine at ten days, broken at twenty.
+
+**Reconsider when** any of these is true, at which point it earns its own
+schema project rather than being bolted onto something else:
+
+- The `trip_id` filter convention actually bites — someone ships a query without
+  it, or the rules grow a second field they have to agree on.
+- Per-trip export, hard-delete or per-trip access control is wanted; those are
+  natural with subcollections and awkward without.
+- The schema is being reworked for another reason anyway.
+
+If a comparable app were being started fresh, subcollections would be the right
+model from day one — they cost nothing to adopt at the start.
+
+### 12. Delete a trip's children with the trip
+
+**What's wrong.** Trip `nfjax8ZH0fynNChNFgn3` no longer exists, but 5 days and
+14 slots still point at it — found while backfilling `trip_id` on **7 Sep 2026**.
+Firestore doesn't cascade, so whatever deleted that trip left its children
+behind, and `netlify/functions/delete-trip.ts` is where that should happen.
+
+They're unreachable from the app — nothing lists a trip that isn't there — so
+this is untidiness and storage rather than a live bug. But it means "is this
+document orphaned?" can't be answered by looking at the document.
+
+**Done when** deleting a trip removes its days, slots, proposals, collection
+items, stays, to-dos and notes, and the existing orphans are cleared out.
+`scripts/backfill-trip-ids.mjs` already reports documents whose parent is
+missing, which is the shape a cleanup script wants.
+
 ## Deploy
 
 The app is set up for **Netlify**: build command `npm run build`, publish directory `dist` (see `netlify.toml`).
