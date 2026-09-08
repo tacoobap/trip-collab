@@ -9,6 +9,7 @@ import { classifyPlaceInput, normalizePlaceUrl, placeFieldValue } from '@/lib/pl
 import type { StayInput } from '@/services/staysService'
 import type { Stay, Trip } from '@/types/database'
 import { cn } from '@/lib/utils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 /** The "Other" chip: a city that isn't one of the trip's destinations. */
 const CUSTOM_CITY = '__custom__'
@@ -31,6 +32,7 @@ export function StayForm({
   onSubmit,
   onCancel,
 }: StayFormProps) {
+  const { me } = useTripPeople()
   const isEdit = stay !== null
   const hasDestinations = trip.destinations.length > 0
   // A stay whose city has since been dropped from the trip still edits as
@@ -102,7 +104,8 @@ export function StayForm({
         check_in: checkIn,
         check_out: checkOut,
         // Provenance stays with whoever added it, even when someone else edits.
-        proposed_by: stay?.proposed_by ?? currentName,
+        proposed_by: stay?.proposed_by ?? me ?? '',
+        proposed_by_name: stay?.proposed_by_name ?? currentName,
         google_maps_url: location.effectiveUrl || null,
         latitude: location.position?.latitude ?? null,
         longitude: location.position?.longitude ?? null,

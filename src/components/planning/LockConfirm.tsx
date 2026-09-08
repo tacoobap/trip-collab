@@ -2,6 +2,7 @@ import { Lock } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import type { Proposal } from '@/types/database'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 interface LockConfirmProps {
   proposal: Proposal | null
@@ -20,6 +21,7 @@ export function LockConfirm({
   onConfirm,
   loading = false,
 }: LockConfirmProps) {
+  const { nameFor } = useTripPeople()
   if (!proposal) return null
 
   return (
@@ -39,7 +41,7 @@ export function LockConfirm({
             <p className="text-xs text-muted-foreground mt-1">{proposal.note}</p>
           )}
           <p className="text-xs text-muted-foreground mt-2">
-            Proposed by {proposal.proposer_name}
+            Proposed by {nameFor(proposal.proposer_uid, proposal.proposer_name)}
             {proposal.votes.length > 0 && ` · ${proposal.votes.length} vote${proposal.votes.length !== 1 ? 's' : ''}`}
           </p>
         </div>

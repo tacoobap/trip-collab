@@ -59,6 +59,57 @@ Note that this makes a trip's name, cover photo and dates readable by anyone hol
 | `npm run build`  | TypeScript + Vite build |
 | `npm run preview`| Preview production build |
 | `npm run lint`   | Run ESLint        |
+| `npm run typecheck:functions` | Type-check `netlify/functions/` (the build doesn't) |
+| `npm run test:rules`  | `firestore.rules` against the Firestore emulator |
+| `npm run test:access` | The real trip subscription against those rules |
+
+## Testing the security rules
+
+There's no test runner in the project, but `firestore.rules` has two suites,
+because a rules mistake is invisible until it locks everyone out of the app.
+
+Both need a JDK for the emulator. It's keg-only, so rather than changing your
+PATH:
+
+```bash
+PATH="/usr/local/opt/openjdk/bin:$PATH" npm run test:rules
+```
+
+- **`test:rules`** (`scripts/test-firestore-rules.mjs`) — what an outsider, a
+  member and an invitee may read and write, every query in `src/services/`, the
+  self-join and takeover cases, and the access-call budget that makes
+  `IN_QUERY_MAX` load-bearing.
+- **`test:access`** (`scripts/test-trip-access.mjs`) — bundles the real
+  `getTripBySlug` and `subscribeToTrip` with `@/lib/firebase` swapped for a stub
+  and runs them against the emulator with the rules enforced. This is the seam
+  the rules tests can't see: it covers an invitee landing on a link, joining, and
+  the itinerary opening without a reload.
+
+**Deploying rules.** Netlify does not deploy `firestore.rules` — it builds the
+app only, so this is a manual step, and the order matters.
+
+**App first, rules second.** The current client works under either version of
+the rules: it resolves a slug from your own trips and falls back to the
+`resolve-trip` function, neither of which the old rules mind. The reverse isn't
+true — under the new rules the old client's `where('slug', '==', slug)` is a
+list it isn't allowed to make, so deploying rules first breaks every open tab
+until it reloads.
+
+To confirm that before shipping, run the access suite against the rules that are
+currently live:
+
+```bash
+git show HEAD:firestore.rules > /tmp/live.rules && RULES_FILE=/tmp/live.rules npm run test:access
+```
+
+So: push, let Netlify finish, then
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+A tab left open across the rules deploy still holds the old bundle and will fail
+to open a trip until it's reloaded.
 
 ## One-time migration: assign members to an existing trip
 
@@ -130,7 +181,8 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 ## Future to-dos / enhancements
 
 Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
-by what to do first. Each is written to be picked up cold in a fresh session —
+by what to do first. Items 1, 2, 4, 5, 6 and 8 are done; 3 was dropped; 7, 9 and
+10 are open. Each is written to be picked up cold in a fresh session —
 what's wrong, where it lives, and what "done" looks like. Item 9 predates that
 review; item 10 came out of **Feb 28 Productionizing.md**, which is otherwise
 finished or superseded and is kept only as a record of that round.
@@ -138,145 +190,102 @@ finished or superseded and is kept only as a record of that round.
 The numbers are stable — don't renumber a finished item away, since sessions
 refer to them by number. A done item keeps its heading and says so.
 
-### 1. Lock down `firestore.rules` — any signed-in account can read, and take over, every trip
+### 1. Lock down `firestore.rules` — **done (7 Sep 2026)**
 
-Do this before anything else.
+Every collection used to be `allow read: if request.auth != null`, so any
+signed-in account could run `getDocs(collection(db, 'trips'))` and read every
+trip in the database, then evict the members and take ownership.
 
-**What's wrong.** Every collection is `allow read: if request.auth != null` —
-`firestore.rules` lines 30, 61, 72, 100, 125, 138, 155, 169. Rules gate `list`
-as well as `get`, and none of these look at `resource.data`, so any signed-in
-account can run `getDocs(collection(db, 'trips'))` — or the same against `days`,
-`slots`, `proposals`, `stays`, `collection_items`, `trip_notes`, `trip_todos` —
-and read every trip in the database. The comment at the top of the file explains
-the open read as being for invite links, but an invite link only needs a
-single-document read.
+**What it is now.** Reads are scoped to trips you're on, for `get` and `list`
+alike. The single exception is `get` on one `/trips/{id}`, which any signed-in
+user may make — that is the invite landing page, where someone has to see a trip
+before deciding to join it. `owner_uid` and `member_uids` are pinned on the
+edit branch, and the self-join branch takes the old member list plus the caller
+and nothing else, so a joiner can neither evict anyone nor add a third party.
 
-There is also a takeover chain:
+**The two things that make these rules hard to read**, both measured against the
+emulator rather than reasoned about, and both written at the top of
+`firestore.rules`:
 
-1. The second `allow update` branch on `/trips` (~line 48) requires only that
-   `member_uids` is the sole changed key and that the caller's uid appears in
-   the **new** value. Nothing requires the existing members to survive, so any
-   signed-in user can set `member_uids: [attacker]` and evict everyone else.
-2. Now a member, the first branch (~line 40) validates only `name`, `slug` and
-   `destinations`. `owner_uid` is unpinned, so they can make themselves owner.
-3. `netlify/functions/delete-trip.ts:49` trusts `owner_uid` — so they can then
-   delete the trip.
+- A `list` rule is evaluated against **the query**, not the documents it
+  returns, using a synthetic document holding only the fields the query
+  constrains. A rule can therefore only read a field the query filters on — and
+  an unfiltered collection read sees an empty document and is denied, which is
+  what closes the hole.
+- A query's rule gets ~20 document access calls, and an `in` filter spends one
+  per value. `IN_QUERY_MAX` is now load-bearing for reads: at 10 the slots query
+  costs 11 calls, and raising it past 19 would make the board unreadable.
 
-**Done when**
+**Client changes.** `getTripBySlug` can't resolve a slug with
+`where('slug', '==', slug)` any more, so it looks in your own trips first and
+falls back to `netlify/functions/resolve-trip.ts`, which is authenticated and
+returns only the document id. And because days are now members-only,
+`subscribeToTrip` holds the itinerary subscription back until you're a member —
+otherwise an invitee's listener is refused, `rebuild()` never runs and the join
+screen sits on a spinner. It opens the itinerary from the **server-confirmed**
+trip snapshot: Firestore fires that listener optimistically off the local write
+when you join, and a listener opened on that snapshot races the write to the
+server, is refused by rules that still see the old `member_uids`, and stays dead.
+That is also why the trip listener asks for `includeMetadataChanges`.
 
-- No collection is readable by an arbitrary signed-in account.
-- Self-join adds the caller and nothing else: the new `member_uids` must be the
-  old array plus the caller's uid.
-- `owner_uid` can't change on update. (If ownership transfer is ever wanted, it
-  belongs in a server function.)
-- The invite flow still works end to end: paste `/trip/:slug` → sign in → see
-  the trip → **Join this trip** → edit.
+**Tests.** `npm run test:rules` covers the rules; `npm run test:access` runs the
+real `getTripBySlug` and `subscribeToTrip` against them, which is where both
+bugs above were found. Both need a JDK for the emulator — see **Testing** below.
 
-**How, and the trade-off to decide.** For `list`, Firestore evaluates the rule
-against every document the query returns and rejects the whole query if any one
-fails; it does not inspect the `where` clauses. So the rule and the client query
-have to agree.
+**Left alone.** `SeedPage` (dev-only, behind `import.meta.env.DEV`) resolves a
+slug with a `list` and can no longer do so. It was already half-broken, since
+`allow delete` on trips has been `false` for longer than that.
 
-- `trips` is the easy one: `allow list: if request.auth.uid in resource.data.member_uids`.
-  `listUserTrips` (`src/services/tripService.ts:66`) already filters on
-  `owner_uid ==` and `member_uids array-contains`, and create forces the owner
-  into `member_uids`, so both of its queries still pass. Keep `allow get` open to
-  authed users so an invitee can see a trip before joining.
-- Child collections are queried by `trip_id` (slots by `day_id`), so a
-  membership rule needs the membership on the document itself. Two ways:
-  - **Denormalize `member_uids` onto every child document** and test it
-    directly. No rule-time `get()`, so no extra read cost — but it needs a
-    backfill and somewhere that keeps the array in sync when membership changes.
-  - **Call `tripMember(resource.data.trip_id)`**, as the write rules already do.
-    Trivial to write, but it's a document read per document evaluated, on every
-    list.
+### 2. Key identity on `uid`, not display name — **done (7 Sep 2026)**
 
-**Gotcha.** `getTripBySlug` (`src/services/tripService.ts:21`) resolves a slug
-with `where('slug', '==', slug)` — a `list`. Once `list` is membership-scoped,
-an invitee who isn't a member yet can no longer resolve the slug, which breaks
-the invite link. Resolve it server-side instead (`netlify/functions/lib/` already
-does this with the Admin SDK for `link-preview`), or add a `trip_slugs/{slug}`
-mapping document holding just `{ trip_id }`.
+Everything that recorded *who* stored a display name, so two travellers with the
+same Google name shared one identity and a rename orphaned every vote, like and
+assignment that person had made.
 
-Check every query shape against whatever rules you land on —
-`src/services/tripSubscription.ts` and the `useTrip` / `useStays` / `useTodos` /
-`useCollectionItems` hooks all have to keep matching.
+**What it is now.** `proposals.votes[]`, `collection_items.likes[]` and
+`created_by`, `stays.proposed_by`, and `trip_todos`'
+`created_by`/`assigned_to`/`completed_by` all hold uids. Where a label is still
+wanted for someone who has since left the trip, a name snapshot rides alongside
+the uid rather than replacing it: `proposer_name` next to the new
+`proposer_uid`, and the new `created_by_name` / `proposed_by_name` /
+`author_uid`. Names are resolved for display only.
 
-### 2. Key identity on `uid`, not display name
+**Where names come from.** `TripPeopleProvider`
+(`src/contexts/TripPeopleContext.tsx`) holds the roster for a trip and hands
+down `nameFor(id, fallback)`, `isMe(id)` and `me`. It's mounted by TripPage,
+CollectionPage and ItineraryPage, and reads through `useTripMembers`, which now
+caches per trip and shares one in-flight request — the roster is needed on every
+surface that shows a name, not just when the to-dos sheet opens.
 
-**What's wrong.** Everything that records *who* stores a display-name string,
-taken from `useDisplayName()` (`src/hooks/useDisplayName.ts`), which returns
-`user.displayName` — or the email prefix, or `'Traveler'`. Two travellers with
-the same Google name share one identity, and anyone who renames themselves
-silently orphans every vote, like and assignment they've made.
+**Old and new documents coexist.** `isMe` matches the uid *or* the display name,
+and `nameFor` falls back to the stored string when it isn't a uid, so nothing
+breaks before the migration runs. Un-voting removes both forms, so a vote left
+under a name doesn't get stuck.
 
-Affected fields (`src/types/database.ts`):
+**The migration.** `scripts/migrate-identities.mjs` rewrites the stored names to
+uids, resolving each against that trip's own members. Dry run by default:
 
-| Document | Fields |
-|---|---|
-| `proposals` | `proposer_name`, `votes[]` |
-| `collection_items` | `likes[]`, `created_by` |
-| `stays` | `proposed_by` |
-| `trip_todos` | `assigned_to`, `created_by`, `completed_by` |
-| `trip_notes` | `author_name` |
+```bash
+TRIP_SLUG=your-trip-slug node scripts/migrate-identities.mjs   # then APPLY=1
+```
 
-The comparisons to replace are the `.includes(currentName)` / filter-by-name
-patterns — `ProposalCard.tsx:34`, `ProposalDrawer`'s `handleVote`,
-`CollectionPage`'s `handleLike`, and the `travelers` / `todoPeople` lists in
-`TripPage.tsx`.
+It needs `GOOGLE_APPLICATION_CREDENTIALS`, is safe to re-run, and leaves two
+cases alone rather than guessing: a name matching no current member (someone who
+left) and a name shared by two members — that second one is the collision this
+item exists to fix, and it's the only part needing a human. Verified against the
+emulator, including the dry run writing nothing and a re-run being a no-op.
 
-**Done when** those fields hold uids, names are resolved for display only, and
-existing documents are migrated.
+**Also.** `firestore.rules` now pins `proposer_uid` to the caller when it's
+present, so a proposal can't be filed under someone else's uid. Absent it still
+passes, so a tab running the old bundle mid-deploy keeps working.
 
-**Notes.** `netlify/functions/trip-members.ts` already returns
-`{ uid, display_name }[]` for a trip — that's the resolver, and it exists
-because `firestore.rules` restricts `/users/{uid}` to that same user, so a
-browser can't read anyone else's profile. Don't reach for Firestore directly.
-`useTripMembers` currently only fetches when the to-dos sheet opens
-(`TripPage.tsx:45`); a uid-keyed UI needs the roster on every surface that shows
-a name, so fetch it once per trip and cache it.
+### 3. Offline — **dropped (7 Sep 2026)**
 
-Migration: a script in `scripts/`, in the shape of `migrate-trip-members.mjs`,
-mapping name → uid per trip. Some names will match no member — someone who left,
-or a legacy guest — so decide whether to keep the raw string as a fallback
-(`{ uid: null, name }`) or drop it; keeping it is safer. Comparing on
-`uid ?? name` during the transition lets old and new documents coexist.
-
-### 3. Offline — data cache done, app shell still needs the network
-
-**Data cache: done (7 Sep 2026).** `src/lib/firebase.ts` initialises Firestore
-through `initializeFirestore` with `persistentLocalCache` +
-`persistentMultipleTabManager`, so everything read is mirrored into IndexedDB,
-queries resolve from disk, and writes made offline queue until reconnection.
-Verified by booting the client on a throwaway preview entry and confirming
-`firestore/[DEFAULT]/<project>/main` appears in IndexedDB.
-
-**What's left, and the decision behind it.** This caches the *data*, not the app
-shell — with no service worker a cold start still needs the network to fetch the
-bundle at all, so the cache helps a live tab and a warm reload, not a phone
-opened from scratch in airplane mode. The remaining pieces were considered
-together on 7 Sep 2026 and deliberately **parked**:
-
-- **Web app manifest** — `public/manifest.json` plus icons and
-  `apple-touch-icon`, linked from `index.html` (which has no manifest link
-  today), so Add to Home Screen gives a real icon and opens without browser
-  chrome. Small, but parked on its own: an icon that looks like an app and shows
-  a blank page offline sets an expectation the manifest can't meet. Only worth
-  doing together with the service worker.
-- **Service worker** — the piece that actually makes offline work, via
-  `vite-plugin-pwa`. Carries the real cost: a precached shell means users can run
-  stale JS after a deploy, so it needs update handling ("new version — reload").
-- **Honest cache-state UI** — Firestore exposes `metadata.fromCache` and
-  `hasPendingWrites`; `ToastProvider` is the obvious place to say "offline —
-  changes will sync". Independent of the two above and can be done any time.
-
-**Gotcha for whoever picks this up.** Day photos, the itinerary hero and
-collection thumbnails are absolute URLs on a third-party host, so an offline
-itinerary is correct text with broken images unless the service worker also
-runtime-caches that host — see item 9, which changes where those images live.
-Also verify the auth gate: the whole app is behind sign-in, and whether
-`AuthContext` resolves a restored session without the network hasn't been
-checked.
+Not being pursued. The data cache did ship and is still there:
+`src/lib/firebase.ts` initialises Firestore through `initializeFirestore` with
+`persistentLocalCache` + `persistentMultipleTabManager`, so reads are mirrored
+into IndexedDB and offline writes queue until reconnection. The rest — web app
+manifest, service worker, cache-state UI — was dropped rather than parked.
 
 ### 4. Schedule a collection idea without going to the board — **done (7 Sep 2026)**
 
@@ -333,13 +342,14 @@ and nothing else renders "2026 (day: 18)".
 The related label fix is done too: the "Sign in with Google" links outside the
 sign-in page now read "Sign in".
 
-### 6. Per-trip browser tab title
+### 6. Per-trip browser tab title — **done (7 Sep 2026)**
 
-`document.title` is `Trup` for the whole app, so two trips open in two tabs are
-indistinguishable. The only code that touches it is
-`src/hooks/useItineraryExport.ts:38`, which sets it temporarily so the browser
-seeds the PDF filename and then restores it. Set it per trip — and restore it on
-unmount — wherever `useTrip` resolves.
+`useDocumentTitle` (`src/hooks/useDocumentTitle.ts`), called from `useTrip`, so
+every trip-scoped page gets it. The tab reads `<trip name> · Trup` and restores
+the base title on unmount. It reads that base from `index.html` once at module
+load rather than hardcoding it, and only ever restores it — which is what keeps
+it clear of `useItineraryExport`, which swaps the title in and out around
+`window.print()` to seed the PDF filename.
 
 ### 7. Navigation — three metaphors for five destinations
 

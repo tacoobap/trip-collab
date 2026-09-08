@@ -4,10 +4,10 @@ import { motion } from 'framer-motion'
 import type { Proposal } from '@/types/database'
 import { ProposerAvatar } from '@/components/shared/ProposerAvatar'
 import { cn } from '@/lib/utils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 interface ProposalCardProps {
   proposal: Proposal
-  currentName: string
   isLocked?: boolean
   onVote?: (proposalId: string) => void
   onLock?: (proposalId: string) => void
@@ -18,7 +18,6 @@ interface ProposalCardProps {
 
 export function ProposalCard({
   proposal,
-  currentName,
   isLocked = false,
   onVote,
   onLock,
@@ -26,13 +25,15 @@ export function ProposalCard({
   onEdit,
   className,
 }: ProposalCardProps) {
+  const { isMe, nameFor } = useTripPeople()
+  const proposerName = nameFor(proposal.proposer_uid, proposal.proposer_name)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(proposal.title)
   const [editNote, setEditNote] = useState(proposal.note ?? '')
   const [savingEdit, setSavingEdit] = useState(false)
 
-  const hasVoted = proposal.votes.includes(currentName)
+  const hasVoted = proposal.votes.some((vote) => isMe(vote))
   const voteCount = proposal.votes.length
 
   const startEdit = () => {
@@ -69,7 +70,7 @@ export function ProposalCard({
         className={cn('py-3', className)}
       >
         <div className="flex gap-2.5">
-          <ProposerAvatar name={proposal.proposer_name} size="xs" className="mt-1 shrink-0" />
+          <ProposerAvatar name={proposerName} size="xs" className="mt-1 shrink-0" />
           <div className="flex-1 min-w-0 space-y-2">
             <input
               autoFocus
@@ -128,7 +129,7 @@ export function ProposalCard({
       animate={{ opacity: 1, y: 0 }}
       className={cn('flex items-start gap-3 py-3', className)}
     >
-      <ProposerAvatar name={proposal.proposer_name} size="xs" className="mt-0.5 shrink-0" />
+      <ProposerAvatar name={proposerName} size="xs" className="mt-0.5 shrink-0" />
 
       {/* Title + note + url + proposer */}
       <div className="flex-1 min-w-0">
@@ -152,7 +153,7 @@ export function ProposalCard({
             Link
           </a>
         )}
-        <p className="text-xs text-muted-foreground mt-0.5">{proposal.proposer_name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{proposerName}</p>
       </div>
 
       {/* Actions */}

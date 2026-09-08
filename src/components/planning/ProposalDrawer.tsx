@@ -39,6 +39,7 @@ import {
   gridStretchCost,
 } from '@/lib/timeGrid'
 import { cn } from '@/lib/utils'
+import { useTripPeople, toggleMine } from '@/contexts/TripPeopleContext'
 
 const TIME_CHIPS = ['9:00 AM', '11:00 AM', '12:00 PM', '3:00 PM', '5:00 PM', '7:00 PM']
 
@@ -618,6 +619,7 @@ interface ProposalDrawerProps {
 }
 
 export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClose, onUpdate, onSlotDeleted, canEdit = true, canDeleteSlot = false }: ProposalDrawerProps) {
+  const { me, isMe } = useTripPeople()
   const [showAddForm, setShowAddForm] = useState(false)
   const [pickFromCollectionOpen, setPickFromCollectionOpen] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
@@ -670,6 +672,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
     await addProposal({
       slot_id: slot.id,
       trip_id: trip.id,
+      proposer_uid: me ?? '',
       proposer_name: currentName,
       title: data.title,
       note: data.note ?? null,
@@ -696,12 +699,8 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
 
   const handleVote = async (proposalId: string) => {
     const proposal = slot.proposals.find((p) => p.id === proposalId)
-    if (!proposal) return
-    const hasVoted = proposal.votes.includes(currentName)
-    const newVotes = hasVoted
-      ? proposal.votes.filter((v) => v !== currentName)
-      : [...proposal.votes, currentName]
-    await setProposalVotes(proposalId, newVotes)
+    if (!proposal || !me) return
+    await setProposalVotes(proposalId, toggleMine(proposal.votes, me, isMe))
     onUpdate()
   }
 
@@ -929,7 +928,6 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                             <ProposalCard
                               key={proposal.id}
                               proposal={proposal}
-                              currentName={currentName}
                               onDelete={canEdit ? handleDeleteProposal : undefined}
                               onEdit={canEdit ? handleEditProposal : undefined}
                             />
@@ -963,7 +961,6 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
                         <ProposalCard
                           key={proposal.id}
                           proposal={proposal}
-                          currentName={currentName}
                           isLocked={isThisLocked}
                           onVote={canEdit ? handleVote : undefined}
                           onLock={canEdit && !isLocked ? handleLock : undefined}

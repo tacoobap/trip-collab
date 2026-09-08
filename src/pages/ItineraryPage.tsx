@@ -25,6 +25,7 @@ import { useItineraryExport } from '@/hooks/useItineraryExport'
 import { searchImage } from '@/lib/imageSearch'
 import { formatTripDate } from '@/lib/utils'
 import { TripInvitePreview } from '@/components/marketing/TripInvitePreview'
+import { TripPeopleProvider } from '@/contexts/TripPeopleContext'
 
 export function ItineraryPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -330,6 +331,7 @@ export function ItineraryPage() {
   const currentHero = heroPreview ?? heroUrl ?? trip.image_url
 
   return (
+    <TripPeopleProvider tripId={trip.id}>
     <div data-print="page" className="min-h-screen bg-background">
       {!scrolledPastHero && (
         <PageHeader
@@ -436,5 +438,6 @@ export function ItineraryPage() {
         {days.length > 0 && <AtAGlanceSection days={days} />}
       </motion.div>
     </div>
+    </TripPeopleProvider>
   )
 }

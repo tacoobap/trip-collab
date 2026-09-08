@@ -63,10 +63,18 @@ export type Proposal = {
   id: string
   slot_id: string
   trip_id?: string   // denormalized for rules; set on create
+  /**
+   * Who proposed it. `proposer_uid` is the identity; `proposer_name` is a
+   * snapshot kept for display, so a proposal still says who made it after that
+   * person leaves the trip or renames themselves. Documents written before the
+   * uid migration have only the name — see `scripts/migrate-identities.mjs`.
+   */
+  proposer_uid?: string
   proposer_name: string
   title: string
   note: string | null
   url: string | null
+  /** Voter uids. Legacy documents hold display names. */
   votes: string[]
   created_at: string
   exact_time: string | null          // e.g. "7:30 PM" — used for itinerary ordering
@@ -87,7 +95,10 @@ export type Stay = {
   city: string
   check_in: string
   check_out: string
+  /** Uid of whoever added it; legacy documents hold a display name. */
   proposed_by: string
+  /** Display snapshot alongside `proposed_by`, for someone since departed. */
+  proposed_by_name?: string | null
   created_at: string
   // Where the stay is, when a Google Maps link was pasted. Optional: stays
   // created before they could be pinned don't carry these.
@@ -105,6 +116,8 @@ export type TripNote = {
   id: string
   trip_id: string
   text: string
+  /** Uid of the author; legacy documents hold a display name. */
+  author_uid?: string
   author_name: string
   created_at: string
 }
@@ -122,9 +135,13 @@ export type CollectionItem = {
   latitude: number | null
   longitude: number | null
   place_name: string | null
+  /** Liker uids. Legacy documents hold display names. */
   likes: string[]
   created_at: string
+  /** Uid of whoever added it; legacy documents hold a display name. */
   created_by: string
+  /** Display snapshot alongside `created_by`, for someone since departed. */
+  created_by_name?: string | null
   url?: string | null          // optional external link (e.g. website, booking page)
   note?: string | null         // optional freeform description/notes
 }
@@ -146,7 +163,8 @@ export type TripTodo = {
   /** Manual order within the open list. Lower sorts first; done items ignore it. */
   sort_order: number
   due_date: string | null      // 'YYYY-MM-DD'
-  assigned_to: string | null   // display name, matching proposer_name / created_by elsewhere
+  /** Uids throughout; legacy documents hold display names. */
+  assigned_to: string | null
   created_at: string
   created_by: string
   completed_at: string | null

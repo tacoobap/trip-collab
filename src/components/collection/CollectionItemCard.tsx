@@ -4,10 +4,10 @@ import type { CollectionItem } from '@/types/database'
 import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
 import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 interface CollectionItemCardProps {
   item: CollectionItem
-  currentName: string
   onLike?: (itemId: string) => void
   onEdit?: (item: CollectionItem) => void
   onDelete?: (itemId: string) => void
@@ -24,14 +24,16 @@ const CATEGORY_LABELS: Record<CollectionItem['category'], string> = {
 
 export function CollectionItemCard({
   item,
-  currentName,
   onLike,
   onEdit,
   onDelete,
   onSchedule,
   className,
 }: CollectionItemCardProps) {
-  const hasLiked = item.likes.includes(currentName)
+  const { isMe, nameFor } = useTripPeople()
+  // Stored identities resolved to names once, for the avatars and the list.
+  const likerNames = item.likes.map((like) => nameFor(like))
+  const hasLiked = item.likes.some((like) => isMe(like))
   const likeCount = item.likes.length
   const canLike = !!onLike
   const [likesOpen, setLikesOpen] = useState(false)
@@ -170,10 +172,10 @@ export function CollectionItemCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); setLikesOpen(true) }}
               className="flex items-center -space-x-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              title={`Liked by: ${item.likes.join(', ')}`}
-              aria-label={`See who liked (${item.likes.join(', ')})`}
+              title={`Liked by: ${likerNames.join(', ')}`}
+              aria-label={`See who liked (${likerNames.join(', ')})`}
             >
-              {item.likes.map((name) => {
+              {likerNames.map((name) => {
                 const color = getProposerColor(name)
                 const initial = getProposerInitial(name)
                 return (
@@ -199,7 +201,7 @@ export function CollectionItemCard({
             <DialogTitle>Liked by</DialogTitle>
           </DialogHeader>
           <ul className="space-y-1.5">
-            {item.likes.map((name) => {
+            {likerNames.map((name) => {
               const color = getProposerColor(name)
               const initial = getProposerInitial(name)
               return (

@@ -15,6 +15,7 @@ import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
 import { formatStayRange, stayAddress, stayNights } from '@/lib/stayDisplay'
 import { cn } from '@/lib/utils'
 import type { CollectionItemCategory } from '@/types/database'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 /** Matches the category chips on the cards. */
 const PIN_COLOR: Record<CollectionItemCategory, string> = {
@@ -181,7 +182,6 @@ export interface CollectionMapProps {
   items: MappableItem[]
   /** The stays in this city that parsed to coordinates. */
   stays?: MappableStay[]
-  currentName: string
   onLike?: (itemId: string) => void
   className?: string
 }
@@ -189,10 +189,10 @@ export interface CollectionMapProps {
 export function CollectionMap({
   items,
   stays = NO_STAYS,
-  currentName,
   onLike,
   className,
 }: CollectionMapProps) {
+  const { isMe, nameFor } = useTripPeople()
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef(new Map<string, maplibregl.Marker>())
@@ -400,6 +400,7 @@ export function CollectionMap({
     ? activeCluster.items.findIndex((i) => i.id === selectedItemId)
     : -1
   const activeItem = activeIndex >= 0 ? activeCluster!.items[activeIndex] : null
+  const activeLiked = !!activeItem?.likes.some((like) => isMe(like))
   const activeStay =
     selected?.kind === 'stay' ? (stays.find((s) => s.id === selected.id) ?? null) : null
 
@@ -531,18 +532,18 @@ export function CollectionMap({
                       onClick={() => onLike(activeItem.id)}
                       className={cn(
                         'inline-flex items-center gap-1 text-xs transition-colors',
-                        activeItem.likes.includes(currentName)
+                        activeLiked
                           ? 'text-red-500'
                           : 'text-muted-foreground hover:text-red-500'
                       )}
                       aria-label={
-                        activeItem.likes.includes(currentName) ? 'Unlike' : 'Like'
+                        activeLiked ? 'Unlike' : 'Like'
                       }
                     >
                       <Heart
                         className={cn(
                           'h-3.5 w-3.5',
-                          activeItem.likes.includes(currentName) && 'fill-current'
+                          activeLiked && 'fill-current'
                         )}
                       />
                       {activeItem.likes.length > 0 ? activeItem.likes.length : 'Like'}
@@ -557,11 +558,12 @@ export function CollectionMap({
                   )}
                   {activeItem.likes.length > 0 && (
                     <span className="flex -space-x-1.5">
-                      {activeItem.likes.map((name) => {
+                      {activeItem.likes.map((like) => {
+                        const name = nameFor(like)
                         const color = getProposerColor(name)
                         return (
                           <span
-                            key={name}
+                            key={like}
                             title={name}
                             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-card text-[10px] font-semibold"
                             style={{ backgroundColor: color.bg, color: color.text }}

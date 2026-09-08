@@ -29,6 +29,11 @@ import { CollectionList } from '@/components/collection/CollectionList'
 import { CollectionSuggestionsDialog } from '@/components/collection/CollectionSuggestionsDialog'
 import { ScheduleIdeaDialog } from '@/components/collection/ScheduleIdeaDialog'
 import { TripInvitePreview } from '@/components/marketing/TripInvitePreview'
+import {
+  TripPeopleProvider,
+  useTripPeopleValue,
+  toggleMine,
+} from '@/contexts/TripPeopleContext'
 
 export function CollectionPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -36,6 +41,7 @@ export function CollectionPage() {
   const { addToast } = useToast()
   const { displayName } = useDisplayName()
   const { trip, days, loading: tripLoading, error, isMember, isOwner } = useTrip(slug, user?.uid)
+  const { isMe } = useTripPeopleValue(trip?.id)
   const { items, loading: itemsLoading } = useCollectionItems(trip?.id)
   const { stays } = useStays(trip?.id)
   const {
@@ -90,20 +96,17 @@ export function CollectionPage() {
       latitude: null,
       longitude: null,
       place_name: null,
-      created_by: displayName ?? '',
+      created_by: user?.uid ?? '',
+      created_by_name: displayName ?? '',
     })
     setSavedIds((prev) => new Set(prev).add(index))
   }
 
   const handleLike = async (itemId: string) => {
-    if (!displayName) return
+    if (!user) return
     const item = items.find((i) => i.id === itemId)
     if (!item) return
-    const hasLiked = item.likes.includes(displayName)
-    const newLikes = hasLiked
-      ? item.likes.filter((n) => n !== displayName)
-      : [...item.likes, displayName]
-    await setCollectionItemLikes(itemId, newLikes)
+    await setCollectionItemLikes(itemId, toggleMine(item.likes, user.uid, isMe))
   }
 
   const handleDelete = async (itemId: string) => {
@@ -152,6 +155,7 @@ export function CollectionPage() {
   const isMemberBool = isMember === true
 
   return (
+    <TripPeopleProvider tripId={trip.id}>
     <TripLayout trip={trip} currentName={displayName ?? ''}>
       <CollectionHeader
         isMember={isMemberBool}
@@ -169,7 +173,6 @@ export function CollectionPage() {
           items={items}
           stays={stays}
           destinationOrder={destinationOrder}
-          displayName={displayName ?? ''}
           isMember={isMemberBool}
           isOwner={isOwner ?? false}
           onLike={handleLike}
@@ -250,5 +253,6 @@ export function CollectionPage() {
         onSaveSuggestion={handleSaveSuggestion}
       />
     </TripLayout>
+    </TripPeopleProvider>
   )
 }

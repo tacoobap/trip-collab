@@ -26,6 +26,7 @@ import { usePlanningHistory } from '@/hooks/usePlanningHistory'
 import { TimeGridCard } from './TimeGridCard'
 import { TimeGridDayHeader } from './TimeGridDayHeader'
 import { cn } from '@/lib/utils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 /**
  * Touch only: how long a finger must rest on a card before it lifts for
@@ -108,6 +109,7 @@ export function TimeGridBoard({
   onSlotClick,
   onEditDay,
 }: TimeGridBoardProps) {
+  const { me } = useTripPeople()
   const history = usePlanningHistory()
   const wrapRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
@@ -139,6 +141,7 @@ export function TimeGridBoard({
   const daysRef = useRef(days)
   const tripRef = useRef(trip)
   const currentNameRef = useRef(currentName)
+  const meRef = useRef(me)
   const canEditRef = useRef(canEdit)
   const gridStartRef = useRef(gridStart)
   const gridEndRef = useRef(gridEnd)
@@ -150,6 +153,7 @@ export function TimeGridBoard({
     daysRef.current = days
     tripRef.current = trip
     currentNameRef.current = currentName
+    meRef.current = me
     canEditRef.current = canEdit
     gridStartRef.current = gridStart
     gridEndRef.current = gridEnd
@@ -210,6 +214,7 @@ export function TimeGridBoard({
       trip_id: tripRef.current.id,
       time_label: minutesToTimeLabel(d.start),
       sort_order: day.slots.length,
+      proposer_uid: meRef.current ?? '',
       proposer_name: currentNameRef.current,
       title,
       start_minutes: d.start,
@@ -230,6 +235,7 @@ export function TimeGridBoard({
       trip_id: tripRef.current.id,
       time_label: '',
       sort_order: day.slots.length,
+      proposer_uid: meRef.current ?? '',
       proposer_name: currentNameRef.current,
       title,
       start_minutes: null,

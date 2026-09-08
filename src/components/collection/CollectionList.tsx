@@ -11,6 +11,7 @@ import {
 } from '@/lib/mapPoints'
 import { cn } from '@/lib/utils'
 import type { CollectionItem, Stay } from '@/types/database'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 const OTHER_LABEL = 'Other'
 
@@ -91,7 +92,6 @@ interface CollectionListProps {
   items: CollectionItem[]
   stays: Stay[]
   destinationOrder: string[]
-  displayName: string
   isMember: boolean
   isOwner: boolean
   onLike: (itemId: string) => void
@@ -107,7 +107,6 @@ export function CollectionList({
   items,
   stays,
   destinationOrder,
-  displayName,
   isMember,
   isOwner,
   onLike,
@@ -116,6 +115,7 @@ export function CollectionList({
   onSchedule,
   onAddClick,
 }: CollectionListProps) {
+  const { isMe } = useTripPeople()
   const [view, setView] = useState<CollectionView>(readStoredView)
 
   const chooseView = (next: CollectionView) => {
@@ -209,7 +209,6 @@ export function CollectionList({
                     items={mappable}
                     stays={sectionStays}
                     unmappable={unmappable}
-                    currentName={displayName}
                     onLike={isMember ? onLike : undefined}
                   />
                 ) : (
@@ -224,15 +223,14 @@ export function CollectionList({
                     <CollectionItemCard
                       key={item.id}
                       item={item}
-                      currentName={displayName}
                       onLike={isMember ? onLike : undefined}
                       onEdit={
-                        isMember && (isOwner || item.created_by === displayName)
+                        isMember && (isOwner || isMe(item.created_by))
                           ? onEdit
                           : undefined
                       }
                       onDelete={
-                        isMember && (isOwner || item.created_by === displayName)
+                        isMember && (isOwner || isMe(item.created_by))
                           ? onDelete
                           : undefined
                       }

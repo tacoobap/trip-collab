@@ -17,6 +17,7 @@ import { useDragReorder } from '@/hooks/useDragReorder'
 import type { TripTodo } from '@/types/database'
 import type { UpdateTodoInput } from '@/services/todoService'
 import { cn, formatTripDate } from '@/lib/utils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 /** Local-midnight YYYY-MM-DD, so "overdue" matches the user's calendar day. */
 function todayIso(): string {
@@ -68,9 +69,10 @@ function TodoCheckbox({ done, disabled, onToggle, label }: CheckboxProps) {
 
 
 interface PersonChipsProps {
-  people: string[]
+  /** Identity to store, and the name to show for it. */
+  people: { id: string; name: string }[]
   value: string | null
-  onChange: (name: string | null) => void
+  onChange: (id: string | null) => void
   size?: 'sm' | 'xs'
 }
 
@@ -93,21 +95,21 @@ function PersonChips({ people, value, onChange, size = 'sm' }: PersonChipsProps)
       >
         Anyone
       </button>
-      {people.map((name) => (
+      {people.map((person) => (
         <button
-          key={name}
+          key={person.id}
           type="button"
-          onClick={() => onChange(name)}
+          onClick={() => onChange(person.id)}
           className={cn(
             'flex items-center gap-1.5 rounded-full font-medium border transition-all',
             padWithAvatar,
-            value === name
+            value === person.id
               ? 'bg-primary text-primary-foreground border-primary'
               : 'bg-background text-foreground border-border hover:border-primary/40'
           )}
         >
-          <ProposerAvatar name={name} size="xs" />
-          {name}
+          <ProposerAvatar name={person.name} size="xs" />
+          {person.name}
         </button>
       ))}
     </>
@@ -160,7 +162,7 @@ function DueDateField({ value, onChange, size = 'sm' }: DueDateFieldProps) {
 
 interface TodoEditorProps {
   todo: TripTodo
-  people: string[]
+  people: { id: string; name: string }[]
   onSave: (data: UpdateTodoInput) => Promise<void>
   onDelete: () => void
   onCancel: () => void
@@ -249,6 +251,7 @@ function TodoRow({
   onOpenEditor,
   handleProps,
 }: TodoRowProps) {
+  const { nameFor } = useTripPeople()
   const due = todo.due_date ? dueLabel(todo.due_date, today) : null
   const hasMeta = !!todo.assigned_to || !!due
 
@@ -297,8 +300,8 @@ function TodoRow({
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             {todo.assigned_to && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ProposerAvatar name={todo.assigned_to} size="xs" />
-                {todo.assigned_to}
+                <ProposerAvatar name={nameFor(todo.assigned_to)} size="xs" />
+                {nameFor(todo.assigned_to)}
               </span>
             )}
             {due && (
@@ -329,7 +332,6 @@ interface TodosDrawerProps {
   currentName: string | null
   /** Candidate assignees: trip members, plus any name seen elsewhere on the
    *  trip as a fallback for members whose profile couldn't be read. */
-  travelers: string[]
   onAdd: (text: string, opts: { assigned_to: string | null; due_date: string | null }) => Promise<void>
   onUpdate: (todoId: string, data: UpdateTodoInput) => Promise<void>
   onToggle: (todoId: string, done: boolean) => Promise<void>
@@ -345,7 +347,6 @@ export function TodosDrawer({
   openTodos,
   doneTodos,
   currentName,
-  travelers,
   onAdd,
   onUpdate,
   onToggle,
@@ -354,6 +355,7 @@ export function TodosDrawer({
   onClearDone,
   canEdit = true,
 }: TodosDrawerProps) {
+  const { people: roster, nameFor } = useTripPeople()
   const [draft, setDraft] = useState('')
   const [draftAssignee, setDraftAssignee] = useState<string | null>(null)
   const [draftDue, setDraftDue] = useState('')
@@ -377,16 +379,19 @@ export function TodosDrawer({
     if (isDragging) setEditingId(null)
   }, [isDragging])
 
+  // The roster, plus any identity the existing to-dos already carry — which
+  // covers a legacy display name left by a document written before the uid
+  // migration, so an assignment made then can still be re-picked.
   const people = useMemo(() => {
-    const names = new Set<string>()
-    if (currentName) names.add(currentName)
-    travelers.forEach((n) => n && names.add(n))
+    const byId = new Map<string, string>()
+    roster.forEach((person) => byId.set(person.uid, person.name))
     ;[...openTodos, ...doneTodos].forEach((t) => {
-      if (t.assigned_to) names.add(t.assigned_to)
-      if (t.created_by) names.add(t.created_by)
+      if (t.assigned_to && !byId.has(t.assigned_to)) {
+        byId.set(t.assigned_to, nameFor(t.assigned_to))
+      }
     })
-    return [...names]
-  }, [currentName, travelers, openTodos, doneTodos])
+    return [...byId].map(([id, name]) => ({ id, name }))
+  }, [roster, nameFor, openTodos, doneTodos])
 
   const handleAdd = async () => {
     const text = draft.trim()

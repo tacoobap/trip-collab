@@ -42,7 +42,7 @@ export function useTodos(tripId: string | undefined) {
   const addTodo = useCallback(
     async (
       text: string,
-      createdBy: string,
+      createdByUid: string,
       opts?: { assigned_to?: string | null; due_date?: string | null }
     ) => {
       if (!tripId || !text.trim()) return
@@ -53,7 +53,7 @@ export function useTodos(tripId: string | undefined) {
       await addTodoService({
         trip_id: tripId,
         text,
-        created_by: createdBy,
+        created_by: createdByUid,
         assigned_to: opts?.assigned_to ?? null,
         due_date: opts?.due_date ?? null,
         after_sort_order: maxSortOrder,
@@ -67,8 +67,8 @@ export function useTodos(tripId: string | undefined) {
   }, [])
 
   const toggleTodo = useCallback(
-    async (todoId: string, done: boolean, byName: string) => {
-      await setTodoDoneService(todoId, done, byName)
+    async (todoId: string, done: boolean, byUid: string) => {
+      await setTodoDoneService(todoId, done, byUid)
     },
     []
   )

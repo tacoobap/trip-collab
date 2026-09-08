@@ -10,6 +10,7 @@ import { useCollectionItems } from '@/hooks/useCollectionItems'
 import { getProposerColor, getProposerInitial } from '@/lib/proposerColors'
 import type { CollectionItem, DayWithSlots } from '@/types/database'
 import { cn } from '@/lib/utils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 interface PickFromCollectionModalProps {
   open: boolean
@@ -45,6 +46,7 @@ export function PickFromCollectionModal({
   currentName: _currentName,
   onSelect,
 }: PickFromCollectionModalProps) {
+  const { nameFor } = useTripPeople()
   const { items, loading } = useCollectionItems(open ? tripId : undefined)
   const itemToDayLabels = buildItemToDayLabels(days)
 
@@ -117,18 +119,21 @@ export function PickFromCollectionModal({
                               <Heart className="w-3.5 h-3.5" />
                               {item.likes?.length > 0 ? item.likes.length : '0'} like{(item.likes?.length ?? 0) !== 1 ? 's' : ''}
                             </span>
-                            {item.created_by && (
-                              <div
-                                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold border-2 border-background shrink-0"
-                                style={{
-                                  backgroundColor: getProposerColor(item.created_by).bg,
-                                  color: getProposerColor(item.created_by).text,
-                                }}
-                                title={item.created_by}
-                              >
-                                {getProposerInitial(item.created_by)}
-                              </div>
-                            )}
+                            {item.created_by && (() => {
+                              const creator = nameFor(item.created_by, item.created_by_name)
+                              return (
+                                <div
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold border-2 border-background shrink-0"
+                                  style={{
+                                    backgroundColor: getProposerColor(creator).bg,
+                                    color: getProposerColor(creator).text,
+                                  }}
+                                  title={creator}
+                                >
+                                  {getProposerInitial(creator)}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </button>
                       ))}

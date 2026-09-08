@@ -16,6 +16,7 @@ import {
 import { formatTimeLabel, parseTimeToMinutes } from '@/lib/timeUtils'
 import { cn } from '@/lib/utils'
 import type { CollectionItem, DayWithSlots, Slot } from '@/types/database'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 const TIME_HINT = 'Use a time like 9:00 AM or 2:30 PM'
 
@@ -160,6 +161,7 @@ export function ScheduleIdeaDialog({
   onScheduled,
   onError,
 }: ScheduleIdeaDialogProps) {
+  const { me } = useTripPeople()
   const [startInput, setStartInput] = useState('')
   const [endInput, setEndInput] = useState('')
   const [timeError, setTimeError] = useState<string | null>(null)
@@ -209,6 +211,7 @@ export function ScheduleIdeaDialog({
         time_label: schedule.label ?? '',
         sort_order: day.slots.length,
         category: slotCategoryFor(item.category),
+        proposer_uid: me ?? '',
         proposer_name: currentName,
         title: item.name,
         note: item.place_name ?? null,

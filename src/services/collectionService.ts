@@ -39,6 +39,7 @@ export type CreateCollectionItemInput = {
   longitude?: number | null
   place_name?: string | null
   created_by: string
+  created_by_name: string
 }
 
 export type UpdateCollectionItemInput = {
@@ -75,6 +76,7 @@ export async function addCollectionItem(
     likes: [],
     created_at: serverTimestamp(),
     created_by: input.created_by,
+    created_by_name: input.created_by_name,
   })
   return ref.id
 }
@@ -99,7 +101,7 @@ export async function deleteCollectionItem(itemId: string): Promise<void> {
 }
 
 /**
- * Set the likes array on a collection item (e.g. after toggle by display name).
+ * Set the likes array on a collection item. Holds uids; legacy items hold names.
  */
 export async function setCollectionItemLikes(
   itemId: string,

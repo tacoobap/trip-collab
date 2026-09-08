@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
@@ -10,13 +10,13 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
 import { useStays } from '@/hooks/useStays'
 import { useTodos } from '@/hooks/useTodos'
-import { useTripMembers } from '@/hooks/useTripMembers'
 import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
 import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
 import { Loader2, BedDouble, ListChecks, Pencil } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
+import { TripPeopleProvider } from '@/contexts/TripPeopleContext'
 import { PlanningHistoryProvider } from '@/contexts/PlanningHistoryProvider'
 import { TripInvitePreview } from '@/components/marketing/TripInvitePreview'
 import { UndoButton } from '@/components/planning/UndoButton'
@@ -26,7 +26,7 @@ export function TripPage() {
   const { displayName } = useDisplayName()
   const { user, loading: authLoading, getIdToken } = useAuth()
   const { addToast } = useToast()
-  const { trip, days, travelers, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
+  const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
   const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
   const {
     openTodos,
@@ -40,14 +40,7 @@ export function TripPage() {
   } = useTodos(trip?.id)
   const [staysOpen, setStaysOpen] = useState(false)
   const [todosOpen, setTodosOpen] = useState(false)
-  // Fetched only once the to-dos sheet is opened, since that's the only thing
-  // that needs a roster. `travelers` alone misses a member who hasn't proposed
-  // anything yet, which is most of them early in a trip.
-  const { memberNames } = useTripMembers(trip?.id, getIdToken, todosOpen)
-  const todoPeople = useMemo(
-    () => [...memberNames, ...travelers],
-    [memberNames, travelers]
-  )
+
   const [editTripOpen, setEditTripOpen] = useState(false)
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -144,6 +137,7 @@ export function TripPage() {
     startShort && endShort ? `${startShort} – ${endShort}` : startShort ?? endShort ?? null
 
   return (
+    <TripPeopleProvider tripId={trip.id}>
     <PlanningHistoryProvider>
     <div className="h-dvh flex flex-col bg-background">
       <PageHeader trip={trip} currentName={displayName ?? ''} />
@@ -261,10 +255,9 @@ export function TripPage() {
         openTodos={openTodos}
         doneTodos={doneTodos}
         currentName={displayName ?? ''}
-        travelers={todoPeople}
-        onAdd={(text, opts) => addTodo(text, displayName ?? '', opts)}
+        onAdd={(text, opts) => addTodo(text, user.uid, opts)}
         onUpdate={updateTodo}
-        onToggle={(todoId, done) => toggleTodo(todoId, done, displayName ?? '')}
+        onToggle={(todoId, done) => toggleTodo(todoId, done, user.uid)}
         onDelete={deleteTodo}
         onReorder={reorderTodos}
         onClearDone={clearDone}
@@ -285,6 +278,7 @@ export function TripPage() {
       />
     </div>
     </PlanningHistoryProvider>
+    </TripPeopleProvider>
   )
 }
 

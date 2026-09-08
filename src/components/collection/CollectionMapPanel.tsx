@@ -11,7 +11,6 @@ interface CollectionMapPanelProps {
   stays: MappableStay[]
   /** Why places in this city are missing from the map, if any are. */
   unmappable: { shortLinks: number; linksWithoutPosition: number; total: number }
-  currentName: string
   onLike?: (itemId: string) => void
 }
 
@@ -23,7 +22,6 @@ export function CollectionMapPanel({
   items,
   stays,
   unmappable,
-  currentName,
   onLike,
 }: CollectionMapPanelProps) {
   return (
@@ -39,7 +37,6 @@ export function CollectionMapPanel({
           <CollectionMap
             items={items}
             stays={stays}
-            currentName={currentName}
             onLike={onLike}
             className="h-full w-full"
           />

@@ -16,6 +16,7 @@ import type { CollectionItem, CollectionItemCategory } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
 
 const CATEGORIES: { value: CollectionItemCategory; label: string }[] = [
@@ -160,6 +161,8 @@ export function CollectionItemForm({
     photoFieldRef.current?.scrollIntoView({ block: 'nearest' })
   }, [photoFile, fetchedImageUrl])
 
+  const { me } = useTripPeople()
+
   // The form lives in a dialog, so a paste anywhere in it means the photo —
   // except while typing, where a pasted link belongs to the field.
   const { isDragging, dropHandlers } = useImageDrop({
@@ -211,7 +214,8 @@ export function CollectionItemForm({
           latitude: parsed?.latitude ?? null,
           longitude: parsed?.longitude ?? null,
           place_name: parsed?.placeName ?? null,
-          created_by: currentName,
+          created_by: me ?? '',
+          created_by_name: currentName,
         })
         if (photoFile) {
           setUploadPct(10)

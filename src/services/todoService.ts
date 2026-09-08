@@ -67,6 +67,7 @@ function sortTodos(todos: TripTodo[]): TripTodo[] {
 export type CreateTodoInput = {
   trip_id: string
   text: string
+  /** Uid, like every other identity on a to-do. */
   created_by: string
   due_date?: string | null
   assigned_to?: string | null
@@ -115,12 +116,12 @@ export async function updateTodo(
 export async function setTodoDone(
   todoId: string,
   done: boolean,
-  byName: string
+  byUid: string
 ): Promise<void> {
   await updateDoc(doc(db, 'trip_todos', todoId), {
     done,
     completed_at: done ? serverTimestamp() : null,
-    completed_by: done ? byName : null,
+    completed_by: done ? byUid : null,
   })
 }
 

@@ -13,6 +13,7 @@ import { ImagePasteBox } from '@/components/shared/ImagePasteBox'
 import { Camera, Loader2, Plus, Check, X, Upload, Sparkles, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseTimeToMinutes, formatTimeLabel } from '@/lib/timeUtils'
+import { useTripPeople } from '@/contexts/TripPeopleContext'
 
 
 interface DayColumnProps {
@@ -26,6 +27,7 @@ interface DayColumnProps {
 }
 
 export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, canEdit = true, onEditDay }: DayColumnProps) {
+  const { me } = useTripPeople()
   const getDisplayTime = (slot: SlotWithProposals) => {
     const locked = slot.proposals.find((p) => p.id === slot.locked_proposal_id)
     return locked?.exact_time ?? locked?.narrative_time ?? slot.time_label
@@ -143,6 +145,7 @@ export function DayColumn({ day, tripId, currentName, onSlotClick, getToken, can
           trip_id: tripId,
           time_label: formatted,
           sort_order: day.slots.length,
+          proposer_uid: me ?? '',
           proposer_name: currentName,
           title,
         })

@@ -329,6 +329,8 @@ export async function addSlot(input: AddSlotInput): Promise<void> {
 export type AddProposalInput = {
   slot_id: string
   trip_id: string
+  /** Identity. `proposer_name` rides along as a display snapshot. */
+  proposer_uid: string
   proposer_name: string
   title: string
   note?: string | null
@@ -339,10 +341,11 @@ export type AddProposalInput = {
  * Create a new proposal on a slot. Caller should set slot status to 'proposed' when it was 'open'.
  */
 export async function addProposal(input: AddProposalInput): Promise<void> {
-  const { slot_id, trip_id, proposer_name, title, note = null, url = null } = input
+  const { slot_id, trip_id, proposer_uid, proposer_name, title, note = null, url = null } = input
   await addDoc(collection(db, 'proposals'), {
     slot_id,
     trip_id,
+    proposer_uid,
     proposer_name,
     title,
     note,
@@ -358,6 +361,7 @@ export type AddLockedSlotInput = {
   time_label: string
   sort_order: number
   category?: SlotCategory
+  proposer_uid: string
   proposer_name: string
   title: string
   /** Carried onto the proposal, as the pick-from-collection path does. */
@@ -380,6 +384,7 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
     time_label,
     sort_order,
     category = 'activity',
+    proposer_uid,
     proposer_name,
     title,
     note = null,
@@ -408,6 +413,7 @@ export async function addLockedSlot(input: AddLockedSlotInput): Promise<void> {
   batch.set(proposalRef, {
     slot_id: slotRef.id,
     trip_id,
+    proposer_uid,
     proposer_name,
     title,
     note,
@@ -445,6 +451,7 @@ export async function updateProposalExactTime(
   await updateDoc(doc(db, 'proposals', proposalId), { exact_time })
 }
 
+/** `votes` holds uids. */
 export async function setProposalVotes(
   proposalId: string,
   votes: string[]
