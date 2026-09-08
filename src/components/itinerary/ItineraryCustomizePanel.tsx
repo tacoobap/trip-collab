@@ -140,7 +140,10 @@ export function ItineraryCustomizePanel({
         </div>
         {canPasteHero && (
           <ImagePasteBox
-            className="w-full max-w-sm text-xs"
+            // Centred on both axes, like every button in the row above it. The
+            // shared box is left-aligned because its other caller is a menu of
+            // left-aligned rows; this one stands alone under a centred column.
+            className="w-full max-w-sm text-xs flex items-center justify-center text-center"
             label="Paste an image here to set the cover"
           />
         )}
