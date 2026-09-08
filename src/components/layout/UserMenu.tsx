@@ -9,11 +9,24 @@ import { useDisplayName } from '@/hooks/useDisplayName'
 interface UserMenuProps {
   /** When true, use dark styling (e.g. over hero) */
   isDark?: boolean
-  /** Trip slug — when set, the menu offers that trip's settings. */
+  /** Trip slug — when set, the menu offers that trip's controls. */
   tripSlug?: string
+  /** Trip name, shown as the group heading so the menu's scope reads. */
+  tripName?: string
 }
 
-export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
+/**
+ * Account and trip menu. Deliberately shallow: everything you administer about
+ * a trip — its name, dates, destinations, and both of its links — lives on the
+ * settings page rather than being scattered across menu items, so this only has
+ * to point at one door. Off a trip (`/home`) the heading and the settings link
+ * are absent, leaving just Sign out.
+ */
+export function UserMenu({
+  isDark = false,
+  tripSlug,
+  tripName,
+}: UserMenuProps) {
   const { user, signOut } = useAuth()
   const { displayName } = useDisplayName()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -33,7 +46,13 @@ export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpen])
 
+
   if (!user || !displayName) return null
+
+  const itemClass = cn(
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+    isDark ? 'hover:bg-white/15' : 'hover:bg-muted text-foreground'
+  )
 
   return (
     <div className="relative flex items-center shrink-0 max-sm:min-h-[44px] max-sm:items-center">
@@ -45,8 +64,8 @@ export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
           'flex items-center gap-1.5 transition-colors group touch-manipulation max-sm:p-2 max-sm:-m-2 rounded-md',
           nameBtn
         )}
-        title="Account menu"
-        aria-label="Account menu"
+        title="Menu"
+        aria-label="Menu"
         aria-expanded={menuOpen}
         aria-haspopup="true"
       >
@@ -64,25 +83,35 @@ export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
           ref={menuRef}
           role="menu"
           className={cn(
-            'absolute right-0 top-full mt-1 min-w-[10rem] rounded-lg border py-1 shadow-lg z-30',
+            'absolute right-0 top-full mt-1 min-w-[12rem] rounded-lg border py-1 shadow-lg z-30',
             isDark
               ? 'border-white/20 bg-black/90 backdrop-blur-md text-white'
               : 'border-border bg-warm-white shadow-md'
           )}
         >
           {tripSlug && (
-            <Link
-              to={`/trip/${tripSlug}/settings`}
-              role="menuitem"
-              onClick={() => setMenuOpen(false)}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-                isDark ? 'hover:bg-white/15' : 'hover:bg-muted text-foreground'
+            <>
+              {tripName && (
+                <p
+                  className={cn(
+                    'px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider truncate',
+                    isDark ? 'text-white/50' : 'text-muted-foreground'
+                  )}
+                >
+                  {tripName}
+                </p>
               )}
-            >
-              <Settings className="w-4 h-4 shrink-0 opacity-70" />
-              Trip settings
-            </Link>
+              <Link
+                to={`/trip/${tripSlug}/settings`}
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                className={itemClass}
+              >
+                <Settings className="w-4 h-4 shrink-0 opacity-70" />
+                Trip settings
+              </Link>
+              <div className={cn('my-1 h-px', isDark ? 'bg-white/20' : 'bg-border')} />
+            </>
           )}
           <button
             type="button"
@@ -91,10 +120,7 @@ export function UserMenu({ isDark = false, tripSlug }: UserMenuProps) {
               setMenuOpen(false)
               signOut()
             }}
-            className={cn(
-              'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-              isDark ? 'hover:bg-white/15' : 'hover:bg-muted text-foreground'
-            )}
+            className={itemClass}
           >
             <LogOut className="w-4 h-4 shrink-0 opacity-70" />
             Sign out

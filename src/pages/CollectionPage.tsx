@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Plus, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,8 @@ import {
 import { searchImage } from '@/lib/imageSearch'
 import type { CollectionItem } from '@/types/database'
 import { CollectionItemForm } from '@/components/collection/CollectionItemForm'
-import { CollectionHeader } from '@/components/collection/CollectionHeader'
+import { TripBar } from '@/components/layout/TripBar'
+import { Button } from '@/components/ui/button'
 import { CollectionList } from '@/components/collection/CollectionList'
 import { CollectionSuggestionsDialog } from '@/components/collection/CollectionSuggestionsDialog'
 import { ScheduleIdeaDialog } from '@/components/collection/ScheduleIdeaDialog'
@@ -157,17 +158,49 @@ export function CollectionPage() {
   return (
     <TripPeopleProvider tripId={trip.id}>
     <TripLayout trip={trip} currentName={displayName ?? ''}>
-      <CollectionHeader
+      <TripBar
+        trip={trip}
         isMember={isMemberBool}
-        onSuggestClick={() => {
-          setSuggestOpen(true)
-          setSavedIds(new Set())
-          setVibeSentence('')
-        }}
-        onAddClick={() => setAddOpen(true)}
+        currentName={displayName ?? ''}
+        userUid={user.uid}
+        getToken={getIdToken}
       />
 
+
       <main className="max-w-4xl mx-auto px-5 sm:px-6 py-6 max-sm:py-4">
+        {!isMemberBool && (
+          <div className="mb-6 max-sm:mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+            <p className="text-sm text-warning-foreground">
+              Only trip members can add or edit ideas. Join this trip to contribute to the
+              collection.
+            </p>
+          </div>
+        )}
+        {isMemberBool && (
+          <div className="flex gap-3 mb-6 max-sm:mb-4 max-sm:gap-2">
+            <Button
+              onClick={() => {
+                setSuggestOpen(true)
+                setSavedIds(new Set())
+                setVibeSentence('')
+              }}
+              className="gap-2 max-sm:flex-1 max-sm:justify-center max-sm:min-h-[44px]"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span className="sm:hidden">Suggest</span>
+              <span className="hidden sm:inline">Suggest something for me</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setAddOpen(true)}
+              className="gap-2 max-sm:flex-1 max-sm:justify-center max-sm:min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="sm:hidden">Add idea</span>
+              <span className="hidden sm:inline">Add an idea</span>
+            </Button>
+          </div>
+        )}
         <CollectionList
           itemsLoading={itemsLoading}
           items={items}

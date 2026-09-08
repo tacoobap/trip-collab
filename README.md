@@ -161,7 +161,7 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 ## Project layout
 
 - `src/pages/` — Route-level pages (Landing, Trip, Itinerary, Collection, TripSettings, SharedItinerary, Seed).
-- `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout.
+- `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout. `layout/TripBar` is the trip name, dates and trip-wide drawers, rendered by Planning and Collection; the itinerary deliberately doesn't.
 - `src/services/` — Data layer: `tripService`, `planningService`, `staysService`, `collectionService`.
 - `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, `useItineraryExport`, `useShareLink`, etc.
 - `src/lib/` — Firebase, utils, time/URL helpers, `dateRange` (timezone-safe date maths), `slotEmojis` (icon set + search + auto-assign), image upload/search, `aiRequest` (posts to the Gemini functions), narrative and suggestion payload builders.
@@ -182,8 +182,8 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 ## Future to-dos / enhancements
 
 Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
-by what to do first. Items 1, 2, 4, 5, 6, 8 and 10 are done; 3 was dropped; 7 and
-9 are open. Each is written to be picked up cold in a fresh session —
+by what to do first. Items 1, 2, 4, 5, 6, 7, 8 and 10 are done; 3 was dropped;
+only 9 is open. Each is written to be picked up cold in a fresh session —
 what's wrong, where it lives, and what "done" looks like. Item 9 predates that
 review; item 10 came out of **Feb 28 Productionizing.md**, which is otherwise
 finished or superseded and is kept only as a record of that round.
@@ -360,25 +360,61 @@ load rather than hardcoding it, and only ever restores it — which is what keep
 it clear of `useItineraryExport`, which swaps the title in and out around
 `window.print()` to seed the PDF filename.
 
-### 7. Navigation — three metaphors for five destinations
+### 7. Navigation — three metaphors for five destinations — **done (8 Sep 2026)**
 
-Not a bug; a design question worth settling before more gets added.
+A trip's surfaces were reached three ways — tabs for Planning/Collection/Itinerary,
+unlabelled icons for Stays and To-dos, the avatar menu for settings — and Stays
+and To-dos were trip-wide data reachable only from Planning. So were Edit trip,
+Undo and Invite; Collection didn't even show which trip you were on.
 
-A trip's surfaces are reached three different ways:
+**The rule that settled it.** Planning and Collection carry the trip's working
+tools. The itinerary is the output and carries the trip in its own hero and
+nothing else — it already has the sharing affordance appropriate to a finished
+itinerary, the read-only link in its customize panel. Ruling Itinerary out is
+what made this cheap: every expensive part (a dark over-hero icon variant, a
+second bar over a full-bleed hero) was Itinerary's.
 
-- **Planning / Collection / Itinerary** — tabs in `PageHeader`
-  (`src/components/layout/PageHeader.tsx`), absolutely centred in the bar.
-- **Stays** and **To-dos** — unlabelled icon buttons in the trip name bar
-  (`src/pages/TripPage.tsx`), opening drawers.
-- **Trip settings** — inside the avatar menu (`src/components/layout/UserMenu.tsx`).
+**`TripBar`** (`src/components/layout/TripBar.tsx`) is the shared piece: the trip
+name and dates, the To-dos and Stays buttons, and both drawers, which it owns
+rather than taking as props so a page gets everything by rendering one component.
+It takes an `actions` slot for icon-sized controls — `UndoButton` on Planning,
+which stays there because it undoes board drags, not trip-wide actions.
 
-The sharpest symptom: Stays and To-dos are trip-wide data, but they're only
-reachable from the Planning page — `TripLayout` takes the trip name bar as a
-prop and `CollectionPage` passes its own, while `ItineraryPage` doesn't use
-`TripLayout` at all. Whatever the answer — promote them into the tab row, put
-everything trip-level behind one consistent control, or make the drawers
-reachable from every page — the goal is a single rule for "where do I find a
-thing about this trip".
+Note it is **not** in `TripLayout`, despite that being the obvious home.
+`TripLayout` is used by CollectionPage alone; TripPage renders `PageHeader`
+directly because the time grid needs the page to be `h-dvh flex flex-col` rather
+than a scrolling document. `TripLayout`'s comment claimed TripPage used it and
+was years stale.
+
+**Page actions live in the page, not the bar.** Collection's Suggest and Add sit
+at the top of `<main>`, aligned to the list they act on. They were briefly in the
+trip bar; a bar carrying a page's own actions stops reading as the trip.
+`CollectionHeader` is gone — its `<h1>Collection</h1>` repeated the lit tab, and
+its blurb and full-width stacked buttons cost 288px of phone chrome above the
+first idea, now 212px.
+
+**Everything you administer moved to the settings page**, which now has Trip
+details, Invite link and Public share link. Two reasons beyond tidiness. The two
+links are only legible next to each other — separately, "invite link" and "share
+link" sound identical, when one lets people join and edit and the other is
+read-only. And **the pencil was load-bearing**: `TripSetupPanel`, the other route
+to `EditTripModal`, only renders when `days.length === 0`, so on any trip with
+days the trip bar's pencil was the sole way to edit dates and destinations. Trip
+details therefore opens that same modal rather than being a name field — which it
+had to anyway, since dates move as a range through `syncTripDays`.
+
+So `UserMenu` ends up shallow on purpose: the trip's name as a heading, Trip
+settings, a divider, Sign out. Off a trip it's just Sign out, exactly as before.
+
+**One stacking bug this surfaced.** `PageHeader` was `sticky top-0 z-20`, and
+`sticky` with a `z-index` makes it its own stacking context — so the menu inside
+it could never out-paint a sibling however high its own `z-index` went. The
+board's day headers are also `z-20` and come later in the DOM, and its hour
+gutter is `z-[25]`, so an open menu was covered by the day photos. The header is
+`z-30` now. If you add a board layer above 30, this breaks again.
+
+`PageHeader` also had to learn that `/settings` is not a tab: Planning was the
+"none of the others" branch, so the settings page lit the Planning tab.
 
 ### 8. Error boundary, and type-check the functions — **done (7 Sep 2026)**
 

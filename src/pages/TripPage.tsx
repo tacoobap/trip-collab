@@ -2,19 +2,15 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
-import { StaysDrawer } from '@/components/stays/StaysDrawer'
-import { TodosDrawer } from '@/components/todos/TodosDrawer'
+import { TripBar } from '@/components/layout/TripBar'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useTrip } from '@/hooks/useTrip'
-import { useStays } from '@/hooks/useStays'
-import { useTodos } from '@/hooks/useTodos'
 import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
-import { formatTripDate } from '@/lib/utils'
 import { firebaseProjectId } from '@/lib/firebase'
-import { Loader2, BedDouble, ListChecks, Pencil } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
 import { TripPeopleProvider } from '@/contexts/TripPeopleContext'
 import { PlanningHistoryProvider } from '@/contexts/PlanningHistoryProvider'
@@ -27,24 +23,10 @@ export function TripPage() {
   const { user, loading: authLoading, getIdToken } = useAuth()
   const { addToast } = useToast()
   const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
-  const { stays, addStay, updateStay, deleteStay } = useStays(trip?.id)
-  const {
-    openTodos,
-    doneTodos,
-    addTodo,
-    updateTodo,
-    toggleTodo,
-    deleteTodo,
-    reorderTodos,
-    clearDone,
-  } = useTodos(trip?.id)
-  const [staysOpen, setStaysOpen] = useState(false)
-  const [todosOpen, setTodosOpen] = useState(false)
 
   const [editTripOpen, setEditTripOpen] = useState(false)
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
-  const [copied, setCopied] = useState(false)
 
   const handleJoinTrip = async () => {
     if (!trip || !user || joining) return
@@ -58,25 +40,6 @@ export function TripPage() {
       setJoinError('Failed to join trip. Please try again.')
     } finally {
       setJoining(false)
-    }
-  }
-
-  const handleCopyInviteLink = async () => {
-    if (!trip) return
-    if (typeof window === 'undefined') return
-    const url = `${window.location.origin}/trip/${trip.slug}`
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url)
-        setCopied(true)
-        addToast('Link copied to clipboard.', { variant: 'success' })
-        window.setTimeout(() => setCopied(false), 2000)
-      } else {
-        window.prompt('Copy this link', url)
-      }
-    } catch (err) {
-      console.error('Failed to copy invite link', err)
-      window.prompt('Copy this link', url)
     }
   }
 
@@ -128,14 +91,6 @@ export function TripPage() {
     )
   }
 
-  const startFmt = formatTripDate(trip.start_date, { month: 'long', day: 'numeric', year: 'numeric' })
-  const endFmt = formatTripDate(trip.end_date, { month: 'long', day: 'numeric', year: 'numeric' })
-  const dateRange = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt ?? endFmt ?? null
-  const startShort = formatTripDate(trip.start_date, { month: 'short', day: 'numeric' })
-  const endShort = formatTripDate(trip.end_date, { month: 'short', day: 'numeric' })
-  const dateRangeShort =
-    startShort && endShort ? `${startShort} – ${endShort}` : startShort ?? endShort ?? null
-
   return (
     <TripPeopleProvider tripId={trip.id}>
     <PlanningHistoryProvider>
@@ -171,62 +126,14 @@ export function TripPage() {
         </div>
       )}
 
-      <div className="shrink-0 border-b border-border bg-warm-white/50">
-        <div className="max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2.5 flex items-center justify-between gap-4 max-sm:gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="font-serif text-lg sm:text-xl font-semibold text-foreground truncate">
-                {trip.name}
-              </h2>
-              {(isMember ?? false) && (
-                <button
-                  type="button"
-                  onClick={() => setEditTripOpen(true)}
-                  className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                  title="Edit trip"
-                  aria-label="Edit trip"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            {dateRange && (
-              <p className="text-sm text-muted-foreground mt-0.5 truncate">
-                <span className="sm:hidden">{dateRangeShort}</span>
-                <span className="hidden sm:inline">{dateRange}</span>
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 max-sm:gap-0.5 shrink-0">
-            <UndoButton />
-            <button
-              onClick={() => setTodosOpen(true)}
-              className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
-              title="To-dos"
-              aria-label="To-dos"
-            >
-              <ListChecks className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setStaysOpen(true)}
-              className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-manipulation max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:flex max-sm:items-center max-sm:justify-center"
-              title="Stays"
-              aria-label="Stays"
-            >
-              <BedDouble className="w-4 h-4" />
-            </button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCopyInviteLink}
-              className="max-sm:min-h-[40px]"
-            >
-              <span className="sm:hidden">{copied ? 'Copied' : 'Invite'}</span>
-              <span className="hidden sm:inline">{copied ? 'Link copied' : 'Invite link'}</span>
-            </Button>
-          </div>
-        </div>
-      </div>
+      <TripBar
+        trip={trip}
+        isMember={isMember ?? false}
+        currentName={displayName ?? ''}
+        userUid={user.uid}
+        getToken={getIdToken}
+        actions={<UndoButton />}
+      />
       {/* The time grid owns its own two-axis scroll region, so the page
           itself must not scroll: cap the column at the viewport and let the
           board fill what's left. */}
@@ -247,34 +154,6 @@ export function TripPage() {
         onOpenChange={setEditTripOpen}
         trip={trip}
         days={days}
-      />
-
-      <TodosDrawer
-        open={todosOpen}
-        onClose={() => setTodosOpen(false)}
-        openTodos={openTodos}
-        doneTodos={doneTodos}
-        currentName={displayName ?? ''}
-        onAdd={(text, opts) => addTodo(text, user.uid, opts)}
-        onUpdate={updateTodo}
-        onToggle={(todoId, done) => toggleTodo(todoId, done, user.uid)}
-        onDelete={deleteTodo}
-        onReorder={reorderTodos}
-        onClearDone={clearDone}
-        canEdit={isMember ?? false}
-      />
-
-      <StaysDrawer
-        open={staysOpen}
-        onClose={() => setStaysOpen(false)}
-        trip={trip}
-        stays={stays}
-        currentName={displayName ?? ''}
-        onAdd={addStay}
-        onUpdate={updateStay}
-        onDelete={deleteStay}
-        getToken={getIdToken}
-        canEdit={isMember ?? false}
       />
     </div>
     </PlanningHistoryProvider>

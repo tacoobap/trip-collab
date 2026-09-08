@@ -19,6 +19,10 @@ export function PageHeader({
   const location = useLocation()
   const isItinerary = location.pathname.endsWith('/itinerary')
   const isCollection = location.pathname.includes('/collection')
+  // Settings is not a tab. Without this it falls through to the Planning
+  // branch below, which is "none of the others", and lights the wrong tab.
+  const isSettings = location.pathname.endsWith('/settings')
+  const isPlanning = !isItinerary && !isCollection && !isSettings
 
   const isDark = overHero
   const linkActive = isDark ? 'text-white bg-white/15' : 'border-primary text-foreground'
@@ -28,7 +32,12 @@ export function PageHeader({
     <header
       data-print="hide"
       className={cn(
-        'top-0 z-20 transition-colors duration-300 border-b',
+        // z-30, not z-20: sticky + z-index makes this header its own stacking
+        // context, so the account menu inside it can never out-paint a sibling
+        // however high its own z-index goes. The planning board's day headers
+        // are also z-20 and come later in the DOM, and its hour gutter is
+        // z-[25] — both used to cover the open menu.
+        'top-0 z-30 transition-colors duration-300 border-b',
         isDark
           ? 'fixed left-0 right-0 bg-black/20 backdrop-blur-md border-white/10'
           : 'sticky top-0 bg-warm-white/80 backdrop-blur-sm border-border'
@@ -56,7 +65,7 @@ export function PageHeader({
             to={`/trip/${trip.slug}`}
             className={cn(
               'px-3 py-2 text-sm font-medium rounded-md border-b-2 border-transparent transition-colors touch-manipulation max-sm:px-2.5 max-sm:py-2.5 max-sm:min-h-[44px] max-sm:flex max-sm:items-center',
-              !isItinerary && !isCollection ? linkActive : linkInactive
+              isPlanning ? linkActive : linkInactive
             )}
           >
             Planning
@@ -82,7 +91,9 @@ export function PageHeader({
         </nav>
 
         {/* Right: user avatar + dropdown menu */}
-        {currentName && <UserMenu isDark={isDark} tripSlug={trip.slug} />}
+        {currentName && (
+          <UserMenu isDark={isDark} tripSlug={trip.slug} tripName={trip.name} />
+        )}
       </div>
     </header>
   )
