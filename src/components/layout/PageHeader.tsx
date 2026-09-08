@@ -74,9 +74,14 @@ export function PageHeader({
             : 'sticky top-0 bg-warm-white/80 backdrop-blur-sm border-border'
         )}
       >
-        <div className="relative max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2 flex items-center justify-between gap-3 max-sm:gap-2">
+        {/* Three parts, with the outer two on an identical `flex-1 basis-0`.
+            Equal sides put the nav in the true centre of the bar at every
+            width — `justify-between` alone centres it between the two groups
+            instead, which reads as off-centre on a phone because the right
+            group is much wider than the lone mark on the left. */}
+        <div className="max-w-7xl mx-auto px-5 sm:px-6 py-3 max-sm:py-2 flex items-center gap-3 max-sm:gap-2">
           {/* Left: mark, then the trip it belongs to */}
-          <div className="flex items-center gap-3 min-w-0 z-10">
+          <div className="flex-1 basis-0 flex items-center gap-3 min-w-0">
             <Link
               to="/home"
               className={cn(
@@ -91,8 +96,9 @@ export function PageHeader({
 
             {showTripId && (
               // Hidden below `sm`: the tab row needs that width, and the menu
-              // names the trip anyway. Capped above it so a long name truncates
-              // before reaching the centred tabs, which won't be pushed.
+              // names the trip anyway. The cap keeps a long name from eating
+              // the whole half on a wide screen; the equal-basis sides already
+              // stop it pushing the tabs off centre.
               <div className="hidden sm:block min-w-0 sm:max-w-[22rem] lg:max-w-[26rem]">
                 <h2
                   className={cn(
@@ -119,10 +125,10 @@ export function PageHeader({
 
           {/* Centre: the three surfaces. Icons below `sm`, where three labels
               would take 238 of the 375px viewport and leave nothing for the
-              rest of the row; absolutely centred from `sm` up, where there is
-              room and the labels are worth having. Kept in normal flow on
-              phones so the row can never overlap itself. */}
-          <nav className="flex items-center gap-0.5 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+              rest of the row; labels from `sm` up, where there is room and they
+              are worth having. In flow rather than absolutely positioned, so a
+              tight row can never overlap itself. */}
+          <nav className="shrink-0 flex items-center gap-0.5">
             {tabs.map(({ label, to, on, Icon }) => (
               <Link
                 key={label}
@@ -144,7 +150,7 @@ export function PageHeader({
           </nav>
 
           {/* Right: trip-wide tools, then you */}
-          <div className="flex items-center gap-1 max-sm:gap-0 shrink-0 z-10">
+          <div className="flex-1 basis-0 flex items-center justify-end gap-1 max-sm:gap-0 min-w-0">
             {actions}
             {currentName && (
               <UserMenu

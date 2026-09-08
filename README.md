@@ -403,9 +403,15 @@ complementary rather than additive. If you add a third tool, add it to both
 lists — the regression to watch for is it showing up twice on one side of the
 breakpoint, or vanishing on the other.
 
-Below `sm` the tabs stay in normal flow rather than being absolutely centred, so
-a row that gets tighter can never overlap itself. Above it they are centred, and
-the trip name is capped so it truncates instead of running underneath them.
+The bar is three parts with the outer two on an identical `flex-1 basis-0`, so
+the tabs land in the true centre by construction at every width. Neither
+`justify-between` nor absolute centring is right here: the first centres them
+between the two groups, which reads as visibly off-centre on a phone because the
+right group is far wider than the lone mark on the left, and the second takes
+the tabs out of flow so a tight row can silently overlap itself. Equal sides
+avoid both. Measured 0px off centre at 375, 414, 640, 768, 1024 and 1280,
+including with a deliberately long trip name. The name keeps a `max-w` so it
+can't eat its whole half on a wide screen.
 
 **`useTripTools`** (`src/components/layout/TripTools.tsx`) returns the To-dos and
 Stays controls as three separate pieces — `buttons` for the header's `actions`

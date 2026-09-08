@@ -118,7 +118,7 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {!firebaseReady && (
-        <div className="bg-warning/10 border-b border-warning/30 px-4 py-3 flex items-start gap-2.5">
+        <div className="bg-warning/10 border-b border-warning/30 px-5 sm:px-6 py-3 flex items-start gap-2.5">
           <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
           <div className="text-sm text-warning-foreground">
             <strong>Firebase not connected.</strong> Create a{' '}
@@ -128,21 +128,27 @@ export function LandingPage() {
         </div>
       )}
 
-      <header className="border-b border-border px-4 sm:px-8 py-4 max-sm:py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" />
-          <span className="text-lg font-serif font-bold text-foreground">Trup</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
-            <Plus className="w-4 h-4 mr-1.5" />
-            New trip
-          </Button>
-          <UserMenu />
+      {/* Border full-bleed, row capped at `max-w-7xl` on the shared `px-5
+          sm:px-6` gutter — the same box `PageHeader` uses on every trip page,
+          so the mark and the account menu sit the same distance from the edge
+          of the screen here as they do there. */}
+      <header className="border-b border-border">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6 py-4 max-sm:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <span className="text-lg font-serif font-bold text-foreground">Trup</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setNewTripOpen(true)} className="max-sm:min-h-[44px]">
+              <Plus className="w-4 h-4 mr-1.5" />
+              New trip
+            </Button>
+            <UserMenu />
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-8 py-10 max-sm:py-6">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-5 sm:px-6 py-10 max-sm:py-6">
         {authLoading || loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -255,7 +261,7 @@ export function LandingPage() {
         />
       )}
 
-      <footer className="border-t border-border py-4 px-4 sm:px-8 text-center text-xs text-muted-foreground">
+      <footer className="border-t border-border py-4 px-5 sm:px-6 text-center text-xs text-muted-foreground">
         <Link to="/privacy" className="hover:text-foreground underline">Privacy</Link>
         {' · '}
         <Link to="/terms" className="hover:text-foreground underline">Terms</Link>
