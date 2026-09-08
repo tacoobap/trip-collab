@@ -1,9 +1,12 @@
 import type { Trip } from '@/types/database'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { PageHeader, MOBILE_TABBAR_PAD } from '@/components/layout/PageHeader'
+import { cn } from '@/lib/utils'
 
 interface TripLayoutProps {
   trip: Trip
   currentName: string | null
+  /** Trip-wide controls for the header — To-dos and Stays. */
+  headerActions?: React.ReactNode
   /** Optional banner below header (e.g. guest "Join this trip") */
   guestBanner?: React.ReactNode
   /** Optional trip name + dates + actions bar (Planning page only; Collection/Itinerary use their own) */
@@ -21,13 +24,19 @@ interface TripLayoutProps {
 export function TripLayout({
   trip,
   currentName,
+  headerActions,
   guestBanner,
   tripNameBar,
   children,
 }: TripLayoutProps) {
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader trip={trip} currentName={currentName ?? ''} />
+    <div className={cn('min-h-screen bg-background', MOBILE_TABBAR_PAD)}>
+      <PageHeader
+        trip={trip}
+        currentName={currentName ?? ''}
+        showTripId
+        actions={headerActions}
+      />
       {guestBanner}
       {tripNameBar}
       {children}

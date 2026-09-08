@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Link2, Loader2, Check, Copy, Globe, Lock, Pencil, UserPlus } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { PageHeader, MOBILE_TABBAR_PAD } from '@/components/layout/PageHeader'
 import { EditTripModal } from '@/components/trips/EditTripModal'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTrip } from '@/hooks/useTrip'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useShareLink, shareUrlFor } from '@/hooks/useShareLink'
-import { formatTripDate } from '@/lib/utils'
+import { cn, formatTripDate } from '@/lib/utils'
 
 export function TripSettingsPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -63,7 +63,7 @@ export function TripSettingsPage() {
     typeof window === 'undefined' ? `/trip/${trip.slug}` : `${window.location.origin}/trip/${trip.slug}`
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={cn('min-h-screen bg-background', MOBILE_TABBAR_PAD)}>
       <PageHeader trip={trip} currentName={displayName ?? ''} />
 
       <div className="max-w-2xl mx-auto px-5 sm:px-6 py-10 max-sm:py-6">

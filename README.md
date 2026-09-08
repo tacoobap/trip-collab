@@ -161,7 +161,7 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 ## Project layout
 
 - `src/pages/` — Route-level pages (Landing, Trip, Itinerary, Collection, TripSettings, SharedItinerary, Seed).
-- `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout. `layout/TripBar` is the trip name, dates and trip-wide drawers, rendered by Planning and Collection; the itinerary deliberately doesn't.
+- `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout. `layout/PageHeader` is the single bar (mark, trip name, tabs, tools, menu) plus the phone tab bar; `layout/TripTools` supplies the To-dos and Stays buttons and drawers as separate pieces.
 - `src/services/` — Data layer: `tripService`, `planningService`, `staysService`, `collectionService`.
 - `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, `useItineraryExport`, `useShareLink`, etc.
 - `src/lib/` — Firebase, utils, time/URL helpers, `dateRange` (timezone-safe date maths), `slotEmojis` (icon set + search + auto-assign), image upload/search, `aiRequest` (posts to the Gemini functions), narrative and suggestion payload builders.
@@ -374,21 +374,40 @@ itinerary, the read-only link in its customize panel. Ruling Itinerary out is
 what made this cheap: every expensive part (a dark over-hero icon variant, a
 second bar over a full-bleed hero) was Itinerary's.
 
-**`TripBar`** (`src/components/layout/TripBar.tsx`) is the shared piece: the trip
-name and dates, the To-dos and Stays buttons, and both drawers, which it owns
-rather than taking as props so a page gets everything by rendering one component.
-It takes an `actions` slot for icon-sized controls — `UndoButton` on Planning,
-which stays there because it undoes board drags, not trip-wide actions.
+**It is all one bar.** `PageHeader` carries the mark, the trip's name and dates
+(`showTripId`, off for the itinerary which has them in its hero and for settings
+which has its own heading), the centred tabs, an `actions` slot, and the menu.
+There is no second bar; the trip bar that briefly existed was folded in.
 
-Note it is **not** in `TripLayout`, despite that being the obvious home.
-`TripLayout` is used by CollectionPage alone; TripPage renders `PageHeader`
-directly because the time grid needs the page to be `h-dvh flex flex-col` rather
-than a scrolling document. `TripLayout`'s comment claimed TripPage used it and
-was years stale.
+**Below `sm` the tabs move to a bottom bar.** Not a preference — arithmetic. At
+375px the three text tabs measure 238 of the 335 usable pixels, and the mark,
+trip name, To-dos, Stays and the menu cannot share the remaining 97. Icon-only
+tabs were tried and are worse than they look: everything else in the row is
+`shrink-0`, so the trip name absorbs the whole shortfall and collapses to 21px —
+a name in the bar in name only. Moving the tabs to the bottom is the only
+arrangement that keeps the name legible and the labels intact, and it puts
+navigation where a thumb is. It does not save pixels (57px bottom + 61px top vs
+110px for the two bars it replaced); it spends them better.
+
+**`useTripTools`** (`src/components/layout/TripTools.tsx`) returns the To-dos and
+Stays controls as two separate pieces — `buttons` for the header's `actions`
+slot, `drawers` rendered at page level. They must be separated: the header sets
+`backdrop-blur`, and an element with a `backdrop-filter` becomes the containing
+block for every `position: fixed` descendant, so a drawer rendered inside the
+header is positioned against the header rather than the viewport and collapses
+to a sliver. The phone tab bar is a sibling of `<header>` for the same reason —
+check `getBoundingClientRect().bottom === innerHeight` if you ever move it.
+
+`UndoButton` goes in the same `actions` slot on Planning only; it undoes board
+drags, not trip-wide actions.
+
+Pages that render `PageHeader` add `MOBILE_TABBAR_PAD` so the tab bar doesn't
+cover their last row — including TripPage, whose board is `h-dvh flex flex-col`
+and would otherwise size itself to the full viewport.
 
 **Page actions live in the page, not the bar.** Collection's Suggest and Add sit
 at the top of `<main>`, aligned to the list they act on. They were briefly in the
-trip bar; a bar carrying a page's own actions stops reading as the trip.
+header; a bar carrying a page's own actions stops reading as the trip.
 `CollectionHeader` is gone — its `<h1>Collection</h1>` repeated the lit tab, and
 its blurb and full-width stacked buttons cost 288px of phone chrome above the
 first idea, now 212px.
@@ -415,6 +434,11 @@ gutter is `z-[25]`, so an open menu was covered by the day photos. The header is
 
 `PageHeader` also had to learn that `/settings` is not a tab: Planning was the
 "none of the others" branch, so the settings page lit the Planning tab.
+
+The trip name is capped (`sm:max-w-[22rem] lg:max-w-[26rem]`) because the tabs
+are absolutely centred and will not be pushed — without it a long name runs
+underneath them. `SharedItineraryPage` renders no `PageHeader`, so a public
+viewer still gets no trip navigation.
 
 ### 8. Error boundary, and type-check the functions — **done (7 Sep 2026)**
 

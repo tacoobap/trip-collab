@@ -24,7 +24,7 @@ import {
 import { searchImage } from '@/lib/imageSearch'
 import type { CollectionItem } from '@/types/database'
 import { CollectionItemForm } from '@/components/collection/CollectionItemForm'
-import { TripBar } from '@/components/layout/TripBar'
+import { useTripTools } from '@/components/layout/TripTools'
 import { Button } from '@/components/ui/button'
 import { CollectionList } from '@/components/collection/CollectionList'
 import { CollectionSuggestionsDialog } from '@/components/collection/CollectionSuggestionsDialog'
@@ -55,6 +55,13 @@ export function CollectionPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [editItem, setEditItem] = useState<CollectionItem | null>(null)
   const [scheduleItem, setScheduleItem] = useState<CollectionItem | null>(null)
+  const tools = useTripTools({
+    trip,
+    isMember: isMember ?? false,
+    currentName: displayName ?? '',
+    userUid: user?.uid,
+    getToken: getIdToken,
+  })
   const [suggestOpen, setSuggestOpen] = useState(false)
   const [vibeSentence, setVibeSentence] = useState('')
   const [suggestionImageUrls, setSuggestionImageUrls] = useState<Record<number, string>>({})
@@ -157,15 +164,11 @@ export function CollectionPage() {
 
   return (
     <TripPeopleProvider tripId={trip.id}>
-    <TripLayout trip={trip} currentName={displayName ?? ''}>
-      <TripBar
-        trip={trip}
-        isMember={isMemberBool}
-        currentName={displayName ?? ''}
-        userUid={user.uid}
-        getToken={getIdToken}
-      />
-
+    <TripLayout
+      trip={trip}
+      currentName={displayName ?? ''}
+      headerActions={tools.buttons}
+    >
 
       <main className="max-w-4xl mx-auto px-5 sm:px-6 py-6 max-sm:py-4">
         {!isMemberBool && (
@@ -272,6 +275,8 @@ export function CollectionPage() {
         }}
         onError={() => addToast('Could not add it to that day.', { variant: 'error' })}
       />
+
+      {tools.drawers}
 
       <CollectionSuggestionsDialog
         open={suggestOpen}

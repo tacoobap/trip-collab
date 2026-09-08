@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { PageHeader, MOBILE_TABBAR_PAD } from '@/components/layout/PageHeader'
 import { PlanningBoard } from '@/components/planning/PlanningBoard'
-import { TripBar } from '@/components/layout/TripBar'
+import { useTripTools } from '@/components/layout/TripTools'
 import { useDisplayName } from '@/hooks/useDisplayName'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -10,6 +10,7 @@ import { useTrip } from '@/hooks/useTrip'
 import { Button } from '@/components/ui/button'
 import { joinTrip } from '@/services/tripService'
 import { firebaseProjectId } from '@/lib/firebase'
+import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
 import { EditTripModal } from '@/components/trips/EditTripModal'
 import { TripPeopleProvider } from '@/contexts/TripPeopleContext'
@@ -23,6 +24,14 @@ export function TripPage() {
   const { user, loading: authLoading, getIdToken } = useAuth()
   const { addToast } = useToast()
   const { trip, days, loading, error, isMember, isOwner } = useTrip(slug, user?.uid)
+
+  const tools = useTripTools({
+    trip,
+    isMember: isMember ?? false,
+    currentName: displayName ?? '',
+    userUid: user?.uid,
+    getToken: getIdToken,
+  })
 
   const [editTripOpen, setEditTripOpen] = useState(false)
   const [joining, setJoining] = useState(false)
@@ -94,8 +103,13 @@ export function TripPage() {
   return (
     <TripPeopleProvider tripId={trip.id}>
     <PlanningHistoryProvider>
-    <div className="h-dvh flex flex-col bg-background">
-      <PageHeader trip={trip} currentName={displayName ?? ''} />
+    <div className={cn('h-dvh flex flex-col bg-background', MOBILE_TABBAR_PAD)}>
+      <PageHeader
+        trip={trip}
+        currentName={displayName ?? ''}
+        showTripId
+        actions={<><UndoButton />{tools.buttons}</>}
+      />
       {user && isMember === false && (
         <div className="shrink-0 border-b border-warning/30 bg-warning/10">
           <div className="max-w-7xl mx-auto px-5 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -126,14 +140,6 @@ export function TripPage() {
         </div>
       )}
 
-      <TripBar
-        trip={trip}
-        isMember={isMember ?? false}
-        currentName={displayName ?? ''}
-        userUid={user.uid}
-        getToken={getIdToken}
-        actions={<UndoButton />}
-      />
       {/* The time grid owns its own two-axis scroll region, so the page
           itself must not scroll: cap the column at the viewport and let the
           board fill what's left. */}
@@ -148,6 +154,8 @@ export function TripPage() {
           onOpenEditTrip={() => setEditTripOpen(true)}
         />
       </main>
+
+      {tools.drawers}
 
       <EditTripModal
         open={editTripOpen}
