@@ -183,9 +183,9 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
 by what to do first. Items 1, 2, 4, 5, 6, 7, 8 and 10 are done; 3 was dropped;
-11 is a recorded "no" rather than work. **Open: 9 and 12**, plus the missing CI
-noted under 8. Each is written to be picked up cold in a fresh session — what's
-wrong, where it lives, and what "done" looks like. Item 9 predates that review;
+11 is a recorded "no" rather than work. **Open: 9, 12 and 13.** Each is written
+to be picked up cold in a fresh session — what's wrong, where it lives, and what
+"done" looks like. Item 9 predates that review;
 item 10 came out of **Feb 28 Productionizing.md**, which is otherwise finished
 or superseded and is kept only as a record of that round; 11 and 12 came out of
 the rules work on 7 Sep.
@@ -488,8 +488,7 @@ typed `match` as `false | RegExpMatchArray | null` via `&&`, and `?.` doesn't
 short-circuit on `false`. It happened to behave (`false[1]` is `undefined`), but
 the type was a lie; it's a ternary now.
 
-Not done: there is still no CI — no `.github/workflows` at all — so `lint`,
-`build` and `typecheck:functions` are local-only.
+Not done: there is still no CI. That grew past a footnote — it's **item 13**.
 
 ### 9. Image storage — move off the GitHub repo
 
@@ -751,3 +750,47 @@ Netlify’s secrets scanner will block builds until the private key is gone from
 1. Remove the file from the tree, ensure it matches an entry in `.gitignore`, and commit that change.
 2. **Purge Git history** for that path (for example [`git filter-repo`](https://github.com/newren/git-filter-repo) with `--path path/to/file.json --invert-paths`), then force-push, or follow [GitHub’s guide](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository) to remove sensitive data.
 3. In **Google Cloud Console** → IAM → **Service accounts** → your Firebase admin user → **Keys**, **delete** the leaked key and **add** a new key. Update **`FIREBASE_SERVICE_ACCOUNT_JSON`** in Netlify with the new JSON (one line).
+
+
+### 13. No CI — nothing is checked before it reaches `main`
+
+Was a footnote under item 8 until **8 Sep 2026**; promoted because it kept being
+invisible there. There is no `.github/workflows` at all, so `lint`, `build` and
+`typecheck:functions` only ever run on whichever machine happened to push.
+
+**The gap that isn't obvious.** Netlify already builds on push, so a broken
+`npm run build` does surface — late, but it surfaces. What nothing catches is
+`netlify/functions/`. `tsconfig.app.json` covers only `src`, so `npm run build`
+skips the functions, and Netlify bundles them with its own esbuild pass, which
+strips types **without checking them**. A type error in a function therefore
+ships green and fails at runtime as a 500. `npm run typecheck:functions` exists
+precisely for this and is run by nothing automatic.
+
+That matters more than usual here because two sessions commit to `main`
+concurrently — on 8 Sep one swept another's in-progress files into its own
+commit and pushed, which put production in a half-shipped state for a while.
+
+**What can actually be gated, measured 8 Sep 2026:**
+
+| command | status | gate now? |
+| --- | --- | --- |
+| `npm run build` | clean | yes |
+| `npm run typecheck:functions` | clean | yes |
+| `npm run lint` | **112 errors, 72 warnings** | no |
+| `test:rules`, `test:access` | need a JDK | yes, with `actions/setup-java` |
+
+Do **not** put `npm run lint` in the first workflow. It is red today — mostly
+`react-hooks/set-state-in-effect` and a `require()` in `tailwind.config.ts` —
+and a check that is red on day one gets ignored, which is worse than not having
+it. Either land it as non-blocking (`continue-on-error`) or clean the 112 first
+and gate it after.
+
+**Done when** a push to `main` and any PR runs `build` and
+`typecheck:functions`, the emulator tests run with a JDK step, and `lint` is
+either green and gating or explicitly non-blocking with a note saying why.
+
+**Worth being honest about what this doesn't buy.** Neither bug found on 8 Sep —
+the account menu painting behind the board's day photos, and `/settings` lighting
+the Planning tab — would have been caught by any of these. Both were behavioural
+and were found by driving the page and measuring it. CI protects against
+regressions in what already type-checks; it is not a substitute for looking.
