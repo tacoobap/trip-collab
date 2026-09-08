@@ -14,6 +14,17 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
+/**
+ * Membership as `firestore.rules` decides it, so the client stops before making
+ * a read the rules would refuse.
+ */
+function isMemberOfTrip(
+  trip: Pick<Trip, 'owner_uid' | 'member_uids'>,
+  uid: string
+): boolean {
+  return trip.owner_uid === uid || (trip.member_uids ?? []).includes(uid)
+}
+
 export type TripSubscriptionCallbacks = {
   setTrip: (trip: Trip | null) => void
   setDays: (days: DayWithSlots[]) => void
@@ -49,7 +60,7 @@ export function subscribeToTrip(
   setError('')
   setLoading(true)
 
-  getTripBySlug(slug)
+  getTripBySlug(slug, currentUid)
     .then((result) => {
       if (cancelled) return
 
@@ -65,6 +76,11 @@ export function subscribeToTrip(
       unsubs.push(
         onSnapshot(
           doc(db, 'trips', selectedId),
+          // Metadata changes included so the server's acknowledgement of a join
+          // arrives as its own snapshot. Without it Firestore delivers only the
+          // optimistic local write — the document data doesn't change when the
+          // server confirms it — and the itinerary below would never open.
+          { includeMetadataChanges: true },
           (snap) => {
             if (cancelled) return
             const data = snap.data()
@@ -74,6 +90,19 @@ export function subscribeToTrip(
               destinations: Array.isArray(data?.destinations) ? data.destinations : [],
             } as Trip
             setTrip(next)
+            // Joining shows up here: this snapshot is the only thing that fires
+            // when member_uids changes, so it's what opens the itinerary for
+            // someone who arrived on an invite link.
+            //
+            // It has to be the server's copy. Firestore fires this listener
+            // optimistically off the local write the moment `joinTrip` is
+            // called, and a listener opened on that snapshot races the write to
+            // the server, gets refused by rules that still see the old
+            // member_uids, and stays dead — the board would then stay empty
+            // until a reload.
+            if (!snap.metadata.hasPendingWrites && isMemberOfTrip(next, currentUid)) {
+              subscribeItinerary()
+            }
           },
           (err) => {
             if (cancelled) return
@@ -87,6 +116,9 @@ export function subscribeToTrip(
           }
         )
       )
+
+      let itinerarySubscribed = false
+      let subscribeItinerary = () => {}
 
       const liveSlots = new Map<string, Slot>()
       const liveProposals = new Map<string, Proposal>()
@@ -146,7 +178,10 @@ export function subscribeToTrip(
         setLoading(false)
       }
 
-      unsubs.push(
+      subscribeItinerary = () => {
+        if (itinerarySubscribed) return
+        itinerarySubscribed = true
+        unsubs.push(
         onSnapshot(
           query(collection(db, 'days'), where('trip_id', '==', selectedId)),
           (daysSnap) => {
@@ -224,9 +259,36 @@ export function subscribeToTrip(
             }
 
             unsubSlots = () => unsubChunks.forEach((u) => u())
+          },
+          (err) => {
+            if (cancelled) return
+            // Let a refusal be retried by the next trip snapshot rather than
+            // leaving a dead listener behind: this is reachable while a join is
+            // still settling. The board is gated on `isMember` either way, so
+            // the page shows the join screen rather than an empty itinerary.
+            itinerarySubscribed = false
+            if (err?.code !== 'permission-denied') {
+              console.error('tripSubscription itinerary snapshot error:', err)
+              setError('Failed to load trip.')
+            }
+            setLoading(false)
           }
         )
-      )
+        )
+      }
+
+      // Days, slots and proposals are members-only. Someone arriving on an
+      // invite link can read the trip but not its itinerary, so subscribing
+      // would only earn a permission-denied and leave the page loading
+      // forever — TripPage wants an empty board and `isMember === false`, which
+      // is what draws the join screen. The trip snapshot above starts the
+      // itinerary the moment they join.
+      if (isMemberOfTrip(tripData, currentUid)) {
+        subscribeItinerary()
+      } else {
+        setDays([])
+        setLoading(false)
+      }
     })
     .catch((err) => {
       if (cancelled) return

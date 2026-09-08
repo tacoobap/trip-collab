@@ -3,32 +3,75 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   doc,
   updateDoc,
   arrayUnion,
   orderBy,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import type { Trip } from '@/types/database'
+
+function toTrip(d: { id: string; data: () => Record<string, unknown> | undefined }): Trip {
+  const data = d.data() ?? {}
+  return {
+    ...data,
+    id: d.id,
+    destinations: Array.isArray(data.destinations) ? data.destinations : [],
+  } as Trip
+}
+
+/**
+ * Ask the server which trip a slug belongs to.
+ *
+ * Only reachable for a signed-in caller, and it returns nothing but the id —
+ * see `netlify/functions/resolve-trip.ts` for why the lookup lives there.
+ */
+async function resolveTripIdBySlug(slug: string): Promise<string | null> {
+  const idToken = await auth.currentUser?.getIdToken()
+  if (!idToken) return null
+
+  const res = await fetch('/.netlify/functions/resolve-trip', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ slug }),
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error('Could not look up that trip.')
+
+  const data = (await res.json()) as { id?: string }
+  return typeof data.id === 'string' && data.id ? data.id : null
+}
 
 /**
  * Load a trip by slug. Returns null if not found; throws on permission or network errors.
+ *
+ * A slug can't be resolved with `where('slug', '==', slug)` any more: the list
+ * rule in `firestore.rules` scopes a query over /trips to trips you're on, so
+ * that query is denied outright rather than returning nothing. Two steps
+ * instead — your own trips first, which is the common case and costs the reads
+ * the trips list already makes, then the server for a trip you haven't joined,
+ * which is the invite flow arriving for the first time.
  */
 export async function getTripBySlug(
-  slug: string
+  slug: string,
+  userUid: string
 ): Promise<{ id: string; trip: Trip } | null> {
-  const snap = await getDocs(
-    query(collection(db, 'trips'), where('slug', '==', slug))
-  )
-  if (snap.empty) return null
-  const docSnap = snap.docs[0]
-  const data = docSnap.data()
-  const trip: Trip = {
-    id: docSnap.id,
-    ...data,
-    destinations: Array.isArray(data.destinations) ? data.destinations : [],
-  } as Trip
-  return { id: docSnap.id, trip }
+  const mine = await listUserTrips(userUid)
+  const match = mine.find((t) => t.slug === slug)
+  if (match) return { id: match.id, trip: match }
+
+  const id = await resolveTripIdBySlug(slug)
+  if (!id) return null
+
+  // Permitted by `allow get` for any signed-in user — this is the trip an
+  // invitee sees before deciding to join.
+  const snap = await getDoc(doc(db, 'trips', id))
+  if (!snap.exists()) return null
+  return { id: snap.id, trip: toTrip(snap) }
 }
 
 /**
@@ -80,14 +123,6 @@ export async function listUserTrips(userUid: string): Promise<Trip[]> {
       )
     ),
   ])
-  const toTrip = (d: { id: string; data: () => Record<string, unknown> }) => {
-    const data = d.data()
-    return {
-      id: d.id,
-      ...data,
-      destinations: Array.isArray(data.destinations) ? data.destinations : [],
-    } as Trip
-  }
   const owned = ownedSnap.docs.map((d) => toTrip(d))
   const shared = sharedSnap.docs.map((d) => toTrip(d))
   const byId = new Map<string, Trip>()

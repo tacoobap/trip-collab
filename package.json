@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "typecheck:functions": "tsc -p tsconfig.functions.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-trup 'node scripts/test-firestore-rules.mjs'",
+    "test:access": "firebase emulators:exec --only firestore --project demo-trup-access 'node scripts/test-trip-access.mjs'"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -29,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@firebase/rules-unit-testing": "^5.0.0",
     "@netlify/functions": "^5.1.2",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^24.10.1",
