@@ -183,10 +183,12 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 
 Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
 by what to do first. Items 1, 2, 4, 5, 6, 7, 8 and 10 are done; 3 was dropped;
-only 9 is open. Each is written to be picked up cold in a fresh session —
-what's wrong, where it lives, and what "done" looks like. Item 9 predates that
-review; item 10 came out of **Feb 28 Productionizing.md**, which is otherwise
-finished or superseded and is kept only as a record of that round.
+11 is a recorded "no" rather than work. **Open: 9 and 12**, plus the missing CI
+noted under 8. Each is written to be picked up cold in a fresh session — what's
+wrong, where it lives, and what "done" looks like. Item 9 predates that review;
+item 10 came out of **Feb 28 Productionizing.md**, which is otherwise finished
+or superseded and is kept only as a record of that round; 11 and 12 came out of
+the rules work on 7 Sep.
 
 The numbers are stable — don't renumber a finished item away, since sessions
 refer to them by number. A done item keeps its heading and says so.
@@ -435,6 +437,19 @@ gutter is `z-[25]`, so an open menu was covered by the day photos. The header is
 `PageHeader` also had to learn that `/settings` is not a tab: Planning was the
 "none of the others" branch, so the settings page lit the Planning tab.
 
+**Parked: tabs back in the top bar on phones.** Considered and stopped on
+8 Sep 2026, mid-implementation, in favour of keeping the bottom bar for now —
+recorded because the arithmetic is the expensive part to rediscover. The shape
+was: no bottom bar, no trip name on phones, To-dos and Stays moved into the
+menu, Undo left as a button. It does **not** fit. Tabs (238) + Undo (44) +
+avatar (41) + the mark (16) + gutters (40) plus inter-group gaps comes to about
+395 in a 375px viewport, roughly 20px over — *after* removing the name and the
+two tool buttons. Something further has to give: dropping the mark on phones
+(~24px, with "All trips" moved into the menu) is the cleanest, tightening the
+tab padding the other. Revisit if the bottom bar proves unpopular on a real
+device; the half-finished version put `max-sm:hidden` on the tool buttons and
+gave `UserMenu` a `phoneActions` prop for the menu rows.
+
 The trip name is capped (`sm:max-w-[22rem] lg:max-w-[26rem]`) because the tabs
 are absolutely centred and will not be pushed — without it a long name runs
 underneath them. `SharedItineraryPage` renders no `PageHeader`, so a public
@@ -627,10 +642,12 @@ then nothing; the new code drops it earlier, so the day reads "No locked
 activities yet". That is the more accurate sentence, and it's the only case
 where the two disagree.
 
-**Still to do by hand: rotate the key.** It has been public in every build so
-far, so the value currently in Netlify's `GEMINI_API_KEY` should be replaced
-with a fresh one from [Google AI Studio](https://aistudio.google.com/apikey) and
-the old one deleted. Moving it server-side doesn't un-publish it.
+**The key was rotated on 8 Sep 2026** and the old one deleted — moving it
+server-side doesn't un-publish a value that shipped in every previous build, and
+Netlify keeps old deploys live at their own permalinks, so those bundles stayed
+downloadable until the key itself was revoked. `GEMINI_API_KEY` is now marked
+**secret** in Netlify, which also means the build fails if the value ever
+reappears in `dist` — a useful tripwire if someone reintroduces a `VITE_` read.
 
 **Local dev now needs `netlify dev`.** There is no client-side fallback — that
 was the bug. Under plain `vite`, `/.netlify/functions/*` isn't served and the
