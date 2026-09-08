@@ -4,13 +4,17 @@ import { Sparkles } from 'lucide-react'
 export function TermsPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border px-4 sm:px-8 py-4">
-        <Link to="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
-          <Sparkles className="w-5 h-5 text-primary" />
-          <span className="font-serif font-bold">Trup</span>
-        </Link>
+      {/* Same box as `PageHeader` and the home page: border full-bleed, row
+          capped at `max-w-7xl` on the shared `px-5 sm:px-6` gutter. */}
+      <header className="border-b border-border">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6 py-4">
+          <Link to="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <span className="font-serif font-bold">Trup</span>
+          </Link>
+        </div>
       </header>
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-8 py-10">
+      <main className="flex-1 max-w-2xl mx-auto w-full px-5 sm:px-6 py-10">
         <h1 className="text-2xl font-serif font-bold text-foreground mb-6">Terms of Use</h1>
         <div className="prose prose-sm text-muted-foreground space-y-4">
           <p>
