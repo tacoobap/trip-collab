@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { auth } from '@/lib/firebase'
 import type { Trip, DayWithSlots } from '@/types/database'
 import { subscribeToTrip } from '@/services/tripSubscription'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 export function useTrip(slug: string | undefined, currentUid?: string | null) {
   const [trip, setTrip] = useState<Trip | null>(null)
@@ -26,15 +27,7 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     return cleanup
   }, [slug, currentUid])
 
-  const travelers = useMemo(() => {
-    const names = new Set<string>()
-    days.forEach((day) =>
-      day.slots.forEach((slot) =>
-        slot.proposals.forEach((p) => names.add(p.proposer_name))
-      )
-    )
-    return [...names]
-  }, [days])
+  useDocumentTitle(trip?.name)
 
   const isMember = useMemo(() => {
     if (!trip || !currentUid) return null
@@ -48,5 +41,5 @@ export function useTrip(slug: string | undefined, currentUid?: string | null) {
     return trip.owner_uid === currentUid
   }, [trip, currentUid])
 
-  return { trip, days, travelers, loading, error, isMember, isOwner }
+  return { trip, days, loading, error, isMember, isOwner }
 }
