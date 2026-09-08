@@ -738,7 +738,7 @@ export function ProposalDrawer({ trip, days, slot, dayLabel, currentName, onClos
     const deleted = slot
     setDeletingSlot(true)
     try {
-      await deleteSlot(deleted.id)
+      await deleteSlot(deleted.id, trip.id)
       history.record(slotTitle(deleted), () => restoreSlot(deleted, trip.id))
       onClose()
       onSlotDeleted?.()

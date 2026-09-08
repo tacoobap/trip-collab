@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { suggestCollectionItems } from '@/lib/suggestCollectionItems'
 import type { CollectionSuggestion } from '@/lib/suggestCollectionItems'
 import type { Trip, DayWithSlots } from '@/types/database'
@@ -20,6 +21,7 @@ export function useCollectionSuggestions(
   trip: Trip | null,
   days: DayWithSlots[]
 ): UseCollectionSuggestionsResult {
+  const { getIdToken } = useAuth()
   const [suggestions, setSuggestions] = useState<CollectionSuggestion[]>([])
   const [status, setStatus] = useState<CollectionSuggestionsStatus>('idle')
   const [error, setError] = useState('')
@@ -41,7 +43,7 @@ export function useCollectionSuggestions(
 
       try {
         const vibe = typeof vibeSentence === 'string' ? vibeSentence.trim() || null : null
-        const { suggestions: list } = await suggestCollectionItems(trip, days, vibe)
+        const { suggestions: list } = await suggestCollectionItems(trip, days, vibe, getIdToken)
         if (runIdRef.current !== runId) return
         setSuggestions(list)
       } catch (err) {
@@ -54,7 +56,7 @@ export function useCollectionSuggestions(
         if (runIdRef.current === runId) setStatus('idle')
       }
     },
-    [trip, days]
+    [trip, days, getIdToken]
   )
 
   return { suggestions, getSuggestions, status, error, clearError }

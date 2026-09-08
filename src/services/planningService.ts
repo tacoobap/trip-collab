@@ -18,9 +18,6 @@ import { minutesToTimeLabel } from '@/lib/timeUtils'
 
 export type SlotCategory = Slot['category']
 
-/** Firestore `in` queries take at most 10 values. */
-const IN_QUERY_MAX = 10
-
 /** A write batch caps at 500 operations; leave headroom. */
 const BATCH_LIMIT = 450
 
@@ -48,17 +45,30 @@ async function fetchTripDays(tripId: string): Promise<Day[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Day, 'id'>) }))
 }
 
+/**
+ * Every slot on a trip, in one query.
+ *
+ * Reads are scoped by `trip_id` rather than by the day or slot a document hangs
+ * off, because that's the field `firestore.rules` checks — a query that filters
+ * on anything else is refused outright. See the note at the top of that file.
+ */
+async function fetchTripSlots(tripId: string): Promise<(Slot & { id: string })[]> {
+  const snap = await getDocs(
+    query(collection(db, 'slots'), where('trip_id', '==', tripId))
+  )
+  return snap.docs.map((d) => ({ ...(d.data() as Slot), id: d.id }))
+}
+
 /** Slots held by each of the given days. Days with none are absent from the map. */
-async function slotCountByDay(dayIds: string[]): Promise<Map<string, number>> {
+async function slotCountByDay(
+  tripId: string,
+  dayIds: string[]
+): Promise<Map<string, number>> {
+  const wanted = new Set(dayIds)
   const counts = new Map<string, number>()
-  for (const ids of chunk(dayIds, IN_QUERY_MAX)) {
-    const snap = await getDocs(
-      query(collection(db, 'slots'), where('day_id', 'in', ids))
-    )
-    for (const d of snap.docs) {
-      const dayId = (d.data() as Slot).day_id
-      counts.set(dayId, (counts.get(dayId) ?? 0) + 1)
-    }
+  for (const slot of await fetchTripSlots(tripId)) {
+    if (!wanted.has(slot.day_id)) continue
+    counts.set(slot.day_id, (counts.get(slot.day_id) ?? 0) + 1)
   }
   return counts
 }
@@ -68,24 +78,21 @@ async function slotCountByDay(dayIds: string[]): Promise<Map<string, number>> {
  * leaf-first so a failure part-way can't leave a slot pointing at a proposal
  * that no longer exists.
  */
-export async function deleteDays(dayIds: string[]): Promise<void> {
+export async function deleteDays(tripId: string, dayIds: string[]): Promise<void> {
   if (dayIds.length === 0) return
 
-  const slotIds: string[] = []
-  for (const ids of chunk(dayIds, IN_QUERY_MAX)) {
-    const snap = await getDocs(
-      query(collection(db, 'slots'), where('day_id', 'in', ids))
-    )
-    slotIds.push(...snap.docs.map((d) => d.id))
-  }
+  const doomedDays = new Set(dayIds)
+  const slotIds = (await fetchTripSlots(tripId))
+    .filter((slot) => doomedDays.has(slot.day_id))
+    .map((slot) => slot.id)
 
-  const proposalIds: string[] = []
-  for (const ids of chunk(slotIds, IN_QUERY_MAX)) {
-    const snap = await getDocs(
-      query(collection(db, 'proposals'), where('slot_id', 'in', ids))
-    )
-    proposalIds.push(...snap.docs.map((d) => d.id))
-  }
+  const doomedSlots = new Set(slotIds)
+  const proposalsSnap = await getDocs(
+    query(collection(db, 'proposals'), where('trip_id', '==', tripId))
+  )
+  const proposalIds = proposalsSnap.docs
+    .filter((d) => doomedSlots.has((d.data() as { slot_id?: string }).slot_id ?? ''))
+    .map((d) => d.id)
 
   const refs = [
     ...proposalIds.map((id) => doc(db, 'proposals', id)),
@@ -230,7 +237,7 @@ export async function syncTripDays(
   const strays = existing.filter((d) => d.date && !inRange.has(d.date))
   const counts =
     strays.length > 0
-      ? await slotCountByDay(strays.map((d) => d.id))
+      ? await slotCountByDay(tripId, strays.map((d) => d.id))
       : new Map<string, number>()
 
   const doomed =
@@ -239,7 +246,7 @@ export async function syncTripDays(
       : strays.filter(
           (d) => !counts.get(d.id) && !d.image_url && !d.narrative_title
         )
-  await deleteDays(doomed.map((d) => d.id))
+  await deleteDays(tripId, doomed.map((d) => d.id))
 
   const removed = new Set(doomed.map((d) => d.id))
   const survivors = existing.filter((d) => !removed.has(d.id))
@@ -629,10 +636,14 @@ export async function restoreSlot(
   await batch.commit()
 }
 
-export async function deleteSlot(slotId: string): Promise<void> {
+export async function deleteSlot(slotId: string, tripId: string): Promise<void> {
   const proposalsSnap = await getDocs(
-    query(collection(db, 'proposals'), where('slot_id', '==', slotId))
+    query(collection(db, 'proposals'), where('trip_id', '==', tripId))
   )
-  await Promise.all(proposalsSnap.docs.map((d) => deleteDoc(d.ref)))
+  await Promise.all(
+    proposalsSnap.docs
+      .filter((d) => (d.data() as { slot_id?: string }).slot_id === slotId)
+      .map((d) => deleteDoc(d.ref))
+  )
   await deleteDoc(doc(db, 'slots', slotId))
 }

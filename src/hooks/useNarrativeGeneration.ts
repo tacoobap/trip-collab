@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { generateNarrative } from '@/lib/generateNarrative'
 import type { NarrativeResult } from '@/lib/generateNarrative'
 import type { Trip, DayWithSlots } from '@/types/database'
@@ -20,6 +21,7 @@ export function useNarrativeGeneration(
   trip: Trip | null,
   days: DayWithSlots[]
 ): UseNarrativeGenerationResult {
+  const { getIdToken } = useAuth()
   const [status, setStatus] = useState<NarrativeGenerationStatus>('idle')
   const [error, setError] = useState('')
   const runIdRef = useRef(0)
@@ -37,7 +39,7 @@ export function useNarrativeGeneration(
     setError('')
 
     try {
-      const result = await generateNarrative(trip, days)
+      const result = await generateNarrative(trip, days, getIdToken)
       if (runIdRef.current !== runId) return null
       setStatus('idle')
       return result
@@ -50,7 +52,7 @@ export function useNarrativeGeneration(
     } finally {
       generatingRef.current = false
     }
-  }, [trip, days])
+  }, [trip, days, getIdToken])
 
   return { generate, status, error, clearError }
 }

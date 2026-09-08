@@ -14,7 +14,7 @@ npm run dev
 ```
 
 - **Firebase** — Required. Create a project at [Firebase Console](https://console.firebase.google.com), enable Firestore, and set the `VITE_FIREBASE_*` variables in `.env`.
-- **Gemini** — Optional. Used for “Generate text” on the itinerary and “Suggest something for me” on the collection. Set `VITE_GEMINI_API_KEY`.
+- **Gemini** — Optional. Used for “Generate text” on the itinerary and “Suggest something for me” on the collection. Set **`GEMINI_API_KEY`** (no `VITE_` prefix) — both calls go through Netlify functions, so the key never reaches the browser. There is no client-side fallback, which means AI features need **`netlify dev`** locally; plain `npm run dev` doesn't serve `/.netlify/functions/*` and they'll say so.
 - **Unsplash** — Optional. Used for hero/day images and suggestion thumbnails. Set `VITE_UNSPLASH_ACCESS_KEY`. In production, use the Netlify function so the key stays server-side (`UNSPLASH_ACCESS_KEY` in Netlify env).
 - **GitHub (image upload)** — Optional. **Production / Netlify:** set **`GITHUB_TOKEN`**, **`GITHUB_OWNER`**, **`GITHUB_REPO`** (no `VITE_` prefix) so `upload-github-image` can call the GitHub API; the PAT must not be in client env vars or Netlify will flag `ghp_` in `dist`. **Local `npm run dev` only:** you can set `VITE_GITHUB_*` in `.env` for direct uploads without `netlify dev`.
 - **Google Analytics** — Optional. Set `VITE_GA_MEASUREMENT_ID` to your GA4 Measurement ID (e.g. `G-XXXXXXXXXX`). See below for how to get it and view data.
@@ -77,8 +77,8 @@ PATH="/usr/local/opt/openjdk/bin:$PATH" npm run test:rules
 
 - **`test:rules`** (`scripts/test-firestore-rules.mjs`) — what an outsider, a
   member and an invitee may read and write, every query in `src/services/`, the
-  self-join and takeover cases, and the access-call budget that makes
-  `IN_QUERY_MAX` load-bearing.
+  self-join and takeover cases, and that a query not filtering on `trip_id` is
+  refused.
 - **`test:access`** (`scripts/test-trip-access.mjs`) — bundles the real
   `getTripBySlug` and `subscribeToTrip` with `@/lib/firebase` swapped for a stub
   and runs them against the emulator with the rules enforced. This is the seam
@@ -164,11 +164,12 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 - `src/components/` — UI: planning board, itinerary sections, collection, stays, shared layout.
 - `src/services/` — Data layer: `tripService`, `planningService`, `staysService`, `collectionService`.
 - `src/hooks/` — `useTrip`, `useStays`, `useCollectionItems`, `useDisplayName`, `useNarrativeGeneration`, `useCollectionSuggestions`, `useItineraryExport`, `useShareLink`, etc.
-- `src/lib/` — Firebase, utils, time/URL helpers, `dateRange` (timezone-safe date maths), `slotEmojis` (icon set + search + auto-assign), image upload/search, narrative and suggestion (Gemini).
+- `src/lib/` — Firebase, utils, time/URL helpers, `dateRange` (timezone-safe date maths), `slotEmojis` (icon set + search + auto-assign), image upload/search, `aiRequest` (posts to the Gemini functions), narrative and suggestion payload builders.
 - `src/types/database.ts` — Shared Firestore/document types.
 - `netlify/functions/` — Serverless:
   - `search-image` — Unsplash proxy.
-  - `generate-narrative` — optional server-side Gemini.
+  - `generate-narrative` — Gemini itinerary copy. Holds the key, the system prompt and the prompt builder.
+  - `suggest-collection-items` — Gemini collection suggestions. Same shape.
   - `upload-github-image` — GitHub image upload with the PAT server-side.
   - `share-link` — mint or revoke a trip's public share token (members only).
   - `shared-trip` — public, unauthenticated read of a shared itinerary by token.
@@ -181,8 +182,8 @@ After each run, that trip’s `owner_uid` and `member_uids` are updated; those u
 ## Future to-dos / enhancements
 
 Items 1–8 came out of a full review of the app on **5 Sep 2026** and are ordered
-by what to do first. Items 1, 2, 4, 5, 6 and 8 are done; 3 was dropped; 7, 9 and
-10 are open. Each is written to be picked up cold in a fresh session —
+by what to do first. Items 1, 2, 4, 5, 6, 8 and 10 are done; 3 was dropped; 7 and
+9 are open. Each is written to be picked up cold in a fresh session —
 what's wrong, where it lives, and what "done" looks like. Item 9 predates that
 review; item 10 came out of **Feb 28 Productionizing.md**, which is otherwise
 finished or superseded and is kept only as a record of that round.
@@ -213,14 +214,22 @@ emulator rather than reasoned about, and both written at the top of
   an unfiltered collection read sees an empty document and is denied, which is
   what closes the hole.
 - A query's rule gets ~20 document access calls, and an `in` filter spends one
-  per value. `IN_QUERY_MAX` is now load-bearing for reads: at 10 the slots query
-  costs 11 calls, and raising it past 19 would make the board unreadable.
+  per value, so a rule that resolves each value separately fails once a query is
+  big enough. Every rule reads `trip_id` off the document instead — one call at
+  any size — and every query in `src/services/` filters on `trip_id` to match.
+  Both halves matter: filter on something else and the query is refused on its
+  first run, which is the failure you want. Getting there needed
+  `scripts/backfill-trip-ids.mjs`, since 42 slots and proposals predated
+  `trip_id` and could only be resolved through the day they hung off.
 
 **Client changes.** `getTripBySlug` can't resolve a slug with
 `where('slug', '==', slug)` any more, so it looks in your own trips first and
 falls back to `netlify/functions/resolve-trip.ts`, which is authenticated and
 returns only the document id. And because days are now members-only,
-`subscribeToTrip` holds the itinerary subscription back until you're a member —
+`subscribeToTrip` is three flat listeners on one trip — days, slots and
+proposals, each filtered on `trip_id` — rather than a day-chunked cascade that
+re-subscribed slots and proposals whenever the day list moved. It also holds the
+itinerary subscription back until you're a member —
 otherwise an invitee's listener is refused, `rebuild()` never runs and the join
 screen sits on a spinner. It opens the itinerary from the **server-confirmed**
 trip snapshot: Firestore fires that listener optimistically off the local write
@@ -507,28 +516,67 @@ and collection items holds absolute GitHub URLs today. It has to skip
 `images.unsplash.com`, which is a legitimate remote host and not something to
 move.
 
-### 10. Move the Gemini key server-side
+### 10. Move the Gemini key server-side — **done (7 Sep 2026)**
 
-**Do this alongside item 1** — it's the same class of problem, an API key
-anyone can read rather than a database anyone can read.
+`VITE_GEMINI_API_KEY` was read in the browser, and Vite inlines `VITE_*` at
+build time — so the key was a plain string in the shipped bundle, there for
+anyone to pull out of the deployed JS and spend against the account.
 
-`generateNarrative` and `suggestCollectionItems` call Gemini straight from the
-browser with `import.meta.env.VITE_GEMINI_API_KEY`
-(`src/lib/generateNarrative.ts:97`, `src/lib/suggestCollectionItems.ts:90`).
-Vite inlines `VITE_*` at build time, so the key is a string in the shipped
-bundle — anyone can pull it out of the deployed JS and spend against the
-account.
+**What it is now.** Both AI calls go through Netlify functions that verify a
+Firebase ID token: `generate-narrative` (which existed and was wired to nothing)
+and the new `suggest-collection-items`. Each holds the key, the system prompt and
+the prompt builder. `VITE_GEMINI_API_KEY` is gone from `src/` and
+`.env.example`, and `@google/generative-ai` is no longer imported from `src/` at
+all, so the SDK left the client bundle with the key.
 
-The server-side version already exists and is wired to nothing:
-`netlify/functions/generate-narrative.ts` reads `process.env.GEMINI_API_KEY`.
-Nothing in `src/` imports it.
+**The client sends structured data, not a prompt.** `buildPayload` in each lib
+flattens `DayWithSlots` down to a flat wire shape and the function builds the
+prompt from it. Posting the prompt itself would have been a smaller diff and
+would have turned the endpoint into an open Gemini proxy for anyone with an
+account — the token gate stops strangers, not a signed-in user asking it for an
+essay. The cost is that the wire types are duplicated: `netlify/functions/` is
+outside `tsconfig.app.json` and can't import `src/types/database`, so the
+`InputDay` / `LockedItem` shapes in each function and the `buildPayload` that
+feeds them have to be kept in step by hand. Both sides carry a comment saying so.
 
-**Done when** both AI calls go through Netlify functions that verify a Firebase
-ID token (`netlify/functions/lib/` already has that helper, and `search-image`
-is the pattern to copy), `VITE_GEMINI_API_KEY` is gone from `src/` and
-`.env.example`, and the deployed bundle contains no key —
-`curl` the live `assets/index-*.js` and grep for the prefix to confirm. Rotate
-the current key afterwards; it has been public in every build so far.
+**The parked function was stale, in a way that would have shipped broken.** It
+had been written before the client gained `suggested_time` and the 4–10-word
+tagline rule, and it was still on `gemini-2.0-flash-lite` with
+`maxOutputTokens: 2000` — a cap worth removing rather than porting, since
+`gemini-2.5-flash` spends tokens on thinking before it emits any JSON. Worse,
+its `buildPrompt` never wrote the day or proposal ids into the prompt, so the
+model had nothing to echo back into `day_id` / `proposal_id` and every result
+would have failed to match up against the board. Don't trust a parked function
+to still describe the client that outgrew it.
+
+**Verified** by bundling both handlers with esbuild against mocked
+`firebase-admin` and `@google/generative-ai` and calling them with fabricated
+events — the same trick `src/services/` tests use, since there's no test runner.
+That covers the auth gate (401 with no token, 401 with an unverifiable one, 405
+on GET), the day cap, and a malformed generation becoming a 500 with a log line
+instead of a `JSON.parse` throw in the browser. The check worth repeating if you
+touch a prompt: run the **old** client `buildPrompt` and the **new**
+`buildPayload` → server `buildPrompt` over the same board and diff the strings.
+They come out byte-identical on every ordinary board, which is what says the
+move changed nothing the model sees.
+
+The one deliberate difference that diff turned up: a slot marked `locked` whose
+`locked_proposal_id` points at a deleted proposal. The old client kept it past
+the filter and then skipped it in the loop, so the day printed its header and
+then nothing; the new code drops it earlier, so the day reads "No locked
+activities yet". That is the more accurate sentence, and it's the only case
+where the two disagree.
+
+**Still to do by hand: rotate the key.** It has been public in every build so
+far, so the value currently in Netlify's `GEMINI_API_KEY` should be replaced
+with a fresh one from [Google AI Studio](https://aistudio.google.com/apikey) and
+the old one deleted. Moving it server-side doesn't un-publish it.
+
+**Local dev now needs `netlify dev`.** There is no client-side fallback — that
+was the bug. Under plain `vite`, `/.netlify/functions/*` isn't served and the
+SPA fallback answers with `index.html`, so `aiRequest.ts` treats an unparseable
+body in DEV as "functions aren't running" and says to use `netlify dev` rather
+than surfacing a JSON parse error.
 
 The rest of **Feb 28 Productionizing.md** is either done or overtaken: its
 schema-doc and migration section never happened and is worth reopening only if

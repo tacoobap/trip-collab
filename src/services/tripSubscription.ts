@@ -3,17 +3,6 @@ import { db } from '@/lib/firebase'
 import type { Trip, Day, Slot, Proposal, DayWithSlots } from '@/types/database'
 import { getTripBySlug } from '@/services/tripService'
 
-/** Firestore 'in' queries support at most 10 values. */
-const IN_QUERY_MAX = 10
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < arr.length; i += size) {
-    out.push(arr.slice(i, i + size))
-  }
-  return out
-}
-
 /**
  * Membership as `firestore.rules` decides it, so the client stops before making
  * a read the rules would refuse.
@@ -123,9 +112,6 @@ export function subscribeToTrip(
       const liveSlots = new Map<string, Slot>()
       const liveProposals = new Map<string, Proposal>()
       let liveDays: Day[] = []
-      let currentSlotIds: string[] = []
-      let unsubSlots: (() => void) | null = null
-      let unsubProposals: (() => void) | null = null
 
       const ensureLegacyLockedProposals = async () => {
         const lockedIds = new Set<string>()
@@ -181,99 +167,76 @@ export function subscribeToTrip(
       subscribeItinerary = () => {
         if (itinerarySubscribed) return
         itinerarySubscribed = true
+
+        // Three flat listeners on the same trip. Every one filters on
+        // `trip_id`, which is the field `firestore.rules` checks: a query
+        // filtering on anything else — the day a slot sits on, say — is refused
+        // outright, and costs the rule one document read per value besides.
+        let daysLoaded = false
+        let slotsLoaded = false
+        const rebuildWhenReady = () => {
+          // Days and slots are drawn together; holding the first paint until
+          // both have arrived avoids a frame of days with no events on them.
+          if (daysLoaded && slotsLoaded) rebuild()
+        }
+
+        const onItineraryError = (err: { code?: string }) => {
+          if (cancelled) return
+          // Let a refusal be retried by the next trip snapshot rather than
+          // leaving a dead listener behind: this is reachable while a join is
+          // still settling. The board is gated on `isMember` either way, so
+          // the page shows the join screen rather than an empty itinerary.
+          itinerarySubscribed = false
+          if (err?.code !== 'permission-denied') {
+            console.error('tripSubscription itinerary snapshot error:', err)
+            setError('Failed to load trip.')
+          }
+          setLoading(false)
+        }
+
         unsubs.push(
-        onSnapshot(
-          query(collection(db, 'days'), where('trip_id', '==', selectedId)),
-          (daysSnap) => {
-            if (cancelled) return
-            liveDays = daysSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Day))
-            const dayIds = liveDays.map((d) => d.id)
+          onSnapshot(
+            query(collection(db, 'days'), where('trip_id', '==', selectedId)),
+            (snap) => {
+              if (cancelled) return
+              liveDays = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Day))
+              daysLoaded = true
+              rebuildWhenReady()
+            },
+            onItineraryError
+          )
+        )
 
-            unsubSlots?.()
-            unsubSlots = null
-            unsubProposals?.()
-            unsubProposals = null
-            liveSlots.clear()
-            currentSlotIds = []
-
-            if (dayIds.length === 0) {
-              rebuild()
-              return
-            }
-
-            const dayChunks = chunk(dayIds, IN_QUERY_MAX)
-            const slotDocsByChunk: (Slot[] | null)[] = dayChunks.map(() => null)
-            const unsubChunks: (() => void)[] = []
-
-            const onSlotsMerged = () => {
+        unsubs.push(
+          onSnapshot(
+            query(collection(db, 'slots'), where('trip_id', '==', selectedId)),
+            (snap) => {
               if (cancelled) return
               liveSlots.clear()
-              for (const docs of slotDocsByChunk) {
-                if (docs) for (const s of docs) liveSlots.set(s.id, s)
-              }
-              const newSlotIds = [...liveSlots.keys()].sort()
-              const slotIdsChanged =
-                JSON.stringify(newSlotIds) !== JSON.stringify(currentSlotIds)
-              currentSlotIds = newSlotIds
-              if (!slotIdsChanged) {
-                rebuild()
-                return
-              }
-              unsubProposals?.()
-              unsubProposals = null
-              if (newSlotIds.length === 0) {
-                rebuild()
-                return
-              }
-              unsubProposals = onSnapshot(
-                query(
-                  collection(db, 'proposals'),
-                  where('trip_id', '==', selectedId)
-                ),
-                (propsSnap) => {
-                  if (cancelled) return
-                  liveProposals.clear()
-                  propsSnap.docs.forEach((d) =>
-                    liveProposals.set(d.id, { id: d.id, ...d.data() } as Proposal)
-                  )
-                  rebuild()
-                  void ensureLegacyLockedProposals()
-                }
+              snap.docs.forEach((d) =>
+                liveSlots.set(d.id, { id: d.id, ...d.data() } as Slot)
               )
-            }
-
-            for (let i = 0; i < dayChunks.length; i++) {
-              const chunkIds = dayChunks[i]
-              const unsub = onSnapshot(
-                query(collection(db, 'slots'), where('day_id', 'in', chunkIds)),
-                (snap) => {
-                  if (cancelled) return
-                  slotDocsByChunk[i] = snap.docs.map((d) => ({
-                    id: d.id,
-                    ...d.data(),
-                  } as Slot))
-                  onSlotsMerged()
-                }
-              )
-              unsubChunks.push(unsub)
-            }
-
-            unsubSlots = () => unsubChunks.forEach((u) => u())
-          },
-          (err) => {
-            if (cancelled) return
-            // Let a refusal be retried by the next trip snapshot rather than
-            // leaving a dead listener behind: this is reachable while a join is
-            // still settling. The board is gated on `isMember` either way, so
-            // the page shows the join screen rather than an empty itinerary.
-            itinerarySubscribed = false
-            if (err?.code !== 'permission-denied') {
-              console.error('tripSubscription itinerary snapshot error:', err)
-              setError('Failed to load trip.')
-            }
-            setLoading(false)
-          }
+              slotsLoaded = true
+              rebuildWhenReady()
+            },
+            onItineraryError
+          )
         )
+
+        unsubs.push(
+          onSnapshot(
+            query(collection(db, 'proposals'), where('trip_id', '==', selectedId)),
+            (snap) => {
+              if (cancelled) return
+              liveProposals.clear()
+              snap.docs.forEach((d) =>
+                liveProposals.set(d.id, { id: d.id, ...d.data() } as Proposal)
+              )
+              rebuildWhenReady()
+              void ensureLegacyLockedProposals()
+            },
+            onItineraryError
+          )
         )
       }
 

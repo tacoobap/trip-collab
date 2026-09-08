@@ -60,26 +60,23 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
     owner_uid: OUTSIDER, member_uids: [OUTSIDER],
     created_at: '2026-01-02T00:00:00.000Z',
   })
-  // 20 days, enough to run the day chunk the app uses (10) and one twice that
-  // size, which is over the access-call budget.
+  // 20 days, enough to try a query far larger than the old chunk size.
   for (let i = 0; i < 20; i++) {
     await setDoc(doc(db, 'days', `day${i}`), {
       trip_id: TRIP, label: `Day ${i + 1}`, date: `2026-06-0${i + 1}`, day_number: i + 1,
     })
-    // modern slot: carries trip_id
     await setDoc(doc(db, 'slots', `slot${i}`), {
       trip_id: TRIP, day_id: `day${i}`, status: 'open', sort_order: 0,
     })
-    // legacy slot: no trip_id, resolvable only via its day
-    await setDoc(doc(db, 'slots', `legacy${i}`), {
-      day_id: `day${i}`, status: 'open', sort_order: 1,
+    await setDoc(doc(db, 'slots', `extra${i}`), {
+      trip_id: TRIP, day_id: `day${i}`, status: 'open', sort_order: 1,
     })
   }
   await setDoc(doc(db, 'proposals', 'prop1'), {
     trip_id: TRIP, slot_id: 'slot0', title: 'Colosseum', proposer_name: 'A', votes: [],
   })
-  await setDoc(doc(db, 'proposals', 'legacyprop'), {
-    slot_id: 'slot0', title: 'Forum', proposer_name: 'A', votes: [],
+  await setDoc(doc(db, 'proposals', 'prop2'), {
+    trip_id: TRIP, slot_id: 'slot0', title: 'Forum', proposer_name: 'A', votes: [],
   })
   for (const [coll, extra] of [
     ['collection_items', { name: 'Gelato', category: 'food', likes: [] }],
@@ -140,8 +137,6 @@ await check('days where trip_id ==', () =>
   assertSucceeds(getDocs(query(collection(member, 'days'), where('trip_id', '==', TRIP)))))
 await check('proposals where trip_id ==', () =>
   assertSucceeds(getDocs(query(collection(member, 'proposals'), where('trip_id', '==', TRIP)))))
-await check('proposals where slot_id == (legacy doc, no trip_id)', () =>
-  assertSucceeds(getDocs(query(collection(member, 'proposals'), where('slot_id', '==', 'slot0')))))
 await check('single proposal by id', () =>
   assertSucceeds(getDoc(doc(member, 'proposals', 'prop1'))))
 for (const coll of ['collection_items', 'stays', 'trip_todos']) {
@@ -149,18 +144,23 @@ for (const coll of ['collection_items', 'stays', 'trip_todos']) {
     assertSucceeds(getDocs(query(collection(member, coll), where('trip_id', '==', TRIP)))))
 }
 
-results.push('\nSlots by day_id — the access-call ceiling')
-await check('10 days of modern slots (trip_id short-circuit)', () =>
-  assertSucceeds(getDocs(query(collection(member, 'slots'), where('day_id', 'in', dayIds.slice(0, 10)), where('trip_id', '==', TRIP)))))
-await check('10 days, modern + legacy slots mixed', () =>
-  assertSucceeds(getDocs(query(collection(member, 'slots'), where('day_id', 'in', dayIds.slice(0, 10))))))
-await check('2 days, modern + legacy slots mixed', () =>
-  assertSucceeds(getDocs(query(collection(member, 'slots'), where('day_id', 'in', dayIds.slice(10, 12))))))
-// `in` spends one access call per value, so a chunk of 20 needs 21 and the rule
-// is cut off. This is what makes IN_QUERY_MAX a security constraint: it has to
-// stay under ~19 even though Firestore itself now permits 30.
-await check('20 days at once exceeds the access-call budget (guards IN_QUERY_MAX)', () =>
+// Every rule reads trip_id off the document, so a query must filter on it. That
+// costs one access call whatever the query's size — and a query that filters on
+// something else is refused at once rather than working until a trip grows past
+// some length, which is the failure mode these two pin.
+results.push('\nReads are scoped by trip_id, at any size')
+await check('slots by trip_id', () =>
+  assertSucceeds(getDocs(query(collection(member, 'slots'), where('trip_id', '==', TRIP)))))
+await check('slots by trip_id, with a day filter alongside', () =>
+  assertSucceeds(getDocs(query(collection(member, 'slots'), where('trip_id', '==', TRIP), where('day_id', 'in', dayIds.slice(0, 10))))))
+await check('slots by day_id alone are refused, however few days', () =>
+  assertFails(getDocs(query(collection(member, 'slots'), where('day_id', 'in', dayIds.slice(0, 2))))))
+await check('slots by day_id alone are refused at 20 days too', () =>
   assertFails(getDocs(query(collection(member, 'slots'), where('day_id', 'in', dayIds)))))
+await check('proposals by slot_id alone are refused', () =>
+  assertFails(getDocs(query(collection(member, 'proposals'), where('slot_id', '==', 'slot0')))))
+await check('proposals by trip_id, at any size', () =>
+  assertSucceeds(getDocs(query(collection(member, 'proposals'), where('trip_id', '==', TRIP)))))
 
 results.push('\nMember writes')
 await check('edit trip name and dates', () =>
@@ -194,8 +194,8 @@ await check('a pre-migration client, with no uid at all, still works', () =>
   })))
 await check('add a collection item', () =>
   assertSucceeds(addDoc(collection(member, 'collection_items'), { trip_id: TRIP, name: 'Trastevere', category: 'activity', likes: [] })))
-await check('update a legacy slot (no trip_id)', () =>
-  assertSucceeds(updateDoc(doc(member, 'slots', 'legacy0'), { day_id: 'day0', status: 'proposed' })))
+await check('update a slot', () =>
+  assertSucceeds(updateDoc(doc(member, 'slots', 'slot0'), { day_id: 'day0', trip_id: TRIP, status: 'proposed' })))
 
 results.push('\nOutsider writes to a trip it is not on')
 await check('cannot add a day to someone else’s trip', () =>
