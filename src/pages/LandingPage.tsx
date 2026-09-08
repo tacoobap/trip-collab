@@ -176,40 +176,28 @@ export function LandingPage() {
                 New trip
               </Button>
             </div>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {upcoming.map((trip, i) => (
-                <motion.div
-                  key={trip.slug}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <TripCard
-                    trip={trip}
-                    canDelete={trip.owner_uid === user?.uid}
-                    onRequestDelete={() => setTripToDelete(trip)}
-                  />
-                </motion.div>
-              ))}
+            {upcoming.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: upcoming.length * 0.05 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
               >
-                <button
-                  onClick={() => setNewTripOpen(true)}
-                  className="w-full h-full min-h-[110px] bg-card border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-primary/5 transition-all cursor-pointer touch-manipulation max-sm:min-h-[120px]"
-                  aria-label="Plan a new trip"
-                >
-                  <Plus className="w-6 h-6" />
-                  <span className="text-base font-medium">Plan a new trip</span>
-                </button>
+                {upcoming.map((trip, i) => (
+                  <motion.div
+                    key={trip.slug}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <TripCard
+                      trip={trip}
+                      canDelete={trip.owner_uid === user?.uid}
+                      onRequestDelete={() => setTripToDelete(trip)}
+                    />
+                  </motion.div>
+                ))}
               </motion.div>
-            </motion.div>
+            )}
 
             {past.length > 0 && (
               <>
