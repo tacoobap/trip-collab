@@ -27,6 +27,15 @@
  *   variable the Netlify functions authenticate with, so you can reuse the
  *   value that's already set there instead of minting a second key.
  *
+ * A name the roster can't account for — data imported from elsewhere, where
+ * someone was recorded as "Tyler" but signs in as "Tyler Beck" — can be mapped
+ * by hand with ALIASES, as `name=uid` pairs:
+ *
+ *   ALIASES='Tyler=AbC123...' TRIP_SLUG=old-trip node scripts/migrate-identities.mjs
+ *
+ * An alias is only honoured on a trip whose members include that uid, so a
+ * mistyped one is skipped rather than handing a stranger someone's votes.
+ *
  * Usage — dry run first, which writes nothing and prints what it would do:
  *   TRIP_SLUG=your-trip-slug node scripts/migrate-identities.mjs
  *   ALL_TRIPS=1 node scripts/migrate-identities.mjs
@@ -43,6 +52,22 @@ import { getFirestore } from 'firebase-admin/firestore'
 const tripSlug = process.env.TRIP_SLUG
 const allTrips = process.env.ALL_TRIPS === '1'
 const apply = process.env.APPLY === '1'
+
+/** name -> uid, for names the trip rosters can't resolve on their own. */
+const aliases = new Map(
+  (process.env.ALIASES ?? '')
+    .split(',')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const at = pair.indexOf('=')
+      if (at < 1) {
+        console.error(`ALIASES entries look like "Name=uid"; got: ${pair}`)
+        process.exit(1)
+      }
+      return [pair.slice(0, at).trim().toLowerCase(), pair.slice(at + 1).trim()]
+    })
+)
 
 if (!tripSlug && !allTrips) {
   console.error('Set TRIP_SLUG=<slug>, or ALL_TRIPS=1 to sweep every trip.')
@@ -103,6 +128,14 @@ async function migrateTrip(tripDoc) {
     } else {
       byName.set(key, profile.id)
     }
+  }
+
+  // Aliases apply only where the uid is genuinely on this trip: an alias is a
+  // hand-supplied guess, and this is what stops a typo assigning one person's
+  // likes to someone who was never there.
+  for (const [name, uid] of aliases) {
+    if (!memberUids.includes(uid)) continue
+    if (!byName.has(name)) byName.set(name, uid)
   }
 
   /** name -> uid, or null when it can't be resolved and must be left alone. */
